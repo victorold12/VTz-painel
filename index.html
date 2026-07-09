@@ -469,6 +469,96 @@
     #chat-log{padding:24px 32px;}
   }
 
+  /* ---------- Menu de ações da mensagem (estilo Claude) ---------- */
+  .msg-menu-overlay{position:fixed; inset:0; background:rgba(0,0,0,.45); backdrop-filter:blur(2px); z-index:60; display:none; align-items:flex-end; justify-content:center;}
+  .msg-menu-overlay.open{display:flex;}
+  .msg-menu{
+    background:var(--glass-modal); backdrop-filter:blur(30px) saturate(160%); -webkit-backdrop-filter:blur(30px) saturate(160%);
+    border:1px solid var(--line); border-radius:24px 24px 0 0; width:100%; max-width:480px;
+    padding:16px 12px calc(16px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:2px;
+  }
+  .msg-menu-item{
+    display:flex; align-items:center; gap:16px; background:transparent; border:none; color:var(--text);
+    font-size:16px; font-weight:500; padding:14px 16px; border-radius:14px; cursor:pointer; text-align:left; transition:.12s;
+  }
+  .msg-menu-item:hover{background:var(--w06);}
+  .msg-menu-item svg.icon{width:21px; height:21px; color:var(--text);}
+  .msg-menu-item.done{color:var(--violet);}
+  .msg-menu-item.done svg.icon{color:var(--violet);}
+
+  /* ---------- Badge RouteLLM (estilo screenshot: ícone + "RouteLLM ► Modelo") ---------- */
+  .router-badge{
+    display:flex; align-items:center; gap:10px; max-width:820px; margin:0 auto; width:100%;
+    color:var(--text-dim); font-size:13.5px; padding:2px 0;
+  }
+  .router-badge .rb-icon{
+    width:30px; height:30px; border-radius:50%; flex-shrink:0;
+    background:linear-gradient(135deg,var(--violet),#3b2a7a); border:1px solid rgba(255,255,255,.25);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .router-badge .rb-icon svg.icon{width:14px; height:14px; color:#fff;}
+  .router-badge .rb-model{font-weight:600; color:var(--text-dim);}
+
+  /* ---------- Anexos no composer ---------- */
+  .attach-chips{display:flex; flex-wrap:wrap; gap:6px; padding:0 16px 8px;}
+  .attach-chip{
+    display:flex; align-items:center; gap:6px; background:var(--glass-card); border:1px solid var(--line);
+    border-radius:10px; padding:5px 8px; font-size:11.5px; color:var(--text-dim); max-width:220px;
+  }
+  .attach-chip svg.icon{width:13px; height:13px; flex-shrink:0; color:var(--violet);}
+  .attach-chip .an{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .attach-chip .rm{background:none; border:none; color:var(--text-faint); cursor:pointer; padding:2px; display:flex;}
+  .attach-chip .rm svg.icon{width:11px; height:11px; color:var(--text-faint);}
+  .msg-att-note{font-size:10.5px; color:var(--text-faint); margin-top:4px; font-family:var(--mono);}
+
+  /* ---------- Toasts / typing / stop / a11y ---------- */
+  #toasts{position:fixed; top:calc(14px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:90; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; width:min(92vw,420px);}
+  .toast{
+    background:var(--glass-modal); backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%);
+    border:1px solid var(--line); color:var(--text); padding:10px 16px; border-radius:12px; font-size:13px;
+    box-shadow:0 8px 30px rgba(0,0,0,.35); transition:opacity .3s; text-align:center;
+  }
+  .toast.warn{border-color:rgba(255,180,84,.45);}
+  .toast.err{border-color:rgba(255,107,107,.55);}
+  .typing{display:inline-flex; gap:4px; padding:4px 2px; align-items:center;}
+  .typing span{width:6px; height:6px; border-radius:50%; background:var(--text-dim); animation:blink 1.2s infinite;}
+  .typing span:nth-child(2){animation-delay:.2s;}
+  .typing span:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,80%,100%{opacity:.25} 40%{opacity:1}}
+  /* "Pensando..." com shimmer (estilo Claude) */
+  .thinking-label{
+    font-size:14px; font-weight:500;
+    background:linear-gradient(90deg, var(--text-faint) 20%, var(--text) 50%, var(--text-faint) 80%);
+    background-size:200% 100%;
+    -webkit-background-clip:text; background-clip:text;
+    color:transparent; -webkit-text-fill-color:transparent;
+    animation:shimmer 1.8s linear infinite;
+  }
+  @keyframes shimmer{from{background-position:200% 0} to{background-position:-200% 0}}
+  @media (prefers-reduced-motion: reduce){ .thinking-label{animation:none; color:var(--text-dim); -webkit-text-fill-color:var(--text-dim);} }
+  /* copiar por bloco de código */
+  .code-wrap{position:relative;}
+  .code-wrap pre{padding-right:44px;}
+  .code-copy{
+    position:absolute; top:8px; right:8px; display:flex; align-items:center; justify-content:center;
+    background:var(--w08); border:1px solid var(--line); color:var(--text-dim);
+    border-radius:8px; padding:6px; cursor:pointer; opacity:.75; transition:.15s;
+  }
+  .code-copy:hover{opacity:1; color:var(--text);}
+  .code-copy.ok{color:#4ade80; border-color:rgba(74,222,128,.4); opacity:1;}
+  .code-copy svg.icon{width:14px; height:14px;}
+  .composer textarea:disabled{opacity:.55; cursor:not-allowed;}
+  .agent-card .icon .agent-photo{width:30px; height:30px; border-radius:9px; object-fit:cover; display:block;}
+  .msg-av img{width:100%; height:100%; object-fit:cover; border-radius:9px; display:block;}
+  .msg-menu-title{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--text-faint); padding:6px 16px 10px;}
+  .round-btn.send.stop{background:var(--danger); box-shadow:0 4px 16px rgba(255,107,107,.4);}
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible{
+    outline:2px solid var(--violet); outline-offset:2px;
+  }
+  button{transition:transform .1s ease;}
+  button:active{transform:scale(.97);}
+  .sidebar, .picker-sheet, .msg-menu, .modal{will-change:transform;}
+
   ::-webkit-scrollbar{width:0px;}
 </style>
 </head>
@@ -506,9 +596,11 @@
         <span id="tools-status"></span>
         <button id="view-system-btn" style="margin-left:auto; display:flex; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg> system prompt</button>
       </div>
+      <div class="attach-chips" id="attach-chips"></div>
       <div class="composer-wrap">
         <div class="composer">
-          <button class="round-btn plus" id="plus-btn" title="Em breve: anexos">+</button>
+          <button class="round-btn plus" id="plus-btn" title="Anexar arquivos">+</button>
+          <input type="file" id="attach-input" multiple accept="image/*,application/pdf,audio/*,video/*,text/*,.md,.csv,.json" style="display:none;">
           <textarea id="chat-input" rows="1" placeholder="Escreva algo..."></textarea>
           <button class="round-btn mic" id="mic-btn" title="Ditar"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
           <button class="round-btn send" id="send-btn"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></button>
@@ -558,7 +650,20 @@
         <p class="hint" id="cost-detail">Total gasto (estimado): $0.0000</p>
         <label class="hint" style="display:block; margin:12px 0 4px;">Câmbio USD → BRL (usado nos preços do seletor de modelos)</label>
         <input type="text" id="usd-brl-input" inputmode="decimal" style="font-family:var(--mono); max-width:120px;">
+        <label class="hint" style="display:block; margin:12px 0 4px;">Janela de contexto (mensagens reenviadas por chamada — menor = mais barato)</label>
+        <select id="ctx-window-select" style="max-width:220px;">
+          <option value="12">12 mensagens (econômico)</option>
+          <option value="24">24 mensagens (padrão)</option>
+          <option value="48">48 mensagens</option>
+          <option value="0">Tudo (mais caro)</option>
+        </select>
         <button class="danger" id="reset-cost-btn" style="margin-top:10px;">Zerar contador</button>
+      </div>
+      <div class="cfg-group">
+        <h3>Estilo de resposta (system prompt global)</h3>
+        <p class="hint" style="margin-bottom:10px;">Injetado em toda conversa, antes de agentes e skills — é aqui que você "treina" o comportamento das respostas. Edite à vontade.</p>
+        <textarea id="global-prompt-input" style="width:100%; min-height:140px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:12.5px; line-height:1.55; resize:vertical;"></textarea>
+        <button id="global-prompt-reset" style="margin-top:8px;">Restaurar padrão</button>
       </div>
       <div class="cfg-group">
         <h3>Backup</h3>
@@ -656,13 +761,42 @@
   </div>
 </div>
 
+<!-- Toasts -->
+<div id="toasts" aria-live="polite"></div>
+
+<!-- Modal de renomear conversa -->
+<div class="modal-overlay" id="rename-modal" style="display:none;">
+  <div class="modal">
+    <h2>Renomear conversa</h2>
+    <input type="text" id="rename-input" style="font-family:var(--sans);" maxlength="60">
+    <div class="row-btns">
+      <button class="secondary" id="rename-cancel">Cancelar</button>
+      <button id="rename-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Menu de ações da mensagem (estilo Claude) -->
+<div class="msg-menu-overlay" id="msg-menu-overlay">
+  <div class="msg-menu" id="msg-menu"></div>
+</div>
+
+<!-- Modal de selecionar texto -->
+<div class="modal-overlay" id="select-text-modal" style="display:none;">
+  <div class="modal wide">
+    <h2>Selecionar texto</h2>
+    <textarea id="select-text-area" readonly style="min-height:220px; font-family:var(--sans); font-size:14px;"></textarea>
+    <button id="select-text-close">Fechar</button>
+  </div>
+</div>
+
 <!-- Agent modal -->
 <div class="modal-overlay" id="agent-modal" style="display:none;">
   <div class="modal wide">
     <h2 id="agent-modal-title">Novo Agente</h2>
     <p>Um agente é uma conversa que já começa com um system prompt fixo — seu "modo" pra uma tarefa recorrente.</p>
     <div style="display:flex; gap:10px; align-items:center; margin-bottom:14px;">
-      <span id="agent-icon-preview" style="width:40px; height:40px; border-radius:10px; background:rgba(139,92,246,.12); display:flex; align-items:center; justify-content:center; flex-shrink:0;"></span>
+      <span id="agent-icon-preview" style="width:40px; height:40px; border-radius:10px; background:rgba(139,92,246,.12); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden;"></span>
       <select id="agent-icon-input" style="margin-bottom:0;">
         <option value="bot">Genérico</option>
         <option value="bank">Institucional</option>
@@ -675,9 +809,16 @@
         <option value="chat">Comunicação</option>
       </select>
     </div>
+    <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <button class="secondary" id="agent-photo-btn" type="button" style="width:auto; padding:9px 14px; font-size:12px;">Enviar foto</button>
+      <button class="secondary" id="agent-photo-remove" type="button" style="width:auto; padding:9px 14px; font-size:12px;">Remover foto</button>
+      <input type="file" id="agent-photo-input" accept="image/*" style="display:none;">
+    </div>
     <input type="text" id="agent-name-input" placeholder="Nome do agente">
     <input type="text" id="agent-desc-input" placeholder="Descrição curta (aparece no card)">
-    <textarea id="agent-prompt-input" placeholder="System prompt completo..."></textarea>
+    <textarea id="agent-prompt-input" placeholder="System prompt completo... (o papel dele)"></textarea>
+    <label class="hint" style="display:block; margin:0 0 4px;">Modelo de IA deste agente</label>
+    <select id="agent-model-select"></select>
     <div class="row-btns">
       <button class="secondary" id="agent-cancel-btn">Cancelar</button>
       <button id="agent-save-btn">Salvar</button>
@@ -720,6 +861,16 @@ const ICONS = {
   moon: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
   chart: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="19" y1="20" x2="19" y2="9"/></svg>',
   copy: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  more: '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+  refresh: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>',
+  wand: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4l5 5L7 22l-5-5z"/><line x1="14" y1="7" x2="17" y2="10"/><line x1="19" y1="2" x2="19" y2="4"/><line x1="22" y1="5" x2="20" y2="5"/></svg>',
+  thumbUp: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88L14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88z"/></svg>',
+  thumbDown: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12L10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88z"/></svg>',
+  selectText: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M13 13l7 7"/><path d="M17 17l3 3 1-4-4 1z" fill="currentColor" stroke="none"/></svg>',
+  paperclip: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>',
+  close: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  file: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>',
+  stopSq: '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
 };
 function iconHTML(name){ return ICONS[name] || ICONS.bot; }
 /* migra ícones antigos em emoji (versões anteriores do painel) pros novos ícones SVG */
@@ -743,7 +894,172 @@ const state = {
   usdToBrl: parseFloat(localStorage.getItem('vtz_usd_brl') || '5.50'),
   theme: localStorage.getItem('vtz_theme') || 'dark',
   pickerSort: 'default',
+  pendingAttachments: [],
+  ctxWindow: parseInt(localStorage.getItem('vtz_ctx_window') || '24', 10),
+  gens: {}, // convId -> AbortController (gerações ativas, uma por conversa)
 };
+
+/* ---------- Helpers de conteúdo multimodal ---------- */
+/* Extrai texto plano de content (string ou array de parts) */
+function contentToText(content){
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) return content.filter(p => p.type === 'text').map(p => p.text).join('\n');
+  return '';
+}
+/* Converte um File em part da API OpenRouter. Suporte real:
+   imagem (image_url), PDF (file), áudio (input_audio), texto (inline no prompt).
+   Vídeo: só alguns modelos (Gemini) aceitam — enviado como file, pode falhar em outros. */
+function fileToPart(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Falha ao ler ' + file.name));
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      if (file.type.startsWith('image/')){
+        resolve({ type:'image_url', image_url:{ url: dataUrl } });
+      } else if (file.type === 'application/pdf'){
+        resolve({ type:'file', file:{ filename: file.name, file_data: dataUrl } });
+      } else if (file.type.startsWith('audio/')){
+        const fmt = file.type.includes('wav') ? 'wav' : 'mp3';
+        resolve({ type:'input_audio', input_audio:{ data: dataUrl.split(',')[1], format: fmt } });
+      } else if (file.type.startsWith('video/')){
+        resolve({ type:'file', file:{ filename: file.name, file_data: dataUrl } });
+      } else {
+        // texto/código: inline como parte de texto
+        const txtReader = new FileReader();
+        txtReader.onload = () => resolve({ type:'text', text:`[Arquivo: ${file.name}]\n${txtReader.result}` });
+        txtReader.onerror = () => reject(new Error('Falha ao ler ' + file.name));
+        txtReader.readAsText(file);
+        return;
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+/* Remove campos internos (_router, _feedback, _att) antes de mandar pra API */
+function sanitizeForApi(messages){
+  return messages.map(m => {
+    const { _router, _feedback, _att, ...rest } = m;
+    return rest;
+  });
+}
+/* Chips de anexo no composer */
+function renderAttachChips(){
+  const el = document.getElementById('attach-chips');
+  if (!el) return;
+  el.innerHTML = '';
+  state.pendingAttachments.forEach((f, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'attach-chip';
+    const kb = f.size > 1048576 ? (f.size/1048576).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB';
+    chip.innerHTML = `${iconHTML('file')}<span class="an">${esc(f.name)}</span><span style="color:var(--text-faint)">${kb}</span><button class="rm" aria-label="Remover anexo">${iconHTML('close')}</button>`;
+    chip.querySelector('.rm').onclick = () => { state.pendingAttachments.splice(i,1); renderAttachChips(); };
+    el.appendChild(chip);
+  });
+}
+
+/* ---------- Núcleo compartilhado (dedupe) ---------- */
+/* Escapa HTML de qualquer valor vindo do usuário ou da API antes de entrar em innerHTML */
+function esc(s){
+  const d = document.createElement('div');
+  d.textContent = String(s ?? '');
+  return d.innerHTML;
+}
+function debounce(fn, ms){
+  let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+/* Toast não-bloqueante (substitui alert nos fluxos não-destrutivos) */
+function toast(msg, type){
+  const wrap = document.getElementById('toasts');
+  if (!wrap){ console.log('[toast]', msg); return; }
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' ' + type : '');
+  el.setAttribute('role','status');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3200);
+}
+/* Chamada única à API de chat — todas as features passam por aqui */
+function orFetch(payload, opts = {}){
+  return fetch(OR_BASE + '/chat/completions', {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':'Bearer ' + state.apiKey,
+      'HTTP-Referer': location.origin || 'https://vtz-panel.local',
+      'X-Title': SITE_TITLE,
+    },
+    body: JSON.stringify(payload),
+    signal: opts.signal,
+  });
+}
+/* Contabilidade de custo unificada */
+function trackUsage(usage, modelId){
+  if (!usage) return;
+  const pricing = getModelPricing(modelId);
+  state.totalCost += (usage.prompt_tokens||0)*pricing.prompt + (usage.completion_tokens||0)*pricing.completion;
+  localStorage.setItem('vtz_or_cost', String(state.totalCost));
+  updateCostBadge();
+}
+/* Estado do composer depende da CONVERSA visível: se ela está gerando, input trava
+   e o botão vira "parar" — outras conversas continuam livres pra digitar e enviar */
+function updateComposerState(){
+  const busy = !!state.gens[state.currentConvId];
+  const input = document.getElementById('chat-input');
+  const btn = document.getElementById('send-btn');
+  if (!input || !btn) return;
+  input.disabled = busy;
+  input.placeholder = busy ? 'Gerando resposta nesta conversa…' : 'Escreva algo...';
+  btn.classList.toggle('stop', busy);
+  btn.innerHTML = busy ? iconHTML('stopSq') : iconHTML('send');
+  btn.setAttribute('aria-label', busy ? 'Parar geração' : 'Enviar mensagem');
+}
+/* Linha "Pensando..." (shimmer estilo Claude) que vira a resposta em streaming.
+   Só toca no DOM se a conversa dela estiver visível — resposta de outra conversa
+   nunca vaza pra tela errada. */
+function createThinkingRow(conv){
+  if (conv.id !== state.currentConvId){
+    return { el:null, update(){}, remove(){} };
+  }
+  const log = document.getElementById('chat-log');
+  document.getElementById('empty-state').style.display = 'none';
+  log.style.display = 'flex';
+  const agentAv = conv.agentId ? state.agents.find(a => a.id === conv.agentId) : null;
+  const row = document.createElement('div');
+  row.className = 'msg-row';
+  row.innerHTML = `<div class="msg-av ai">${agentAv?.photo ? `<img src="${agentAv.photo}" alt="">` : iconHTML('sparkle')}</div>
+    <div class="msg-body"><div class="msg-sender">VTZ</div>
+    <div class="msg assistant"><span class="thinking-label">Pensando…</span></div></div>`;
+  log.appendChild(row);
+  log.scrollTop = log.scrollHeight;
+  const bubble = row.querySelector('.msg.assistant');
+  return {
+    el: row,
+    update(text){ bubble.innerHTML = safeRenderMarkdown(text); log.scrollTop = log.scrollHeight; },
+    remove(){ row.remove(); }
+  };
+}
+/* Botão de copiar em cada bloco de código dentro da mensagem */
+function enhanceCodeBlocks(scope){
+  scope.querySelectorAll('pre').forEach(pre => {
+    if (pre.parentElement && pre.parentElement.classList.contains('code-wrap')) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'code-wrap';
+    pre.replaceWith(wrap);
+    wrap.appendChild(pre);
+    const btn = document.createElement('button');
+    btn.className = 'code-copy';
+    btn.setAttribute('aria-label','Copiar este bloco');
+    btn.innerHTML = iconHTML('copy');
+    btn.onclick = () => {
+      navigator.clipboard.writeText(pre.innerText).then(() => {
+        btn.classList.add('ok');
+        setTimeout(() => btn.classList.remove('ok'), 1200);
+      }).catch(() => {});
+    };
+    wrap.appendChild(btn);
+  });
+}
 
 /* seed de skills na primeira execução */
 if (localStorage.getItem('vtz_skills') === null){
@@ -753,6 +1069,21 @@ if (localStorage.getItem('vtz_skills') === null){
     { id: uid(), name:'Incubadora Maricá', trigger:'incubadora, evento, maricá, relatório', instructions:'Contexto: mapeamento de eventos e relatórios para 5 empresas incubadas em Maricá-RJ. Tom objetivo, formatação clara com headers, atenção à sensibilidade política local.', active:false },
   ];
   localStorage.setItem('vtz_skills', JSON.stringify(state.skills));
+}
+
+/* ---------- System prompt global — o "treino" das respostas ----------
+   Não existe fine-tuning client-side; o mecanismo real é este prompt, injetado
+   ANTES de agente e skills em toda conversa. Editável em Config. */
+const DEFAULT_GLOBAL_PROMPT = `Você é o VTZ, assistente pessoal do Victor Hugo. Regras de resposta:
+1. Responda em português brasileiro, direto e sem enrolação — zero preâmbulo tipo "Claro! Aqui está".
+2. Se a resposta cabe em um parágrafo denso, não escreva três.
+3. Não concorde automaticamente: se houver erro ou opção melhor, aponte com justificativa técnica.
+4. Em decisões, apresente comparação objetiva e indique a superior (Pareto: máximo retorno, mínimo esforço).
+5. Código sempre pronto para produção, comentado onde importa; automação Windows acompanha .bat de execução e mudanças reversíveis.
+6. Headers e listas só quando facilitarem leitura rápida.
+7. Se não souber, diga que não sabe — nunca invente dados.`;
+if (localStorage.getItem('vtz_global_prompt') === null){
+  localStorage.setItem('vtz_global_prompt', DEFAULT_GLOBAL_PROMPT);
 }
 
 /* seed de agentes na primeira execução — depois disso são 100% editáveis via CRUD */
@@ -989,6 +1320,30 @@ document.addEventListener('DOMContentLoaded', () => {
     chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
   });
 
+  // anexos: + abre o picker; chips com remover
+  document.getElementById('plus-btn').onclick = () => document.getElementById('attach-input').click();
+  document.getElementById('attach-input').addEventListener('change', (e) => {
+    const MAX_TOTAL = 20 * 1024 * 1024; // 20MB total (base64 infla ~33%)
+    let total = state.pendingAttachments.reduce((n,f) => n + f.size, 0);
+    for (const f of e.target.files){
+      if (total + f.size > MAX_TOTAL){ toast(`Limite de 20MB — "${f.name}" não foi adicionado.`, 'err'); continue; }
+      if (f.type.startsWith('video/')) toast(`Vídeo só funciona em modelos com suporte (ex: Gemini).`, 'warn');
+      state.pendingAttachments.push(f);
+      total += f.size;
+    }
+    e.target.value = '';
+    renderAttachChips();
+  });
+
+  // menu de mensagem e select text: fechar
+  document.getElementById('msg-menu-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'msg-menu-overlay') closeMsgMenu();
+  });
+  document.getElementById('select-text-close').onclick = () => { document.getElementById('select-text-modal').style.display = 'none'; };
+  document.getElementById('select-text-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'select-text-modal') e.target.style.display = 'none';
+  });
+
   updateSessionPanel();
 
   ensureConversation();
@@ -1012,7 +1367,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('picker-overlay').addEventListener('click', (e) => {
     if (e.target.id === 'picker-overlay') closePicker();
   });
-  document.getElementById('picker-search-input').addEventListener('input', renderPickerList);
+  document.getElementById('picker-search-input').addEventListener('input', debounce(renderPickerList, 120));
 
   // api key modal
   document.getElementById('modal-save-btn').onclick = () => {
@@ -1021,7 +1376,32 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // chat
-  document.getElementById('send-btn').onclick = sendMessage;
+  document.getElementById('send-btn').onclick = () => {
+    const gen = state.gens[state.currentConvId];
+    if (gen){ gen.abort(); return; }
+    sendMessage();
+  };
+
+  // Acessibilidade: rótulos nos botões de ícone e papel de diálogo nos overlays
+  const ARIA = { 'menu-btn':'Abrir menu', 'theme-btn':'Alternar tema claro/escuro', 'mic-btn':'Ditar por voz',
+    'send-btn':'Enviar mensagem', 'plus-btn':'Anexar arquivos', 'model-picker-btn':'Selecionar modelo de IA' };
+  Object.entries(ARIA).forEach(([id, label]) => document.getElementById(id)?.setAttribute('aria-label', label));
+  ['picker-overlay','msg-menu-overlay','key-modal','skill-modal','agent-modal','select-text-modal','rename-modal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el){ el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); }
+  });
+
+  // Atalhos: Esc fecha overlays; Ctrl/Cmd+K abre o seletor de modelos
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape'){
+      closeMsgMenu(); closePicker(); toggleSidebar(false);
+      ['select-text-modal','skill-modal','agent-modal','rename-modal'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.style.display !== 'none') el.style.display = 'none';
+      });
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){ e.preventDefault(); openPicker(); }
+  });
   document.getElementById('chat-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
@@ -1062,16 +1442,59 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('agent-cancel-btn').onclick = closeAgentModal;
   document.getElementById('agent-save-btn').onclick = saveAgentFromModal;
   document.getElementById('agent-icon-input').addEventListener('change', updateAgentIconPreview);
+  document.getElementById('agent-photo-btn').onclick = () => document.getElementById('agent-photo-input').click();
+  document.getElementById('agent-photo-input').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try{ agentPhotoDraft = await fileToAvatar(f); updateAgentIconPreview(); }
+    catch(err){ toast('Erro na foto: ' + err.message, 'err'); }
+  });
+  document.getElementById('agent-photo-remove').onclick = () => { agentPhotoDraft = null; updateAgentIconPreview(); };
+
+  const gpInput = document.getElementById('global-prompt-input');
+  gpInput.value = localStorage.getItem('vtz_global_prompt') || '';
+  gpInput.addEventListener('change', () => {
+    localStorage.setItem('vtz_global_prompt', gpInput.value);
+    toast('Estilo de resposta salvo.');
+  });
+  document.getElementById('global-prompt-reset').onclick = () => {
+    gpInput.value = DEFAULT_GLOBAL_PROMPT;
+    localStorage.setItem('vtz_global_prompt', DEFAULT_GLOBAL_PROMPT);
+    toast('Estilo restaurado pro padrão.');
+  };
   document.getElementById('agent-modal').addEventListener('click', (e) => { if (e.target.id === 'agent-modal') closeAgentModal(); });
 
-  // busca no histórico
-  document.getElementById('history-search-input').addEventListener('input', renderHistoryList);
+  // busca no histórico (debounced)
+  document.getElementById('history-search-input').addEventListener('input', debounce(renderHistoryList, 120));
+
+  // rename modal
+  document.getElementById('rename-cancel').onclick = () => { document.getElementById('rename-modal').style.display = 'none'; };
+  document.getElementById('rename-save').onclick = () => {
+    const modal = document.getElementById('rename-modal');
+    const conv = state.conversations.find(c => c.id === modal.dataset.convId);
+    const nv = document.getElementById('rename-input').value.trim();
+    if (conv && nv){ conv.title = nv; persistConversations(); renderHistoryList(); }
+    modal.style.display = 'none';
+  };
+  document.getElementById('rename-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('rename-save').click();
+  });
+
+  // janela de contexto
+  const ctxSel = document.getElementById('ctx-window-select');
+  ctxSel.value = String(state.ctxWindow);
+  ctxSel.onchange = () => {
+    state.ctxWindow = parseInt(ctxSel.value, 10);
+    localStorage.setItem('vtz_ctx_window', String(state.ctxWindow));
+    toast(state.ctxWindow ? `Contexto limitado às últimas ${state.ctxWindow} mensagens` : 'Contexto completo (mais caro)');
+  };
 
   // transparência: ver system prompt ativo
   document.getElementById('view-system-btn').onclick = () => {
     const conv = getCurrentConv();
     const sp = conv ? buildSystemPrompt(conv) : null;
-    alert(sp || 'Nenhum system prompt ativo nesta conversa (sem agente e sem skill acionada).');
+    openSelectText(sp || 'Nenhum system prompt ativo nesta conversa (sem agente e sem skill acionada).');
   };
 
   // backup / restore
@@ -1122,7 +1545,7 @@ function newConversation(silent){
   if (!silent){ renderHistoryList(); renderChat(); switchView('chat'); }
 }
 function startAgentConversation(agent){
-  const conv = { id: uid(), title: agent.name, messages:[], updatedAt: Date.now(), systemPrompt: agent.systemPrompt, agentId: agent.id };
+  const conv = { id: uid(), title: agent.name, messages:[], updatedAt: Date.now(), systemPrompt: agent.systemPrompt, agentId: agent.id, model: agent.model || '' };
   state.conversations.unshift(conv);
   state.currentConvId = conv.id;
   persistConversations();
@@ -1136,6 +1559,7 @@ function selectConversation(id){
   renderHistoryList();
   renderChat();
   switchView('chat');
+  toggleSidebar(false);
 }
 function deleteConversation(id){
   state.conversations = state.conversations.filter(c => c.id !== id);
@@ -1150,11 +1574,46 @@ function deleteConversation(id){
 function renameConversation(id){
   const conv = state.conversations.find(c => c.id === id);
   if (!conv) return;
-  const nv = prompt('Renomear conversa:', conv.title);
-  if (nv && nv.trim()){ conv.title = nv.trim(); persistConversations(); renderHistoryList(); }
+  const modal = document.getElementById('rename-modal');
+  document.getElementById('rename-input').value = conv.title;
+  modal.dataset.convId = id;
+  modal.style.display = 'flex';
+  document.getElementById('rename-input').focus();
+}
+/* Menu de ações da conversa (substitui o prompt de texto) */
+function openConvMenu(convId){
+  const conv = state.conversations.find(c => c.id === convId);
+  if (!conv) return;
+  const menu = document.getElementById('msg-menu');
+  menu.innerHTML = '';
+  const items = [
+    { icon:'wand', label:'Renomear', run: () => renameConversation(convId) },
+    { icon:'file', label:'Exportar .md', run: () => exportConversationMarkdown(conv) },
+    { icon:'close', label:'Excluir conversa', run: () => { if (confirm(`Excluir "${conv.title}"?`)) deleteConversation(convId); } },
+  ];
+  items.forEach(it => {
+    const btn = document.createElement('button');
+    btn.className = 'msg-menu-item';
+    btn.innerHTML = iconHTML(it.icon) + ' ' + esc(it.label);
+    btn.onclick = () => { closeMsgMenu(); it.run(); };
+    menu.appendChild(btn);
+  });
+  document.getElementById('msg-menu-overlay').classList.add('open');
 }
 function persistConversations(){
-  localStorage.setItem('vtz_conversations', JSON.stringify(state.conversations));
+  // Anexos (base64) ficam só em memória na sessão — persistir estouraria o localStorage.
+  // Ao salvar, content multimodal vira texto + nota dos anexos.
+  const stripped = state.conversations.map(c => ({
+    ...c,
+    messages: c.messages.map(m => {
+      if (Array.isArray(m.content)){
+        const names = (m._att || []).join(', ');
+        return { ...m, content: contentToText(m.content) + (names ? `\n[anexos enviados: ${names}]` : '') };
+      }
+      return m;
+    })
+  }));
+  localStorage.setItem('vtz_conversations', JSON.stringify(stripped));
   localStorage.setItem('vtz_current_conv', state.currentConvId || '');
   updateSessionPanel();
 }
@@ -1174,7 +1633,7 @@ function renderHistoryList(){
   if (query){
     sorted = sorted.filter(conv =>
       conv.title.toLowerCase().includes(query) ||
-      conv.messages.some(m => (m.content||'').toLowerCase().includes(query))
+      conv.messages.some(m => contentToText(m.content||'').toLowerCase().includes(query))
     );
   }
   if (!sorted.length){
@@ -1211,10 +1670,7 @@ function renderHistoryList(){
     menu.textContent = '⋯';
     menu.onclick = (e) => {
       e.stopPropagation();
-      const action = prompt('Digite "renomear", "excluir" ou "exportar":');
-      if (action === 'renomear') renameConversation(conv.id);
-      else if (action === 'excluir') deleteConversation(conv.id);
-      else if (action === 'exportar') exportConversationMarkdown(conv);
+      openConvMenu(conv.id);
     };
     item.appendChild(titleSpan);
     item.appendChild(menu);
@@ -1224,8 +1680,8 @@ function renderHistoryList(){
 function exportConversationMarkdown(conv){
   let md = `# ${conv.title}\n\n`;
   conv.messages.forEach(m => {
-    if (m.role === 'user') md += `**Você:**\n${m.content}\n\n`;
-    else if (m.role === 'assistant') md += `**Assistente:**\n${m.content}\n\n`;
+    if (m.role === 'user') md += `**Você:**\n${contentToText(m.content)}\n\n`;
+    else if (m.role === 'assistant') md += `**Assistente:**\n${contentToText(m.content)}\n\n`;
   });
   const blob = new Blob([md], {type:'text/markdown'});
   const a = document.createElement('a');
@@ -1278,9 +1734,9 @@ function importBackup(file){
       try{ renderAgents(); }catch(e){ console.error('Erro ao renderizar agentes após import:', e); }
       try{ populateRouterSelects(); }catch(e){ console.error('Erro ao popular selects de router após import:', e); }
 
-      alert('Backup importado com sucesso.');
+      toast('Backup importado com sucesso.');
     }catch(err){
-      alert('Erro ao importar backup: ' + err.message);
+      toast('Erro ao importar backup: ' + err.message, 'err');
     }
   };
   reader.readAsText(file);
@@ -1304,14 +1760,14 @@ function renderAgents(){
     card.className = 'agent-card';
     card.innerHTML = `
       <div class="agent-card-top">
-        <div class="icon">${iconHTML(agent.icon)}</div>
+        <div class="icon">${agent.photo ? `<img src="${agent.photo}" alt="" class="agent-photo">` : iconHTML(agent.icon)}</div>
         <div class="agent-card-actions">
           <button class="edit-agent-btn">Editar</button>
           <button class="delete-agent-btn">Excluir</button>
         </div>
       </div>
-      <div class="name">${agent.name}</div>
-      <div class="desc">${agent.desc}</div>
+      <div class="name">${esc(agent.name)}</div>
+      <div class="desc">${esc(agent.desc)}</div>
     `;
     card.querySelector('.edit-agent-btn').onclick = (e) => { e.stopPropagation(); openAgentModal(agent); };
     card.querySelector('.delete-agent-btn').onclick = (e) => {
@@ -1326,9 +1782,36 @@ function renderAgents(){
     el.appendChild(card);
   });
 }
+let agentPhotoDraft = null; // dataURL da foto em edição no modal
 function updateAgentIconPreview(){
-  const key = document.getElementById('agent-icon-input').value;
-  document.getElementById('agent-icon-preview').innerHTML = iconHTML(key);
+  const prev = document.getElementById('agent-icon-preview');
+  if (agentPhotoDraft){
+    prev.innerHTML = `<img src="${agentPhotoDraft}" alt="" style="width:100%;height:100%;object-fit:cover;">`;
+  } else {
+    prev.innerHTML = iconHTML(document.getElementById('agent-icon-input').value);
+  }
+}
+/* Redimensiona a foto pra 96px (dataURL pequeno — cabe no localStorage) */
+function fileToAvatar(file){
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error('Falha ao ler a imagem'));
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Imagem inválida'));
+      img.onload = () => {
+        const s = 96, c = document.createElement('canvas');
+        c.width = s; c.height = s;
+        const x = c.getContext('2d');
+        const r = Math.max(s/img.width, s/img.height);
+        const w = img.width*r, h = img.height*r;
+        x.drawImage(img, (s-w)/2, (s-h)/2, w, h);
+        resolve(c.toDataURL('image/jpeg', .82));
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
 }
 function openAgentModal(existing){
   document.getElementById('agent-modal-title').textContent = existing ? 'Editar Agente' : 'Novo Agente';
@@ -1337,6 +1820,15 @@ function openAgentModal(existing){
   document.getElementById('agent-desc-input').value = existing?.desc || '';
   document.getElementById('agent-prompt-input').value = existing?.systemPrompt || '';
   document.getElementById('agent-modal').dataset.editId = existing?.id || '';
+  agentPhotoDraft = existing?.photo || null;
+  const sel = document.getElementById('agent-model-select');
+  sel.innerHTML = '<option value="">Padrão do app</option><option value="__router__">RouteLLM (automático)</option>';
+  state.models.filter(m => !isImageModel(m)).forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.id; o.textContent = m.name || m.id;
+    sel.appendChild(o);
+  });
+  sel.value = existing?.model || '';
   updateAgentIconPreview();
   document.getElementById('agent-modal').style.display = 'flex';
 }
@@ -1347,12 +1839,13 @@ function saveAgentFromModal(){
   const desc = document.getElementById('agent-desc-input').value.trim();
   const systemPrompt = document.getElementById('agent-prompt-input').value.trim();
   if (!name || !systemPrompt) return;
+  const model = document.getElementById('agent-model-select').value || '';
   const editId = document.getElementById('agent-modal').dataset.editId;
   if (editId){
     const a = state.agents.find(x => x.id === editId);
-    if (a){ a.icon=icon; a.name=name; a.desc=desc; a.systemPrompt=systemPrompt; }
+    if (a){ a.icon=icon; a.name=name; a.desc=desc; a.systemPrompt=systemPrompt; a.model=model; a.photo=agentPhotoDraft; }
   } else {
-    state.agents.push({ id: uid(), icon, name, desc, systemPrompt });
+    state.agents.push({ id: uid(), icon, name, desc, systemPrompt, model, photo: agentPhotoDraft });
   }
   persistAgents();
   renderAgents();
@@ -1379,14 +1872,14 @@ function renderSkills(){
     const keywords = (s.trigger||'').split(',').map(k=>k.trim()).filter(Boolean);
     card.innerHTML = `
       <div class="skill-card-top">
-        <span class="name">${s.name}</span>
+        <span class="name">${esc(s.name)}</span>
         <label class="switch">
           <input type="checkbox" ${s.active?'checked':''}>
           <span class="track"></span>
         </label>
       </div>
-      <div class="trigger-pills">${keywords.length ? keywords.map(k=>`<span class="pill">${k}</span>`).join('') : '<span class="hint">sem trigger — só manual</span>'}</div>
-      <div class="instructions-preview">${s.instructions}</div>
+      <div class="trigger-pills">${keywords.length ? keywords.map(k=>`<span class="pill">${esc(k)}</span>`).join('') : '<span class="hint">sem trigger — só manual</span>'}</div>
+      <div class="instructions-preview">${esc(s.instructions)}</div>
       <div class="skill-card-actions">
         <button class="edit-btn">Editar</button>
         <button class="delete-btn">Excluir</button>
@@ -1431,9 +1924,11 @@ function saveSkillFromModal(){
 }
 function buildSystemPrompt(conv){
   const parts = [];
+  const globalP = (localStorage.getItem('vtz_global_prompt') || '').trim();
+  if (globalP) parts.push(globalP);
   if (conv.systemPrompt) parts.push(conv.systemPrompt);
   const lastUser = [...conv.messages].reverse().find(m => m.role === 'user');
-  const lastText = (lastUser?.content || '').toLowerCase();
+  const lastText = contentToText(lastUser?.content || '').toLowerCase();
   state.skills.forEach(s => {
     const keywords = (s.trigger||'').split(',').map(k=>k.trim().toLowerCase()).filter(Boolean);
     const autoMatch = keywords.some(k => k && lastText.includes(k));
@@ -1622,8 +2117,8 @@ function renderPickerList(){
     row.innerHTML = `
       ${badge}
       <div class="model-info">
-        <span class="name">${m.name||m.id}</span>
-        <span class="id">${isRouter ? 'roteamento automático por heurística' : m.id}</span>
+        <span class="name">${esc(m.name||m.id)}</span>
+        <span class="id">${isRouter ? 'roteamento automático por heurística' : esc(m.id)}</span>
         ${price ? `<span class="price">${price}</span>` : ''}
       </div>
       ${isRouter ? '' : `<button class="fav-btn ${isFavorite(m.id)?'faved':''}" title="Favoritar">${isFavorite(m.id)?'★':'☆'}</button>`}
@@ -1672,14 +2167,19 @@ function renderChat(){
   if (!conv || !conv.messages.length){
     empty.style.display = 'flex';
     log.style.display = 'none';
+    updateComposerState();
     return;
   }
   empty.style.display = 'none';
   log.style.display = 'flex';
-  conv.messages.forEach(m => {
-    if (m.role === 'user' || m.role === 'assistant') appendMessageDOM(m.role, m.content);
+  conv.messages.forEach((m, i) => {
+    if (m.role === 'user' || m.role === 'assistant'){
+      if (m._router) appendRouterBadge(m._router);
+      appendMessageDOM(m.role, m.content, false, i);
+    }
   });
   log.scrollTop = log.scrollHeight;
+  updateComposerState();
 }
 function safeRenderMarkdown(content){
   if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined'){
@@ -1692,7 +2192,20 @@ function safeRenderMarkdown(content){
   div.textContent = content || '';
   return div.innerHTML.replace(/\n/g, '<br>');
 }
-function appendMessageDOM(role, content, isTool){
+function appendRouterBadge(modelName, conv, beforeEl){
+  if (conv && conv.id !== state.currentConvId) return null;
+  const log = document.getElementById('chat-log');
+  document.getElementById('empty-state').style.display = 'none';
+  log.style.display = 'flex';
+  const badge = document.createElement('div');
+  badge.className = 'router-badge';
+  badge.innerHTML = `<span class="rb-icon">${iconHTML('shuffle')}</span><span>RouteLLM <span style="color:var(--text-faint)">►</span> <span class="rb-model">${esc(modelName)}</span></span>`;
+  if (beforeEl && beforeEl.parentElement === log) log.insertBefore(badge, beforeEl);
+  else log.appendChild(badge);
+  return badge;
+}
+
+function appendMessageDOM(role, content, isTool, msgIndex){
   const empty = document.getElementById('empty-state');
   const log = document.getElementById('chat-log');
   empty.style.display = 'none';
@@ -1701,19 +2214,22 @@ function appendMessageDOM(role, content, isTool){
   if (isTool){
     const div = document.createElement('div');
     div.className = 'msg tool';
-    div.innerHTML = safeRenderMarkdown(content);
+    div.innerHTML = safeRenderMarkdown(contentToText(content));
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
     return div;
   }
 
   const isUser = role === 'user';
+  const textContent = contentToText(content);
   const row = document.createElement('div');
   row.className = 'msg-row' + (isUser ? ' user' : '');
 
+  const convForAv = getCurrentConv();
+  const agentForAv = convForAv?.agentId ? state.agents.find(a => a.id === convForAv.agentId) : null;
   const av = document.createElement('div');
   av.className = 'msg-av ' + (isUser ? 'usr' : 'ai');
-  av.innerHTML = isUser ? 'VH' : iconHTML('sparkle');
+  av.innerHTML = isUser ? 'VH' : (agentForAv?.photo ? `<img src="${agentForAv.photo}" alt="">` : iconHTML('sparkle'));
 
   const body = document.createElement('div');
   body.className = 'msg-body';
@@ -1724,7 +2240,18 @@ function appendMessageDOM(role, content, isTool){
 
   const bubble = document.createElement('div');
   bubble.className = 'msg ' + role;
-  bubble.innerHTML = safeRenderMarkdown(content);
+  bubble.innerHTML = safeRenderMarkdown(textContent);
+  if (!isUser) enhanceCodeBlocks(bubble);
+
+  // nota de anexos (quando a mensagem tinha arquivos)
+  const conv = getCurrentConv();
+  const msgObj = (msgIndex != null && conv) ? conv.messages[msgIndex] : null;
+  if (msgObj && msgObj._att && msgObj._att.length){
+    const note = document.createElement('div');
+    note.className = 'msg-att-note';
+    note.textContent = 'anexos: ' + msgObj._att.join(', ');
+    bubble.appendChild(note);
+  }
 
   const acts = document.createElement('div');
   acts.className = 'msg-acts';
@@ -1732,12 +2259,22 @@ function appendMessageDOM(role, content, isTool){
   copyBtn.className = 'copy-btn';
   copyBtn.innerHTML = iconHTML('copy') + ' Copiar';
   copyBtn.onclick = () => {
-    navigator.clipboard.writeText(content || '').then(() => {
+    navigator.clipboard.writeText(textContent).then(() => {
       copyBtn.innerHTML = iconHTML('copy') + ' Copiado';
       setTimeout(() => { copyBtn.innerHTML = iconHTML('copy') + ' Copiar'; }, 1500);
     }).catch(() => {});
   };
   acts.appendChild(copyBtn);
+
+  // botão ⋯ abre o menu de ações (estilo Claude)
+  if (msgIndex != null){
+    const moreBtn = document.createElement('button');
+    moreBtn.className = 'copy-btn';
+    moreBtn.innerHTML = iconHTML('more');
+    moreBtn.title = 'Mais ações';
+    moreBtn.onclick = () => openMsgMenu(msgIndex);
+    acts.appendChild(moreBtn);
+  }
 
   body.appendChild(sender);
   body.appendChild(bubble);
@@ -1749,88 +2286,364 @@ function appendMessageDOM(role, content, isTool){
   return row;
 }
 
+/* ---------- Menu de ações da mensagem ---------- */
+function openMsgMenu(msgIndex){
+  const conv = getCurrentConv();
+  const msg = conv?.messages[msgIndex];
+  if (!msg) return;
+  const isAssistant = msg.role === 'assistant';
+  const menu = document.getElementById('msg-menu');
+  menu.innerHTML = '';
+
+  const items = [
+    { icon:'selectText', label:'Selecionar texto', run: () => openSelectText(contentToText(msg.content)) },
+  ];
+  if (isAssistant){
+    items.push({ icon:'refresh', label:'Regenerar', run: () => openRegenSheet(msgIndex) });
+    items.push({ icon:'wand', label:'Humanizar', run: () => humanizeMessage(msgIndex) });
+  }
+  items.push({ icon:'thumbUp', label: msg._feedback==='up' ? 'Feedback positivo (registrado)' : 'Feedback positivo', done: msg._feedback==='up',
+    run: () => { msg._feedback = msg._feedback==='up' ? null : 'up'; persistConversations(); } });
+  items.push({ icon:'thumbDown', label: msg._feedback==='down' ? 'Feedback negativo (registrado)' : 'Feedback negativo', done: msg._feedback==='down',
+    run: () => { msg._feedback = msg._feedback==='down' ? null : 'down'; persistConversations(); } });
+
+  items.forEach(it => {
+    const btn = document.createElement('button');
+    btn.className = 'msg-menu-item' + (it.done ? ' done' : '');
+    btn.innerHTML = iconHTML(it.icon) + ' ' + it.label;
+    btn.onclick = () => { closeMsgMenu(); it.run(); };
+    menu.appendChild(btn);
+  });
+  document.getElementById('msg-menu-overlay').classList.add('open');
+}
+function closeMsgMenu(){ document.getElementById('msg-menu-overlay').classList.remove('open'); }
+function openSelectText(text){
+  document.getElementById('select-text-area').value = text;
+  document.getElementById('select-text-modal').style.display = 'flex';
+}
+
+/* Sheet de escolha de modelo pra regenerar: mesmo modelo, favoritos e shortlist */
+function openRegenSheet(msgIndex){
+  const menu = document.getElementById('msg-menu');
+  menu.innerHTML = '';
+  const title = document.createElement('div');
+  title.className = 'msg-menu-title';
+  title.textContent = 'Regenerar com qual modelo?';
+  menu.appendChild(title);
+  const conv = getCurrentConv();
+  const curModel = conv?.model || state.model;
+  const opts = [{ id:null, label:'Mesmo modelo' + (curModel === '__router__' ? ' (RouteLLM)' : '') }];
+  const seen = new Set();
+  state.favorites.forEach(id => {
+    const m = state.models.find(x => x.id === id && !isImageModel(x));
+    if (m && !seen.has(m.id)){ seen.add(m.id); opts.push({ id:m.id, label:'★ ' + (m.name || m.id) }); }
+  });
+  routerCandidates().forEach(c => {
+    if (!seen.has(c.id)){ seen.add(c.id); const m = state.models.find(x => x.id === c.id); opts.push({ id:c.id, label:(m?.name || c.id) }); }
+  });
+  opts.slice(0, 9).forEach(o => {
+    const btn = document.createElement('button');
+    btn.className = 'msg-menu-item';
+    btn.innerHTML = iconHTML('refresh') + ' ' + esc(o.label);
+    btn.onclick = () => { closeMsgMenu(); regenerateFrom(msgIndex, o.id); };
+    menu.appendChild(btn);
+  });
+  document.getElementById('msg-menu-overlay').classList.add('open');
+}
+/* Regenerar: corta a conversa até antes da mensagem e refaz — com modelo opcional */
+async function regenerateFrom(msgIndex, modelOverride){
+  const conv = getCurrentConv();
+  if (!conv) return;
+  if (state.gens[conv.id]){ toast('Aguarde ou interrompa a geração atual.', 'warn'); return; }
+  conv.messages = conv.messages.slice(0, msgIndex);
+  persistConversations();
+  renderChat();
+  try{ await runChatLoop(0, conv, modelOverride || null); }
+  catch(e){ if (e.name !== 'AbortError' && conv.id === state.currentConvId) appendMessageDOM('assistant', 'Erro: ' + e.message); }
+}
+
+/* Humanizar: reescreve a mensagem em tom mais natural via API e substitui o conteúdo.
+   Registrado no mapa de gerações (abortável pelo botão parar) e com tratamento de
+   modelos de raciocínio que devolvem content vazio. */
+async function humanizeMessage(msgIndex){
+  const conv = getCurrentConv();
+  const msg = conv?.messages[msgIndex];
+  if (!msg || !state.apiKey) return;
+  if (state.gens[conv.id]){ toast('Aguarde ou interrompa a geração atual.', 'warn'); return; }
+  const original = contentToText(msg.content);
+  let effectiveModel = conv.model || state.model;
+  if (effectiveModel === '__router__') effectiveModel = state.routerConfig.balanced || state.routerConfig.fast;
+  if (!effectiveModel){ toast('Nenhum modelo disponível pra humanizar.', 'err'); return; }
+  state.gens[conv.id] = new AbortController();
+  updateComposerState();
+  toast('Humanizando resposta…');
+  try{
+    const res = await orFetch({ model: effectiveModel, messages:[
+      { role:'system', content:'Você reescreve textos em português brasileiro num tom mais humano, natural e direto — como uma pessoa experiente escrevendo, sem clichês de IA ("é importante notar", "vale ressaltar"). Mantenha TODO o conteúdo, fatos, números e blocos de código intactos. Responda apenas com o texto reescrito.' },
+      { role:'user', content: original }
+    ]}, { signal: state.gens[conv.id].signal });
+    if (!res.ok) throw new Error('API ' + res.status + ': ' + (await res.text()).slice(0,120));
+    const data = await res.json();
+    const rewritten = (data.choices?.[0]?.message?.content || '').trim();
+    trackUsage(data.usage, effectiveModel);
+    if (!rewritten){
+      toast('O modelo não retornou texto (comum em modelos de raciocínio) — tente outro modelo.', 'err');
+      return;
+    }
+    msg.content = rewritten;
+    persistConversations();
+    if (conv.id === state.currentConvId) renderChat();
+    toast('Resposta humanizada.');
+  }catch(e){
+    if (e.name === 'AbortError') toast('Humanização interrompida.', 'warn');
+    else toast('Erro ao humanizar: ' + e.message, 'err');
+  }finally{
+    delete state.gens[conv.id];
+    updateComposerState();
+  }
+}
+
 /* ---------- Send / loop ---------- */
 async function sendMessage(){
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!text || !state.apiKey) return;
+  const hasAtt = state.pendingAttachments.length > 0;
+  if ((!text && !hasAtt) || !state.apiKey) return;
   input.value = '';
   input.style.height = 'auto';
 
   const conv = getCurrentConv();
-  conv.messages.push({role:'user', content:text});
-  if (conv.title === 'Nova conversa') conv.title = text.slice(0,32);
+  if (state.gens[conv.id]){ toast('Esta conversa já está gerando — interrompa ou aguarde.', 'warn'); return; }
+  let userMsg;
+  if (hasAtt){
+    const parts = [];
+    if (text) parts.push({ type:'text', text });
+    const names = [];
+    for (const f of state.pendingAttachments){
+      try{
+        parts.push(await fileToPart(f));
+        names.push(f.name);
+      }catch(e){
+        appendMessageDOM('assistant', 'Erro ao anexar ' + f.name + ': ' + e.message);
+      }
+    }
+    userMsg = { role:'user', content: parts, _att: names };
+    state.pendingAttachments = [];
+    renderAttachChips();
+  } else {
+    userMsg = { role:'user', content: text };
+  }
+
+  conv.messages.push(userMsg);
+  if (conv.title === 'Nova conversa') conv.title = (text || userMsg._att?.[0] || 'Anexo').slice(0,32);
   conv.updatedAt = Date.now();
-  appendMessageDOM('user', text);
+  appendMessageDOM('user', userMsg.content, false, conv.messages.length - 1);
   persistConversations();
   renderHistoryList();
 
-  const sendBtn = document.getElementById('send-btn');
-  sendBtn.disabled = true;
-  try{ await runChatLoop(); }
-  catch(e){ appendMessageDOM('assistant', 'Erro: ' + e.message); }
-  finally{ sendBtn.disabled = false; }
+  try{ await runChatLoop(0, conv); }
+  catch(e){
+    if (e.name !== 'AbortError' && conv.id === state.currentConvId) appendMessageDOM('assistant', 'Erro: ' + e.message);
+  }
 }
 
-async function runChatLoop(depth=0){
-  if (depth > 5) return;
-  const conv = getCurrentConv();
-
-  let effectiveModel = state.model;
-  if (state.model === '__router__'){
-    const lastUser = [...conv.messages].reverse().find(m => m.role === 'user');
-    const {tier, modelId} = resolveRouterModel(lastUser?.content || '');
-    effectiveModel = modelId;
-    if (depth === 0) appendMessageDOM(null, `RouteLLM → ${modelId} (tier: ${tier})`, true);
+/* ---------- RouteLLM 2.0: um modelo grátis/barato ESCOLHE a melhor IA pra tarefa ----------
+   Diferente do tier fixo: o classificador recebe a mensagem + a lista de candidatos
+   e devolve JSON com o modelo escolhido. Se falhar (rede, JSON inválido), cai na
+   heurística antiga como rede de segurança. */
+function routerCandidates(){
+  // shortlist de candidatos reais presentes no catálogo, com o "papel" de cada um
+  const wanted = [
+    ['claude-opus',   'código complexo, arquitetura, análise profunda'],
+    ['claude-sonnet', 'código, escrita técnica, raciocínio'],
+    ['gpt-5',         'raciocínio geral avançado'],
+    ['deepseek-r1',   'raciocínio matemático, custo baixo'],
+    ['gemini-3.5-flash', 'tarefas médias, rápido e barato'],
+    ['gemini-2.5-flash', 'conversas simples, muito barato'],
+    [':free',         'tarefas triviais, grátis'],
+  ];
+  const picks = [];
+  for (const [pat, role] of wanted){
+    const m = state.models.find(x => x.id.includes(pat) && !isImageModel(x));
+    if (m && !picks.some(p => p.id === m.id)) picks.push({ id: m.id, role });
   }
-
-  const systemPrompt = buildSystemPrompt(conv);
-  const apiMessages = systemPrompt ? [{role:'system', content: systemPrompt}, ...conv.messages] : conv.messages;
-
-  const body = { model: effectiveModel, messages: apiMessages };
-  if (state.toolsEnabled) body.tools = Object.values(TOOLS).map(t => t.def);
-
-  const res = await fetch(OR_BASE + '/chat/completions', {
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'Authorization':'Bearer ' + state.apiKey,
-      'HTTP-Referer': location.origin || 'https://vtz-panel.local',
-      'X-Title': SITE_TITLE,
-    },
-    body: JSON.stringify(body)
-  });
-  if (!res.ok) throw new Error(`API ${res.status}: ${(await res.text()).slice(0,200)}`);
-
+  return picks;
+}
+async function classifyWithLLM(userText, signal){
+  const candidates = routerCandidates();
+  if (!candidates.length) return null;
+  // classificador: prefere um modelo grátis (custo zero); senão o tier fast configurado
+  const freeModel = state.models.find(m => m.id.endsWith(':free') && !isImageModel(m));
+  const classifier = freeModel?.id || state.routerConfig.fast;
+  if (!classifier) return null;
+  const listText = candidates.map(c => `- ${c.id} (${c.role})`).join('\n');
+  const res = await orFetch({ model: classifier, messages:[
+      { role:'system', content:`Você é um roteador de modelos de IA. Analise a tarefa do usuário e escolha o MELHOR modelo da lista abaixo, equilibrando qualidade e custo (não escolha modelo caro pra tarefa trivial).\n${listText}\nResponda APENAS com JSON válido: {"model":"<id exato da lista>"}` },
+      { role:'user', content: userText.slice(0, 2000) }
+    ]}, { signal });
+  if (!res.ok) throw new Error('classificador falhou');
   const data = await res.json();
-  const msg = data.choices[0].message;
+  const raw = (data.choices[0].message.content || '').replace(/```json|```/g,'').trim();
+  const parsed = JSON.parse(raw);
+  const chosen = candidates.find(c => c.id === parsed.model);
+  return chosen ? chosen.id : null;
+}
 
-  if (data.usage){
-    const pricing = getModelPricing(effectiveModel);
-    state.totalCost += (data.usage.prompt_tokens||0)*pricing.prompt + (data.usage.completion_tokens||0)*pricing.completion;
-    localStorage.setItem('vtz_or_cost', String(state.totalCost));
-    updateCostBadge();
+async function runChatLoop(depth=0, convArg, modelOverride){
+  if (depth > 5) return;
+  const conv = convArg || getCurrentConv();
+
+  // registra a geração desta conversa (trava o composer DELA; as outras ficam livres)
+  if (depth === 0){
+    state.gens[conv.id] = new AbortController();
+    updateComposerState();
   }
+  const ctrl = state.gens[conv.id];
 
-  if (msg.tool_calls && msg.tool_calls.length){
-    conv.messages.push(msg);
-    for (const call of msg.tool_calls){
-      const toolName = call.function.name;
-      let args = {}; try{ args = JSON.parse(call.function.arguments || '{}'); }catch(e){}
-      const tool = TOOLS[toolName];
-      let result = 'Tool não encontrada: ' + toolName;
-      if (tool){ appendMessageDOM(null, `tool: ${toolName}(${JSON.stringify(args)})`, true); result = await tool.exec(args); }
-      conv.messages.push({ role:'tool', tool_call_id: call.id, content: String(result) });
+  try{
+    // "Pensando..." aparece imediatamente — inclusive durante o roteamento
+    const thinking = createThinkingRow(conv);
+
+    const baseModel = modelOverride || conv.model || state.model;
+    let effectiveModel = baseModel;
+    if (baseModel === '__router__'){
+      const lastUser = [...conv.messages].reverse().find(m => m.role === 'user');
+      const userText = contentToText(lastUser?.content || '');
+      if (depth === 0){
+        let chosen = null;
+        try{ chosen = await classifyWithLLM(userText, ctrl.signal); }
+        catch(e){
+          if (e.name === 'AbortError'){ thinking.remove(); toast('Geração interrompida', 'warn'); return; }
+          console.warn('Router LLM falhou, usando heurística:', e.message);
+        }
+        if (!chosen){
+          const {modelId} = resolveRouterModel(userText);
+          chosen = modelId;
+        }
+        conv._routedModel = chosen;
+        const chosenName = state.models.find(m => m.id === chosen)?.name || chosen;
+        appendRouterBadge(chosenName, conv, thinking.el);
+      }
+      effectiveModel = conv._routedModel || state.routerConfig.balanced;
     }
-    persistConversations();
-    return runChatLoop(depth+1);
-  }
 
-  conv.messages.push({role:'assistant', content: msg.content || ''});
-  conv.updatedAt = Date.now();
-  appendMessageDOM('assistant', msg.content || '');
-  persistConversations();
-  renderHistoryList();
+    const systemPrompt = buildSystemPrompt(conv);
+    let baseMessages = sanitizeForApi(conv.messages);
+    // Janela de contexto: corta o histórico reenviado (sem isso o custo cresce
+    // quadraticamente com o tamanho da conversa). 0 = enviar tudo.
+    if (state.ctxWindow > 0 && baseMessages.length > state.ctxWindow){
+      baseMessages = baseMessages.slice(-state.ctxWindow);
+      while (baseMessages.length && baseMessages[0].role !== 'user') baseMessages.shift();
+    }
+    const apiMessages = systemPrompt ? [{role:'system', content: systemPrompt}, ...baseMessages] : baseMessages;
+
+    const useStream = !state.toolsEnabled; // tool-use exige resposta completa
+    const body = { model: effectiveModel, messages: apiMessages };
+    if (state.toolsEnabled) body.tools = Object.values(TOOLS).map(t => t.def);
+    if (useStream){ body.stream = true; body.stream_options = { include_usage: true }; }
+
+    let res;
+    try{
+      res = await orFetch(body, { signal: ctrl.signal });
+    }catch(e){
+      thinking.remove();
+      if (e.name === 'AbortError'){ toast('Geração interrompida', 'warn'); return; }
+      throw e;
+    }
+    if (!res.ok){
+      thinking.remove();
+      throw new Error(`API ${res.status}: ${(await res.text()).slice(0,200)}`);
+    }
+
+    /* ---- Streaming (chat normal) ---- */
+    if (useStream){
+      let acc = '', usage = null, lastPaint = 0, aborted = false;
+      try{
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        while(true){
+          const {done, value} = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, {stream:true});
+          let nl;
+          while((nl = buf.indexOf('\n')) >= 0){
+            const line = buf.slice(0, nl).trim();
+            buf = buf.slice(nl + 1);
+            if (!line.startsWith('data:')) continue;
+            const payload = line.slice(5).trim();
+            if (payload === '[DONE]') continue;
+            try{
+              const obj = JSON.parse(payload);
+              const delta = obj.choices?.[0]?.delta?.content;
+              if (delta){
+                acc += delta;
+                const now = Date.now();
+                if (now - lastPaint > 60){ thinking.update(acc); lastPaint = now; }
+              }
+              if (obj.usage) usage = obj.usage;
+            }catch(_){ /* linha parcial/keep-alive */ }
+          }
+        }
+      }catch(e){
+        if (e.name === 'AbortError'){ aborted = true; }
+        else { thinking.remove(); throw e; }
+      }
+      thinking.remove();
+      trackUsage(usage, effectiveModel);
+      if (aborted) toast('Geração interrompida — resposta parcial mantida', 'warn');
+      if (!acc && aborted) return;
+
+      const assistantMsg = { role:'assistant', content: acc };
+      if (baseModel === '__router__' && conv._routedModel){
+        assistantMsg._router = state.models.find(m => m.id === conv._routedModel)?.name || conv._routedModel;
+      }
+      conv.messages.push(assistantMsg);
+      conv.updatedAt = Date.now();
+      if (conv.id === state.currentConvId) appendMessageDOM('assistant', acc, false, conv.messages.length - 1);
+      persistConversations();
+      renderHistoryList();
+      return;
+    }
+
+    /* ---- Não-stream (tools ativas) ---- */
+    const data = await res.json();
+    thinking.remove();
+    const msg = data.choices[0].message;
+    trackUsage(data.usage, effectiveModel);
+
+    if (msg.tool_calls && msg.tool_calls.length){
+      conv.messages.push(msg);
+      for (const call of msg.tool_calls){
+        const toolName = call.function.name;
+        let args = {}; try{ args = JSON.parse(call.function.arguments || '{}'); }catch(e){}
+        const tool = TOOLS[toolName];
+        let result = 'Tool não encontrada: ' + toolName;
+        if (tool){
+          if (conv.id === state.currentConvId) appendMessageDOM(null, `tool: ${toolName}(${JSON.stringify(args)})`, true);
+          result = await tool.exec(args);
+        }
+        conv.messages.push({ role:'tool', tool_call_id: call.id, content: String(result) });
+      }
+      persistConversations();
+      return runChatLoop(depth+1, conv, modelOverride);
+    }
+
+    const assistantMsg = { role:'assistant', content: msg.content || '' };
+    if (baseModel === '__router__' && conv._routedModel){
+      assistantMsg._router = state.models.find(m => m.id === conv._routedModel)?.name || conv._routedModel;
+    }
+    conv.messages.push(assistantMsg);
+    conv.updatedAt = Date.now();
+    if (conv.id === state.currentConvId) appendMessageDOM('assistant', msg.content || '', false, conv.messages.length - 1);
+    persistConversations();
+    renderHistoryList();
+  } finally {
+    if (depth === 0){
+      delete state.gens[conv.id];
+      updateComposerState();
+    }
+  }
 }
 
 function updateCostBadge(){
@@ -1905,12 +2718,7 @@ async function generateImage(){
   const btn = document.getElementById('gen-image-btn');
   btn.disabled = true; btn.textContent = 'Gerando...';
   try{
-    const res = await fetch(OR_BASE + '/chat/completions', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + state.apiKey,
-        'HTTP-Referer': location.origin || 'https://vtz-panel.local', 'X-Title': SITE_TITLE },
-      body: JSON.stringify({ model, messages:[{role:'user', content: prompt}], modalities:['image','text'] })
-    });
+    const res = await orFetch({ model, messages:[{role:'user', content: prompt}], modalities:['image','text'] });
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
     const msg = data.choices[0].message;
