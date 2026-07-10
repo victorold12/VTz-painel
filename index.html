@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>VTZ · Panel</title>
+<title>VTz LLM</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.11/purify.min.js"></script>
 <style>
@@ -538,7 +538,8 @@
   @media (prefers-reduced-motion: reduce){ .thinking-label{animation:none; color:var(--text-dim); -webkit-text-fill-color:var(--text-dim);} }
   /* copiar por bloco de código */
   .code-wrap{position:relative;}
-  .code-wrap pre{padding-right:44px;}
+  .code-wrap pre{padding-right:80px;}
+  .code-dl{right:44px;}
   .code-copy{
     position:absolute; top:8px; right:8px; display:flex; align-items:center; justify-content:center;
     background:var(--w08); border:1px solid var(--line); color:var(--text-dim);
@@ -548,6 +549,17 @@
   .code-copy.ok{color:#4ade80; border-color:rgba(74,222,128,.4); opacity:1;}
   .code-copy svg.icon{width:14px; height:14px;}
   .composer textarea:disabled{opacity:.55; cursor:not-allowed;}
+  /* Modo desempenho: remove os dois maiores custos de GPU (blur composto + blobs animados) */
+  body.perf .liquid-bg{display:none;}
+  body.perf *{backdrop-filter:none !important; -webkit-backdrop-filter:none !important;}
+  body.perf .thinking-label{animation:none; color:var(--text-dim); -webkit-text-fill-color:var(--text-dim);}
+  .ctx-meter{margin-left:auto; font-size:10.5px; font-family:var(--mono); color:var(--text-faint); white-space:nowrap;}
+  .ctx-meter.warn{color:var(--amber);}
+  .ctx-meter.danger{color:var(--danger); font-weight:600;}
+  .storage-track{height:7px; background:var(--w08); border-radius:4px; overflow:hidden;}
+  .storage-bar{height:100%; width:0%; background:var(--violet); border-radius:4px; transition:width .35s ease, background .3s;}
+  .storage-bar.warn{background:var(--amber);}
+  .storage-bar.danger{background:var(--danger);}
   .agent-card .icon .agent-photo{width:30px; height:30px; border-radius:9px; object-fit:cover; display:block;}
   .msg-av img{width:100%; height:100%; object-fit:cover; border-radius:9px; display:block;}
   .msg-menu-title{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--text-faint); padding:6px 16px 10px;}
@@ -593,6 +605,8 @@
       <div id="chat-log" style="display:none;"></div>
       <div class="toolbar-row">
         <label class="toggle"><input type="checkbox" id="tools-toggle"> Ativar tools</label>
+        <label class="toggle" id="web-label"><input type="checkbox" id="web-toggle"> <span id="web-globe"></span> Web</label>
+        <span class="ctx-meter" id="ctx-meter" title="Estimativa de tokens e custo do próximo envio"></span>
         <span id="tools-status"></span>
         <button id="view-system-btn" style="margin-left:auto; display:flex; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg> system prompt</button>
       </div>
@@ -664,6 +678,23 @@
         <p class="hint" style="margin-bottom:10px;">Injetado em toda conversa, antes de agentes e skills — é aqui que você "treina" o comportamento das respostas. Edite à vontade.</p>
         <textarea id="global-prompt-input" style="width:100%; min-height:140px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:12.5px; line-height:1.55; resize:vertical;"></textarea>
         <button id="global-prompt-reset" style="margin-top:8px;">Restaurar padrão</button>
+      </div>
+      <div class="cfg-group">
+        <h3>Diagnóstico</h3>
+        <p class="hint" style="margin-bottom:10px;">Roda um teste real contra a API e mostra exatamente o que funciona e o que falha.</p>
+        <label class="toggle" style="margin-bottom:10px;"><input type="checkbox" id="stream-toggle" checked> Streaming (resposta ao vivo)</label>
+        <label class="toggle" style="margin-bottom:10px;"><input type="checkbox" id="perf-toggle"> Modo desempenho (desliga blur e fundo animado)</label>
+        <button id="diag-btn">Testar conexão</button>
+        <pre id="diag-out" style="display:none; margin-top:10px; background:var(--input-bg); border:1px solid var(--line); border-radius:10px; padding:11px; font-size:11px; line-height:1.6; white-space:pre-wrap; word-break:break-word; max-height:280px; overflow-y:auto;"></pre>
+      </div>
+      <div class="cfg-group">
+        <h3>Armazenamento</h3>
+        <p class="hint" id="storage-label" style="margin-bottom:8px;">—</p>
+        <div class="storage-track"><div class="storage-bar" id="storage-bar"></div></div>
+        <p class="hint" id="storage-warning" style="display:none; margin-top:8px; color:var(--amber);">
+          Perto do limite. Quando estourar, novas conversas param de salvar. Arquive as antigas — as fixadas são preservadas.
+        </p>
+        <button class="danger" id="archive-btn" style="margin-top:10px;">Arquivar antigas (manter 15 recentes)</button>
       </div>
       <div class="cfg-group">
         <h3>Backup</h3>
@@ -765,6 +796,19 @@
 <div id="toasts" aria-live="polite"></div>
 
 <!-- Modal de renomear conversa -->
+<div class="modal-overlay" id="edit-msg-modal" style="display:none;">
+  <div class="modal wide">
+    <h2>Editar mensagem</h2>
+    <p class="hint" style="margin-bottom:10px;">As respostas seguintes serão descartadas e a IA responderá de novo.</p>
+    <textarea id="edit-msg-area" style="min-height:160px; font-family:var(--sans); font-size:14px;"></textarea>
+    <p class="hint" id="edit-msg-note" style="display:none; color:var(--amber); margin-top:6px;">Os anexos desta mensagem serão perdidos ao editar.</p>
+    <div class="row-btns">
+      <button class="secondary" id="edit-msg-cancel">Cancelar</button>
+      <button id="edit-msg-save">Salvar e regerar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="rename-modal" style="display:none;">
   <div class="modal">
     <h2>Renomear conversa</h2>
@@ -834,7 +878,7 @@
    ========================================================= */
 
 const OR_BASE = 'https://openrouter.ai/api/v1';
-const SITE_TITLE = 'VTZ Panel';
+const SITE_TITLE = 'VTz LLM';
 
 function uid(){ return 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
 
@@ -871,6 +915,14 @@ const ICONS = {
   close: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
   file: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>',
   stopSq: '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
+  pin: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l1 7 2 2H6l2-2z"/></svg>',
+  folder: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+  columns: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="8" height="16" rx="2"/><rect x="13" y="4" width="8" height="16" rx="2"/></svg>',
+  expand: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>',
+  edit: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>',
+  download: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  globe: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+  doc: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>',
 };
 function iconHTML(name){ return ICONS[name] || ICONS.bot; }
 /* migra ícones antigos em emoji (versões anteriores do painel) pros novos ícones SVG */
@@ -896,8 +948,24 @@ const state = {
   pickerSort: 'default',
   pendingAttachments: [],
   ctxWindow: parseInt(localStorage.getItem('vtz_ctx_window') || '24', 10),
+  streamOn: localStorage.getItem('vtz_stream') !== '0',
+  perfMode: localStorage.getItem('vtz_perf') === '1',
+  webSearch: false, // busca web por sessão — off por padrão (custa ~$0,02/msg)
   gens: {}, // convId -> AbortController (gerações ativas, uma por conversa)
+  templates: JSON.parse(localStorage.getItem('vtz_templates') || 'null') || [],
+  costByModel: JSON.parse(localStorage.getItem('vtz_cost_by_model') || '{}'),
+  tagFilter: '',
+  soundOn: localStorage.getItem('vtz_sound') === '1',
 };
+const BOOT_TS = Date.now();
+if (localStorage.getItem('vtz_templates') === null){
+  state.templates = [
+    { id: uid(), name:'Relatório incubadora', content:'Estruture um relatório de atividades da incubadora para a empresa {{empresa}}, cobrindo o período {{período}}. Inclua: eventos mapeados, custos estimados e próximos passos. Formato: headers claros, objetivo, pronto pra .docx.' },
+    { id: uid(), name:'Revisão de código VTZ OS', content:'Revise este código do VTZ OS focando em: bugs, performance e legibilidade. Aponte problemas com justificativa e entregue a versão corrigida completa:\n\n```\n{{código}}\n```' },
+    { id: uid(), name:'Script FPS reversível', content:'Crie um script .bat de otimização de {{alvo}} para Windows 11, seguro para anti-cheat, com backup automático e um restaurar.bat que desfaz tudo.' },
+  ];
+  localStorage.setItem('vtz_templates', JSON.stringify(state.templates));
+}
 
 /* ---------- Helpers de conteúdo multimodal ---------- */
 /* Extrai texto plano de content (string ou array de parts) */
@@ -938,8 +1006,8 @@ function fileToPart(file){
 }
 /* Remove campos internos (_router, _feedback, _att) antes de mandar pra API */
 function sanitizeForApi(messages){
-  return messages.map(m => {
-    const { _router, _feedback, _att, ...rest } = m;
+  return messages.filter(m => !m._local).map(m => {
+    const { _router, _feedback, _att, _compare, _local, ts, ...rest } = m;
     return rest;
   });
 }
@@ -986,7 +1054,7 @@ function orFetch(payload, opts = {}){
     headers:{
       'Content-Type':'application/json',
       'Authorization':'Bearer ' + state.apiKey,
-      'HTTP-Referer': location.origin || 'https://vtz-panel.local',
+      'HTTP-Referer': location.origin || 'https://vtz-llm.local',
       'X-Title': SITE_TITLE,
     },
     body: JSON.stringify(payload),
@@ -994,12 +1062,74 @@ function orFetch(payload, opts = {}){
   });
 }
 /* Contabilidade de custo unificada */
-function trackUsage(usage, modelId){
+function trackUsage(usage, modelId, conv){
   if (!usage) return;
   const pricing = getModelPricing(modelId);
-  state.totalCost += (usage.prompt_tokens||0)*pricing.prompt + (usage.completion_tokens||0)*pricing.completion;
+  const cost = (usage.prompt_tokens||0)*pricing.prompt + (usage.completion_tokens||0)*pricing.completion;
+  state.totalCost += cost;
   localStorage.setItem('vtz_or_cost', String(state.totalCost));
+  state.costByModel[modelId] = (state.costByModel[modelId] || 0) + cost;
+  localStorage.setItem('vtz_cost_by_model', JSON.stringify(state.costByModel));
+  if (conv){ conv.cost = (conv.cost || 0) + cost; }
   updateCostBadge();
+}
+/* Retry com backoff: 429/5xx/erro de rede tenta de novo sozinho (2 retries) */
+async function orFetchRetry(payload, opts = {}){
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++){
+    if (attempt > 0){
+      await new Promise(r => setTimeout(r, 800 * attempt));
+      if (opts.signal?.aborted) throw Object.assign(new Error('abortado'), {name:'AbortError'});
+      toast(`Instabilidade na API — tentando de novo (${attempt+1}/3)…`, 'warn');
+    }
+    try{
+      const res = await orFetch(payload, opts);
+      if (res.ok || ![429,500,502,503,504,529].includes(res.status)) return res;
+      lastErr = new Error('API ' + res.status);
+    }catch(e){
+      if (e.name === 'AbortError') throw e;
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('Falha após 3 tentativas');
+}
+/* Som curto opcional ao concluir geração */
+function playDing(){
+  if (!state.soundOn) return;
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = 880; o.type = 'sine';
+    g.gain.setValueAtTime(.08, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + .18);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(); o.stop(ctx.currentTime + .2);
+  }catch(_){}
+}
+/* Hook comum pós-resposta: som + auto-título por IA */
+function afterAssistantDone(conv){
+  playDing();
+  const realMsgs = conv.messages.filter(m => (m.role==='user'||m.role==='assistant') && !m._local);
+  if (!conv.agentId && !conv._titled && realMsgs.length === 2){
+    conv._titled = true;
+    autoTitleConversation(conv);
+  }
+}
+async function autoTitleConversation(conv){
+  try{
+    const freeModel = state.models.find(m => m.id.endsWith(':free') && !isImageModel(m));
+    const model = freeModel?.id || state.routerConfig.fast;
+    if (!model) return;
+    const firstUser = contentToText(conv.messages.find(m => m.role==='user')?.content || '').slice(0, 500);
+    const res = await orFetch({ model, messages:[
+      { role:'system', content:'Gere um título curto de 3 a 6 palavras para esta conversa, em português, sem aspas e sem pontuação final. Responda só o título.' },
+      { role:'user', content: firstUser }
+    ]});
+    if (!res.ok) return;
+    const data = await res.json();
+    const title = (data.choices?.[0]?.message?.content || '').trim().replace(/["'.]/g,'').slice(0, 60);
+    if (title){ conv.title = title; persistConversations(); renderHistoryList(); }
+  }catch(_){ /* título automático é best-effort */ }
 }
 /* Estado do composer depende da CONVERSA visível: se ela está gerando, input trava
    e o botão vira "parar" — outras conversas continuam livres pra digitar e enviar */
@@ -1028,17 +1158,67 @@ function createThinkingRow(conv){
   const row = document.createElement('div');
   row.className = 'msg-row';
   row.innerHTML = `<div class="msg-av ai">${agentAv?.photo ? `<img src="${agentAv.photo}" alt="">` : iconHTML('sparkle')}</div>
-    <div class="msg-body"><div class="msg-sender">VTZ</div>
+    <div class="msg-body"><div class="msg-sender">VTz LLM</div>
     <div class="msg assistant"><span class="thinking-label">Pensando…</span></div></div>`;
   log.appendChild(row);
   log.scrollTop = log.scrollHeight;
   const bubble = row.querySelector('.msg.assistant');
   return {
     el: row,
-    update(text){ bubble.innerHTML = safeRenderMarkdown(text); log.scrollTop = log.scrollHeight; },
+    // Durante o stream: render barato (escape + <br>). Markdown completo só no final,
+    // via appendMessageDOM — re-parsear o texto inteiro a cada chunk era custo
+    // quadrático e travava respostas longas.
+    update(text){ bubble.innerHTML = esc(text).replace(/\n/g,'<br>'); log.scrollTop = log.scrollHeight; },
     remove(){ row.remove(); }
   };
 }
+/* ---------- Download de arquivos gerados pela IA ----------
+   Qualquer bloco de código vira arquivo baixável com a extensão certa.
+   Limite honesto: só arquivos de TEXTO — binário (.docx/.pdf) a API de chat não gera. */
+const LANG_EXT = {
+  python:'py', py:'py', javascript:'js', js:'js', typescript:'ts', ts:'ts', jsx:'jsx', tsx:'tsx',
+  html:'html', css:'css', json:'json', bat:'bat', batch:'bat', cmd:'bat', powershell:'ps1', ps1:'ps1',
+  bash:'sh', sh:'sh', shell:'sh', zsh:'sh', sql:'sql', java:'java', c:'c', cpp:'cpp', 'c++':'cpp',
+  csharp:'cs', cs:'cs', xml:'xml', yaml:'yml', yml:'yml', markdown:'md', md:'md', text:'txt', txt:'txt',
+  php:'php', ruby:'rb', rb:'rb', go:'go', golang:'go', rust:'rs', rs:'rs', kotlin:'kt', swift:'swift',
+  lua:'lua', ini:'ini', toml:'toml', csv:'csv', tsv:'tsv', svg:'svg', dockerfile:'Dockerfile',
+  vue:'vue', dart:'dart', r:'r', perl:'pl', diff:'diff', graphql:'graphql', proto:'proto',
+  reg:'reg', registry:'reg', vbs:'vbs', vbscript:'vbs', ahk:'ahk', autohotkey:'ahk', psm1:'psm1',
+};
+const EXT_MIME = { html:'text/html', htm:'text/html', json:'application/json', svg:'image/svg+xml', csv:'text/csv', xml:'application/xml', js:'text/javascript', css:'text/css' };
+function extFromLang(lang){ return LANG_EXT[(lang||'').toLowerCase()] || 'txt'; }
+/* Nome do arquivo: se a 1ª linha do código tiver um nome (ex: "# organizador.py",
+   ":: limpeza.bat", "// app.js"), usa ele; senão vtz-arquivo-N.ext */
+function guessFilename(code, lang, idx){
+  const first = (code.split('\n')[0] || '').trim();
+  const m = first.match(/([\w][\w.\-]*\.[A-Za-z0-9]{1,12})\b/);
+  if (m && !/^\d/.test(m[1])) return m[1];
+  return `vtz-arquivo-${idx || 1}.${extFromLang(lang)}`;
+}
+function downloadTextFile(name, text){
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  const mime = (EXT_MIME[ext] || 'text/plain') + ';charset=utf-8';
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+/* Extrai blocos ```lang ... ``` do markdown cru (independe do DOM) */
+function extractCodeBlocks(markdown){
+  const blocks = [];
+  const re = /```([\w+.#-]*)\s*\n([\s\S]*?)```/g;
+  let m;
+  while((m = re.exec(markdown)) !== null){
+    const code = m[2].replace(/\n$/, '');
+    if (code.trim()) blocks.push({ lang: m[1] || '', code });
+  }
+  return blocks;
+}
+
 /* Botão de copiar em cada bloco de código dentro da mensagem */
 function enhanceCodeBlocks(scope){
   scope.querySelectorAll('pre').forEach(pre => {
@@ -1058,6 +1238,22 @@ function enhanceCodeBlocks(scope){
       }).catch(() => {});
     };
     wrap.appendChild(btn);
+
+    // Baixar este bloco como arquivo, com extensão detectada da linguagem
+    const codeEl = pre.querySelector('code');
+    const langMatch = (codeEl?.className || '').match(/language-([\w+.#-]+)/);
+    const lang = langMatch ? langMatch[1] : '';
+    const dl = document.createElement('button');
+    dl.className = 'code-copy code-dl';
+    dl.setAttribute('aria-label','Baixar como arquivo');
+    dl.innerHTML = iconHTML('download');
+    dl.onclick = () => {
+      const idx = [...scope.querySelectorAll('pre')].indexOf(pre) + 1;
+      downloadTextFile(guessFilename(pre.innerText, lang, idx), pre.innerText);
+      dl.classList.add('ok');
+      setTimeout(() => dl.classList.remove('ok'), 1200);
+    };
+    wrap.appendChild(dl);
   });
 }
 
@@ -1081,7 +1277,8 @@ const DEFAULT_GLOBAL_PROMPT = `Você é o VTZ, assistente pessoal do Victor Hugo
 4. Em decisões, apresente comparação objetiva e indique a superior (Pareto: máximo retorno, mínimo esforço).
 5. Código sempre pronto para produção, comentado onde importa; automação Windows acompanha .bat de execução e mudanças reversíveis.
 6. Headers e listas só quando facilitarem leitura rápida.
-7. Se não souber, diga que não sabe — nunca invente dados.`;
+7. Se não souber, diga que não sabe — nunca invente dados.
+8. Pedidos explícitos de teste, benchmark ou experimento (ex.: "gere um texto longo pra testar o streaming") devem ser atendidos literalmente, sem questionar o propósito.`;
 if (localStorage.getItem('vtz_global_prompt') === null){
   localStorage.setItem('vtz_global_prompt', DEFAULT_GLOBAL_PROMPT);
 }
@@ -1319,6 +1516,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chatInput.style.height = 'auto';
     chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
   });
+  chatInput.addEventListener('input', debounce(updateCtxMeter, 200));
 
   // anexos: + abre o picker; chips com remover
   document.getElementById('plus-btn').onclick = () => document.getElementById('attach-input').click();
@@ -1386,7 +1584,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ARIA = { 'menu-btn':'Abrir menu', 'theme-btn':'Alternar tema claro/escuro', 'mic-btn':'Ditar por voz',
     'send-btn':'Enviar mensagem', 'plus-btn':'Anexar arquivos', 'model-picker-btn':'Selecionar modelo de IA' };
   Object.entries(ARIA).forEach(([id, label]) => document.getElementById(id)?.setAttribute('aria-label', label));
-  ['picker-overlay','msg-menu-overlay','key-modal','skill-modal','agent-modal','select-text-modal','rename-modal'].forEach(id => {
+  ['picker-overlay','msg-menu-overlay','key-modal','skill-modal','agent-modal','select-text-modal','rename-modal','edit-msg-modal'].forEach(id => {
     const el = document.getElementById(id);
     if (el){ el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); }
   });
@@ -1395,7 +1593,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape'){
       closeMsgMenu(); closePicker(); toggleSidebar(false);
-      ['select-text-modal','skill-modal','agent-modal','rename-modal'].forEach(id => {
+      ['select-text-modal','skill-modal','agent-modal','rename-modal','edit-msg-modal'].forEach(id => {
         const el = document.getElementById(id);
         if (el && el.style.display !== 'none') el.style.display = 'none';
       });
@@ -1481,12 +1679,60 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') document.getElementById('rename-save').click();
   });
 
+  // diagnóstico + toggle de streaming
+  document.getElementById('web-globe').innerHTML = iconHTML('globe');
+  document.getElementById('web-toggle').addEventListener('change', (e) => {
+    state.webSearch = e.target.checked;
+    if (state.webSearch) toast('Busca web ativada — o modelo pesquisa a internet antes de responder (~US$0,02/msg, fora do contador de tokens).');
+    else toast('Busca web desativada.');
+  });
+
+  const perfToggle = document.getElementById('perf-toggle');
+  perfToggle.checked = state.perfMode;
+  document.body.classList.toggle('perf', state.perfMode);
+  perfToggle.onchange = () => {
+    state.perfMode = perfToggle.checked;
+    localStorage.setItem('vtz_perf', state.perfMode ? '1' : '0');
+    document.body.classList.toggle('perf', state.perfMode);
+    toast(state.perfMode ? 'Modo desempenho ativado.' : 'Efeitos visuais completos.');
+  };
+  const streamToggle = document.getElementById('stream-toggle');
+  streamToggle.checked = state.streamOn;
+  streamToggle.onchange = () => {
+    state.streamOn = streamToggle.checked;
+    localStorage.setItem('vtz_stream', state.streamOn ? '1' : '0');
+    toast(state.streamOn ? 'Streaming ativado.' : 'Streaming desativado (resposta chega de uma vez).');
+  };
+  document.getElementById('diag-btn').onclick = async () => {
+    const b = document.getElementById('diag-btn');
+    b.disabled = true; b.textContent = 'Testando…';
+    try{ await runDiagnostics(); }
+    finally{ b.disabled = false; b.textContent = 'Testar conexão'; }
+  };
+
+  // armazenamento
+  document.getElementById('archive-btn').onclick = () => {
+    if (confirm('Arquivar conversas antigas? As 15 mais recentes e as fixadas são mantidas.')) archiveOldConversations(15);
+  };
+  updateStorageMeter();
+
+  // editar mensagem
+  document.getElementById('edit-msg-cancel').onclick = () => { document.getElementById('edit-msg-modal').style.display = 'none'; };
+  document.getElementById('edit-msg-save').onclick = saveEditMsg;
+  document.getElementById('edit-msg-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'edit-msg-modal') e.target.style.display = 'none';
+  });
+
+  // medidor de contexto ao vivo
+  updateCtxMeter();
+
   // janela de contexto
   const ctxSel = document.getElementById('ctx-window-select');
   ctxSel.value = String(state.ctxWindow);
   ctxSel.onchange = () => {
     state.ctxWindow = parseInt(ctxSel.value, 10);
     localStorage.setItem('vtz_ctx_window', String(state.ctxWindow));
+    updateCtxMeter();
     toast(state.ctxWindow ? `Contexto limitado às últimas ${state.ctxWindow} mensagens` : 'Contexto completo (mais caro)');
   };
 
@@ -1512,6 +1758,7 @@ function switchView(name){
   document.getElementById(name + '-view').classList.add('active');
   document.querySelector(`.side-nav-item[data-view="${name}"]`).classList.add('active');
   if (name === 'analytics') renderAnalytics();
+  if (name === 'config') updateStorageMeter();
 }
 function toggleSidebar(open){
   document.getElementById('sidebar').classList.toggle('open', open);
@@ -1587,6 +1834,10 @@ function openConvMenu(convId){
   const menu = document.getElementById('msg-menu');
   menu.innerHTML = '';
   const items = [
+    { icon:'pin', label: conv.pinned ? 'Desafixar' : 'Fixar no topo', run: () => {
+        conv.pinned = !conv.pinned; persistConversations(); renderHistoryList();
+        toast(conv.pinned ? 'Conversa fixada.' : 'Conversa desafixada.');
+      } },
     { icon:'wand', label:'Renomear', run: () => renameConversation(convId) },
     { icon:'file', label:'Exportar .md', run: () => exportConversationMarkdown(conv) },
     { icon:'close', label:'Excluir conversa', run: () => { if (confirm(`Excluir "${conv.title}"?`)) deleteConversation(convId); } },
@@ -1613,9 +1864,148 @@ function persistConversations(){
       return m;
     })
   }));
-  localStorage.setItem('vtz_conversations', JSON.stringify(stripped));
-  localStorage.setItem('vtz_current_conv', state.currentConvId || '');
+  try{
+    localStorage.setItem('vtz_conversations', JSON.stringify(stripped));
+    localStorage.setItem('vtz_current_conv', state.currentConvId || '');
+  }catch(err){
+    // QuotaExceededError: antes falhava em silêncio e o usuário perdia conversas sem saber
+    if (err.name === 'QuotaExceededError' || err.code === 22){
+      state.quotaFull = true;
+      toast('Armazenamento cheio — a conversa NÃO foi salva. Arquive conversas antigas em Config.', 'err');
+    } else {
+      toast('Erro ao salvar: ' + err.message, 'err');
+    }
+  }
   updateSessionPanel();
+}
+
+/* ---------- Diagnóstico de conexão ----------
+   Testa, em ordem: chave presente → catálogo (/models) → chat não-stream → chat com stream.
+   Mostra status HTTP e corpo do erro — é o que faltava pra saber por que "não responde". */
+async function runDiagnostics(){
+  const out = document.getElementById('diag-out');
+  out.style.display = 'block';
+  const log = [];
+  const paint = () => { out.textContent = log.join('\n'); };
+  const push = (ok, label, detail) => {
+    log.push(`${ok === null ? '…' : ok ? '[OK]' : '[FALHA]'} ${label}${detail ? '\n     ' + detail : ''}`);
+    paint();
+  };
+
+  log.push('Origem: ' + (location.origin || 'file:// (origin nulo)'));
+  log.push('Protocolo: ' + location.protocol);
+  if (location.protocol === 'file:'){
+    log.push('     Aviso: em file:// alguns navegadores restringem fetch e streaming.');
+    log.push('     Se falhar aqui, sirva por http (ex.: python3 -m http.server) e teste de novo.');
+  }
+  paint();
+
+  // 1) chave
+  if (!state.apiKey){ push(false, 'Chave da API ausente'); return; }
+  push(true, `Chave presente (${state.apiKey.slice(0,8)}…, ${state.apiKey.length} chars)`);
+
+  // 2) catálogo
+  try{
+    const r = await fetch(OR_BASE + '/models');
+    if (!r.ok) push(false, `GET /models → HTTP ${r.status}`, (await r.text()).slice(0,160));
+    else {
+      const d = await r.json();
+      push(true, `GET /models → ${d.data?.length ?? '?'} modelos (catálogo ao vivo)`);
+    }
+  }catch(e){ push(false, 'GET /models falhou', e.message + ' — provável CORS ou rede'); }
+
+  const model = state.model === '__router__' ? (state.routerConfig.balanced || state.routerConfig.fast) : state.model;
+  push(null, `Modelo em teste: ${model}`);
+
+  // 3) chat sem streaming
+  try{
+    const r = await orFetch({ model, messages:[{role:'user', content:'responda apenas: ok'}], max_tokens: 5 });
+    const body = await r.text();
+    if (!r.ok) push(false, `POST /chat/completions (sem stream) → HTTP ${r.status}`, body.slice(0,220));
+    else {
+      let txt = '';
+      try{ txt = JSON.parse(body).choices?.[0]?.message?.content ?? ''; }catch(_){}
+      push(!!txt, `POST sem stream → HTTP 200`, txt ? `resposta: "${txt.trim().slice(0,40)}"` : 'HTTP 200 mas SEM texto: ' + body.slice(0,160));
+    }
+  }catch(e){ push(false, 'POST sem stream falhou', e.message); }
+
+  // 4) chat com streaming
+  try{
+    const r = await orFetch({ model, messages:[{role:'user', content:'responda apenas: ok'}], max_tokens: 5, stream: true });
+    if (!r.ok){ push(false, `POST com stream → HTTP ${r.status}`, (await r.text()).slice(0,220)); }
+    else if (!r.body){ push(false, 'POST com stream → sem res.body', 'navegador não expõe o corpo em stream'); }
+    else {
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let chunks = 0, acc = '', firstLine = '';
+      const t0 = Date.now();
+      while(Date.now() - t0 < 20000){
+        const {done, value} = await reader.read();
+        if (done) break;
+        chunks++;
+        const s = dec.decode(value, {stream:true});
+        if (!firstLine) firstLine = s.split('\n').find(l => l.trim()) || '';
+        for (const line of s.split('\n')){
+          const t = line.trim();
+          if (!t.startsWith('data:')) continue;
+          const p = t.slice(5).trim();
+          if (p === '[DONE]'){ chunks = chunks; break; }
+          try{ acc += JSON.parse(p).choices?.[0]?.delta?.content || ''; }catch(_){}
+        }
+        if (acc) break;
+      }
+      try{ await reader.cancel(); }catch(_){}
+      push(!!acc, `POST com stream → ${chunks} chunk(s)`,
+        acc ? `texto recebido: "${acc.trim().slice(0,40)}"`
+            : 'nenhum texto extraído. 1a linha crua: ' + (firstLine.slice(0,140) || '(vazia)'));
+    }
+  }catch(e){ push(false, 'POST com stream falhou', e.message); }
+
+  log.push('');
+  log.push('Se "sem stream" funciona e "com stream" falha: desmarque Streaming acima.');
+  paint();
+}
+
+/* ---------- Medidor de armazenamento (limite ~5MB por origem) ---------- */
+function storageBytes(){
+  let total = 0;
+  for (const k in localStorage){
+    if (Object.prototype.hasOwnProperty.call(localStorage, k)) total += (localStorage[k].length + k.length) * 2;
+  }
+  return total;
+}
+const STORAGE_LIMIT = 5 * 1024 * 1024;
+/* Tempo máximo sem receber nenhum byte do stream antes de abortar (evita 'Pensando…' eterno) */
+let STREAM_IDLE_MS = 45000;
+function updateStorageMeter(){
+  const bar = document.getElementById('storage-bar');
+  const label = document.getElementById('storage-label');
+  if (!bar || !label) return;
+  // escanear o localStorage inteiro é caro — só computa com a tela de Config visível
+  const cfgView = document.getElementById('config-view');
+  if (!cfgView || !cfgView.classList.contains('active')) return;
+  const used = storageBytes();
+  const pct = Math.min(100, (used / STORAGE_LIMIT) * 100);
+  bar.style.width = pct.toFixed(1) + '%';
+  bar.classList.toggle('warn', pct >= 70 && pct < 90);
+  bar.classList.toggle('danger', pct >= 90);
+  label.textContent = `${(used/1048576).toFixed(2)} MB de ~5 MB (${pct.toFixed(0)}%)`;
+  const warn = document.getElementById('storage-warning');
+  if (warn) warn.style.display = pct >= 70 ? 'block' : 'none';
+}
+/* Arquiva: remove as conversas mais antigas mantendo as N mais recentes + as fixadas */
+function archiveOldConversations(keep = 15){
+  const pinned = state.conversations.filter(c => c.pinned);
+  const rest = state.conversations.filter(c => !c.pinned).sort((a,b) => b.updatedAt - a.updatedAt);
+  const removed = rest.length - keep;
+  if (removed <= 0){ toast('Nada a arquivar — você tem poucas conversas.', 'warn'); return; }
+  state.conversations = [...pinned, ...rest.slice(0, keep)];
+  if (!state.conversations.some(c => c.id === state.currentConvId)) state.currentConvId = state.conversations[0]?.id || null;
+  state.quotaFull = false;
+  persistConversations();
+  renderHistoryList();
+  renderChat();
+  toast(`${removed} conversa(s) antiga(s) removida(s).`);
 }
 function dateBucket(ts){
   const days = Math.floor((Date.now() - ts) / 86400000);
@@ -1644,9 +2034,10 @@ function renderHistoryList(){
     el.appendChild(empty);
     return;
   }
+  sorted = [...sorted.filter(c => c.pinned), ...sorted.filter(c => !c.pinned)];
   let lastBucket = null;
   sorted.forEach(conv => {
-    const bucket = dateBucket(conv.updatedAt);
+    const bucket = conv.pinned ? 'Fixadas' : dateBucket(conv.updatedAt);
     if (bucket !== lastBucket){
       const label = document.createElement('div');
       label.className = 'history-group-label';
@@ -1662,6 +2053,12 @@ function renderHistoryList(){
       const iconSpan = document.createElement('span');
       iconSpan.innerHTML = iconHTML('bot');
       titleSpan.appendChild(iconSpan);
+    }
+    if (conv.pinned){
+      const pinSpan = document.createElement('span');
+      pinSpan.innerHTML = iconHTML('pin');
+      pinSpan.style.opacity = '.65';
+      titleSpan.appendChild(pinSpan);
     }
     titleSpan.appendChild(document.createTextNode(conv.title));
     titleSpan.onclick = () => selectConversation(conv.id);
@@ -1706,7 +2103,7 @@ function exportBackup(){
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `vtz-panel-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `vtz-llm-backup-${new Date().toISOString().slice(0,10)}.json`;
   a.click();
 }
 function importBackup(file){
@@ -1938,52 +2335,54 @@ function buildSystemPrompt(conv){
 }
 
 /* ---------- Models ---------- */
-/* FALLBACK_MODELS: só é usado se o fetch ao vivo do /models falhar
+/* FALLBACK_MODELS: só é usado se o fetch ao vivo do /models falhar.
+   context_length aqui é o valor conhecido por família (snapshot 2026-07); quando o
+   catálogo real carrega, ele sobrescreve estes números.
    (ex: sem internet, ou CORS bloqueado por algum motivo específico).
    Snapshot pesquisado em 2026-07-07 — vai ficar desatualizado com o tempo.
    NÃO é fonte de verdade: o fetch ao vivo acima já traz o catálogo completo
    e atualizado quando funciona. Isso é só rede de segurança. */
 const FALLBACK_MODELS = [
-  {id:'openai/gpt-5.5', name:'GPT-5.5', pricing:{prompt:'0.000005',completion:'0.00003'}},
-  {id:'openai/gpt-5.4', name:'GPT-5.4', pricing:{prompt:'0.0000025',completion:'0.000015'}},
-  {id:'openai/gpt-4.1', name:'GPT-4.1', pricing:{prompt:'0.000002',completion:'0.000008'}},
-  {id:'openai/gpt-4.1-mini', name:'GPT-4.1 Mini', pricing:{prompt:'0.0000004',completion:'0.0000016'}},
-  {id:'openai/gpt-4.1-nano', name:'GPT-4.1 Nano', pricing:{prompt:'0.0000001',completion:'0.0000004'}},
-  {id:'openai/o4-mini', name:'o4-mini', pricing:{prompt:'0.0000011',completion:'0.0000044'}},
-  {id:'openai/o3-mini', name:'o3-mini', pricing:{prompt:'0.0000011',completion:'0.0000044'}},
-  {id:'openai/gpt-3.5-turbo', name:'GPT-3.5 Turbo', pricing:{prompt:'0.000001',completion:'0.000002'}},
-  {id:'openai/gpt-image-1', name:'GPT Image 1', pricing:{prompt:'0.00001',completion:'0.00001'}, architecture:{output_modalities:['image','text']}},
-  {id:'openai/gpt-image-1-mini', name:'GPT Image 1 Mini', pricing:{prompt:'0.0000025',completion:'0.0000025'}, architecture:{output_modalities:['image','text']}},
-  {id:'openai/gpt-image-2', name:'GPT Image 2', pricing:{prompt:'0.000008',completion:'0.000008'}, architecture:{output_modalities:['image','text']}},
-  {id:'anthropic/claude-opus-4.8', name:'Claude Opus 4.8', pricing:{prompt:'0.000005',completion:'0.000025'}},
-  {id:'anthropic/claude-sonnet-5', name:'Claude Sonnet 5', pricing:{prompt:'0.000002',completion:'0.00001'}},
-  {id:'anthropic/claude-sonnet-4.6', name:'Claude Sonnet 4.6', pricing:{prompt:'0.000003',completion:'0.000015'}},
-  {id:'anthropic/claude-haiku-4.5', name:'Claude Haiku 4.5', pricing:{prompt:'0.000001',completion:'0.000005'}},
-  {id:'anthropic/claude-haiku-3.5', name:'Claude Haiku 3.5', pricing:{prompt:'0.0000008',completion:'0.000004'}},
-  {id:'anthropic/claude-haiku-3', name:'Claude Haiku 3', pricing:{prompt:'0.00000025',completion:'0.00000125'}},
-  {id:'anthropic/claude-fable-5', name:'Claude Fable 5', pricing:{prompt:'0.00001',completion:'0.00005'}},
-  {id:'anthropic/claude-3.5-sonnet', name:'Claude 3.5 Sonnet', pricing:{prompt:'0.000003',completion:'0.000015'}},
-  {id:'google/gemini-3.1-pro', name:'Gemini 3.1 Pro', pricing:{prompt:'0.000002',completion:'0.000012'}},
-  {id:'google/gemini-3.5-flash', name:'Gemini 3.5 Flash', pricing:{prompt:'0.0000015',completion:'0.000009'}},
-  {id:'google/gemini-3.1-flash-lite', name:'Gemini 3.1 Flash Lite', pricing:{prompt:'0.00000025',completion:'0.0000015'}},
-  {id:'google/gemini-2.5-flash', name:'Gemini 2.5 Flash', pricing:{prompt:'0.0000003',completion:'0.0000012'}},
-  {id:'google/gemini-2.5-flash-image', name:'Nano Banana (Gemini 2.5 Flash Image)', pricing:{prompt:'0.0000003',completion:'0.0000012'}, architecture:{output_modalities:['image','text']}},
-  {id:'google/gemini-3.1-flash-image-preview', name:'Nano Banana 2 (Gemini 3.1 Flash Image)', pricing:{prompt:'0.0000003',completion:'0.0000012'}, architecture:{output_modalities:['image','text']}},
-  {id:'google/gemini-3.1-flash-lite-image', name:'Nano Banana 2 Lite (Gemini 3.1 Flash Lite Image)', pricing:{prompt:'0.0000002',completion:'0.0000008'}, architecture:{output_modalities:['image','text']}},
-  {id:'google/gemini-3-pro-image', name:'Nano Banana Pro (Gemini 3 Pro Image)', pricing:{prompt:'0.000002',completion:'0.000012'}, architecture:{output_modalities:['image','text']}},
-  {id:'deepseek/deepseek-v4-flash', name:'DeepSeek V4 Flash', pricing:{prompt:'0.00000014',completion:'0.00000028'}},
-  {id:'deepseek/deepseek-r1', name:'DeepSeek R1', pricing:{prompt:'0.0000006',completion:'0.0000024'}},
-  {id:'deepseek/deepseek-r1:free', name:'DeepSeek R1 (free)', pricing:{prompt:'0',completion:'0'}},
-  {id:'meta-llama/llama-3.3-70b-instruct', name:'Llama 3.3 70B', pricing:{prompt:'0.00000013',completion:'0.0000004'}},
-  {id:'meta-llama/llama-3.3-70b-instruct:free', name:'Llama 3.3 70B (free)', pricing:{prompt:'0',completion:'0'}},
-  {id:'x-ai/grok-4.3', name:'Grok 4.3', pricing:{prompt:'0.00000125',completion:'0.0000025'}},
-  {id:'qwen/qwen3.7-max', name:'Qwen3.7 Max', pricing:{prompt:'0.0000025',completion:'0.0000075'}},
-  {id:'z-ai/glm-5.2', name:'GLM-5.2', pricing:{prompt:'0.0000014',completion:'0.0000044'}},
-  {id:'z-ai/glm-4.7-flash', name:'GLM-4.7 Flash (free)', pricing:{prompt:'0',completion:'0'}},
-  {id:'minimax/minimax-m3', name:'MiniMax M3', pricing:{prompt:'0.0000006',completion:'0.0000024'}},
-  {id:'black-forest-labs/flux.2-pro', name:'FLUX.2 Pro', pricing:{prompt:'0',completion:'0'}, architecture:{output_modalities:['image']}},
-  {id:'bytedance-seed/seedream-4.5', name:'Seedream 4.5', pricing:{prompt:'0',completion:'0'}, architecture:{output_modalities:['image']}},
-  {id:'x-ai/grok-imagine-image-quality', name:'Grok Imagine Image Quality', pricing:{prompt:'0',completion:'0'}, architecture:{output_modalities:['image']}},
+  {id:'openai/gpt-5.5', name:'GPT-5.5', pricing:{prompt:'0.000005',completion:'0.00003'}, context_length:400000},
+  {id:'openai/gpt-5.4', name:'GPT-5.4', pricing:{prompt:'0.0000025',completion:'0.000015'}, context_length:400000},
+  {id:'openai/gpt-4.1', name:'GPT-4.1', pricing:{prompt:'0.000002',completion:'0.000008'}, context_length:1047576},
+  {id:'openai/gpt-4.1-mini', name:'GPT-4.1 Mini', pricing:{prompt:'0.0000004',completion:'0.0000016'}, context_length:1047576},
+  {id:'openai/gpt-4.1-nano', name:'GPT-4.1 Nano', pricing:{prompt:'0.0000001',completion:'0.0000004'}, context_length:1047576},
+  {id:'openai/o4-mini', name:'o4-mini', pricing:{prompt:'0.0000011',completion:'0.0000044'}, context_length:200000},
+  {id:'openai/o3-mini', name:'o3-mini', pricing:{prompt:'0.0000011',completion:'0.0000044'}, context_length:200000},
+  {id:'openai/gpt-3.5-turbo', name:'GPT-3.5 Turbo', pricing:{prompt:'0.000001',completion:'0.000002'}, context_length:16385},
+  {id:'openai/gpt-image-1', name:'GPT Image 1', pricing:{prompt:'0.00001',completion:'0.00001'}, architecture:{output_modalities:['image','text']}, context_length:4096},
+  {id:'openai/gpt-image-1-mini', name:'GPT Image 1 Mini', pricing:{prompt:'0.0000025',completion:'0.0000025'}, architecture:{output_modalities:['image','text']}, context_length:4096},
+  {id:'openai/gpt-image-2', name:'GPT Image 2', pricing:{prompt:'0.000008',completion:'0.000008'}, architecture:{output_modalities:['image','text']}, context_length:4096},
+  {id:'anthropic/claude-opus-4.8', name:'Claude Opus 4.8', pricing:{prompt:'0.000005',completion:'0.000025'}, context_length:200000},
+  {id:'anthropic/claude-sonnet-5', name:'Claude Sonnet 5', pricing:{prompt:'0.000002',completion:'0.00001'}, context_length:200000},
+  {id:'anthropic/claude-sonnet-4.6', name:'Claude Sonnet 4.6', pricing:{prompt:'0.000003',completion:'0.000015'}, context_length:200000},
+  {id:'anthropic/claude-haiku-4.5', name:'Claude Haiku 4.5', pricing:{prompt:'0.000001',completion:'0.000005'}, context_length:200000},
+  {id:'anthropic/claude-haiku-3.5', name:'Claude Haiku 3.5', pricing:{prompt:'0.0000008',completion:'0.000004'}, context_length:200000},
+  {id:'anthropic/claude-haiku-3', name:'Claude Haiku 3', pricing:{prompt:'0.00000025',completion:'0.00000125'}, context_length:200000},
+  {id:'anthropic/claude-fable-5', name:'Claude Fable 5', pricing:{prompt:'0.00001',completion:'0.00005'}, context_length:128000},
+  {id:'anthropic/claude-3.5-sonnet', name:'Claude 3.5 Sonnet', pricing:{prompt:'0.000003',completion:'0.000015'}, context_length:128000},
+  {id:'google/gemini-3.1-pro', name:'Gemini 3.1 Pro', pricing:{prompt:'0.000002',completion:'0.000012'}, context_length:1048576},
+  {id:'google/gemini-3.5-flash', name:'Gemini 3.5 Flash', pricing:{prompt:'0.0000015',completion:'0.000009'}, context_length:1048576},
+  {id:'google/gemini-3.1-flash-lite', name:'Gemini 3.1 Flash Lite', pricing:{prompt:'0.00000025',completion:'0.0000015'}, context_length:1048576},
+  {id:'google/gemini-2.5-flash', name:'Gemini 2.5 Flash', pricing:{prompt:'0.0000003',completion:'0.0000012'}, context_length:1048576},
+  {id:'google/gemini-2.5-flash-image', name:'Nano Banana (Gemini 2.5 Flash Image)', pricing:{prompt:'0.0000003',completion:'0.0000012'}, architecture:{output_modalities:['image','text']}, context_length:1048576},
+  {id:'google/gemini-3.1-flash-image-preview', name:'Nano Banana 2 (Gemini 3.1 Flash Image)', pricing:{prompt:'0.0000003',completion:'0.0000012'}, architecture:{output_modalities:['image','text']}, context_length:1048576},
+  {id:'google/gemini-3.1-flash-lite-image', name:'Nano Banana 2 Lite (Gemini 3.1 Flash Lite Image)', pricing:{prompt:'0.0000002',completion:'0.0000008'}, architecture:{output_modalities:['image','text']}, context_length:1048576},
+  {id:'google/gemini-3-pro-image', name:'Nano Banana Pro (Gemini 3 Pro Image)', pricing:{prompt:'0.000002',completion:'0.000012'}, architecture:{output_modalities:['image','text']}, context_length:1048576},
+  {id:'deepseek/deepseek-v4-flash', name:'DeepSeek V4 Flash', pricing:{prompt:'0.00000014',completion:'0.00000028'}, context_length:164000},
+  {id:'deepseek/deepseek-r1', name:'DeepSeek R1', pricing:{prompt:'0.0000006',completion:'0.0000024'}, context_length:164000},
+  {id:'deepseek/deepseek-r1:free', name:'DeepSeek R1 (free)', pricing:{prompt:'0',completion:'0'}, context_length:164000},
+  {id:'meta-llama/llama-3.3-70b-instruct', name:'Llama 3.3 70B', pricing:{prompt:'0.00000013',completion:'0.0000004'}, context_length:131072},
+  {id:'meta-llama/llama-3.3-70b-instruct:free', name:'Llama 3.3 70B (free)', pricing:{prompt:'0',completion:'0'}, context_length:131072},
+  {id:'x-ai/grok-4.3', name:'Grok 4.3', pricing:{prompt:'0.00000125',completion:'0.0000025'}, context_length:256000},
+  {id:'qwen/qwen3.7-max', name:'Qwen3.7 Max', pricing:{prompt:'0.0000025',completion:'0.0000075'}, context_length:262144},
+  {id:'z-ai/glm-5.2', name:'GLM-5.2', pricing:{prompt:'0.0000014',completion:'0.0000044'}, context_length:200000},
+  {id:'z-ai/glm-4.7-flash', name:'GLM-4.7 Flash (free)', pricing:{prompt:'0',completion:'0'}, context_length:200000},
+  {id:'minimax/minimax-m3', name:'MiniMax M3', pricing:{prompt:'0.0000006',completion:'0.0000024'}, context_length:1000000},
+  {id:'black-forest-labs/flux.2-pro', name:'FLUX.2 Pro', pricing:{prompt:'0',completion:'0'}, architecture:{output_modalities:['image']}, context_length:128000},
+  {id:'bytedance-seed/seedream-4.5', name:'Seedream 4.5', pricing:{prompt:'0',completion:'0'}, architecture:{output_modalities:['image']}, context_length:128000},
+  {id:'x-ai/grok-imagine-image-quality', name:'Grok Imagine Image Quality', pricing:{prompt:'0',completion:'0'}, architecture:{output_modalities:['image']}, context_length:256000},
 ];
 
 async function fetchModels(){
@@ -2137,6 +2536,7 @@ function renderPickerList(){
       state.model = m.id;
       localStorage.setItem('vtz_or_model', state.model);
       updateModelLabel();
+      updateCtxMeter();
       closePicker();
     };
     el.appendChild(row);
@@ -2180,6 +2580,7 @@ function renderChat(){
   });
   log.scrollTop = log.scrollHeight;
   updateComposerState();
+  updateCtxMeter();
 }
 function safeRenderMarkdown(content){
   if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined'){
@@ -2236,7 +2637,7 @@ function appendMessageDOM(role, content, isTool, msgIndex){
 
   const sender = document.createElement('div');
   sender.className = 'msg-sender';
-  sender.textContent = isUser ? 'Você' : 'VTZ';
+  sender.textContent = isUser ? 'Você' : 'VTz LLM';
 
   const bubble = document.createElement('div');
   bubble.className = 'msg ' + role;
@@ -2298,6 +2699,18 @@ function openMsgMenu(msgIndex){
   const items = [
     { icon:'selectText', label:'Selecionar texto', run: () => openSelectText(contentToText(msg.content)) },
   ];
+  if (!isAssistant) items.push({ icon:'edit', label:'Editar mensagem', run: () => openEditMsg(msgIndex) });
+  const rawText = contentToText(msg.content);
+  const blocks = extractCodeBlocks(rawText);
+  items.push({ icon:'download', label:'Baixar mensagem (.md)', run: () => {
+    downloadTextFile(`vtz-mensagem-${msgIndex+1}.md`, rawText);
+  }});
+  if (blocks.length){
+    items.push({ icon:'download', label:`Baixar código${blocks.length>1?'s':''} (${blocks.length} arquivo${blocks.length>1?'s':''})`, run: () => {
+      blocks.forEach((b, i) => setTimeout(() => downloadTextFile(guessFilename(b.code, b.lang, i+1), b.code), i * 250));
+      toast(`Baixando ${blocks.length} arquivo${blocks.length>1?'s':''}…`);
+    }});
+  }
   if (isAssistant){
     items.push({ icon:'refresh', label:'Regenerar', run: () => openRegenSheet(msgIndex) });
     items.push({ icon:'wand', label:'Humanizar', run: () => humanizeMessage(msgIndex) });
@@ -2320,6 +2733,76 @@ function closeMsgMenu(){ document.getElementById('msg-menu-overlay').classList.r
 function openSelectText(text){
   document.getElementById('select-text-area').value = text;
   document.getElementById('select-text-modal').style.display = 'flex';
+}
+
+/* Editar mensagem enviada: corrige o texto, descarta o que veio depois e refaz a resposta */
+function openEditMsg(msgIndex){
+  const conv = getCurrentConv();
+  const msg = conv?.messages[msgIndex];
+  if (!msg) return;
+  if (state.gens[conv.id]){ toast('Aguarde ou interrompa a geração atual.', 'warn'); return; }
+  const modal = document.getElementById('edit-msg-modal');
+  document.getElementById('edit-msg-area').value = contentToText(msg.content);
+  modal.dataset.msgIndex = String(msgIndex);
+  // anexos não sobrevivem à edição (base64 não é persistido) — avisa em vez de perder em silêncio
+  document.getElementById('edit-msg-note').style.display = Array.isArray(msg.content) ? 'block' : 'none';
+  modal.style.display = 'flex';
+  document.getElementById('edit-msg-area').focus();
+}
+async function saveEditMsg(){
+  const modal = document.getElementById('edit-msg-modal');
+  const idx = parseInt(modal.dataset.msgIndex, 10);
+  const text = document.getElementById('edit-msg-area').value.trim();
+  modal.style.display = 'none';
+  if (!text) return;
+  const conv = getCurrentConv();
+  if (!conv || !conv.messages[idx]) return;
+  conv.messages = conv.messages.slice(0, idx);
+  conv.messages.push({ role:'user', content: text });
+  conv.updatedAt = Date.now();
+  persistConversations();
+  renderChat();
+  renderHistoryList();
+  try{ await runChatLoop(0, conv); }
+  catch(e){ if (e.name !== 'AbortError' && conv.id === state.currentConvId) appendMessageDOM('assistant', 'Erro: ' + e.message); }
+}
+
+/* ---------- Medidor de contexto ao vivo (tokens + custo estimado do próximo envio) ----------
+   Estimativa: ~4 chars por token (heurística padrão pra pt/en). Não é o tokenizer exato
+   do modelo — é aproximação declarada, suficiente pra avisar antes de ficar caro. */
+function estimateTokens(text){ return Math.ceil((text || '').length / 4); }
+function updateCtxMeter(){
+  const el = document.getElementById('ctx-meter');
+  if (!el) return;
+  const chatView = document.getElementById('chat-view');
+  if (!chatView || !chatView.classList.contains('active')) return;
+  const conv = getCurrentConv();
+  if (!conv){ el.textContent = ''; return; }
+  let msgs = conv.messages;
+  if (state.ctxWindow > 0 && msgs.length > state.ctxWindow) msgs = msgs.slice(-state.ctxWindow);
+  const draft = document.getElementById('chat-input')?.value || '';
+  const sys = buildSystemPrompt(conv) || '';
+  let totalChars = sys.length + draft.length;
+  for (const m of msgs){
+    if (m.role !== 'user' && m.role !== 'assistant') continue;
+    totalChars += (typeof m.content === 'string') ? m.content.length : contentToText(m.content).length;
+  }
+  const tokens = Math.ceil(totalChars / 4);
+
+  let modelId = conv.model || state.model;
+  if (modelId === '__router__') modelId = state.routerConfig.balanced || state.routerConfig.fast || '';
+  const m = state.models.find(x => x.id === modelId);
+  const pricing = getModelPricing(modelId);
+  const costBRL = tokens * pricing.prompt * state.usdToBrl;
+  const ctxMax = m?.context_length || 0;
+
+  const kt = tokens >= 1000 ? (tokens/1000).toFixed(1).replace('.',',') + 'k' : String(tokens);
+  const maxTxt = ctxMax ? ' / ' + Math.round(ctxMax/1000) + 'k' : '';
+  const custo = costBRL >= 0.01 ? ' · ~R$' + costBRL.toFixed(2).replace('.',',') : '';
+  el.textContent = `~${kt}${maxTxt} tokens${custo}`;
+  const pct = ctxMax ? tokens / ctxMax : 0;
+  el.classList.toggle('warn', pct >= 0.7 && pct < 0.9);
+  el.classList.toggle('danger', pct >= 0.9);
 }
 
 /* Sheet de escolha de modelo pra regenerar: mesmo modelo, favoritos e shortlist */
@@ -2377,6 +2860,10 @@ async function humanizeMessage(msgIndex){
   state.gens[conv.id] = new AbortController();
   updateComposerState();
   toast('Humanizando resposta…');
+  let hDeadline = Date.now();
+  const hWatchdog = setInterval(() => {
+    if (Date.now() - hDeadline > STREAM_IDLE_MS){ try{ state.gens[conv.id]?.abort(); }catch(_){} }
+  }, 1000);
   try{
     const res = await orFetch({ model: effectiveModel, messages:[
       { role:'system', content:'Você reescreve textos em português brasileiro num tom mais humano, natural e direto — como uma pessoa experiente escrevendo, sem clichês de IA ("é importante notar", "vale ressaltar"). Mantenha TODO o conteúdo, fatos, números e blocos de código intactos. Responda apenas com o texto reescrito.' },
@@ -2385,7 +2872,7 @@ async function humanizeMessage(msgIndex){
     if (!res.ok) throw new Error('API ' + res.status + ': ' + (await res.text()).slice(0,120));
     const data = await res.json();
     const rewritten = (data.choices?.[0]?.message?.content || '').trim();
-    trackUsage(data.usage, effectiveModel);
+    trackUsage(data.usage, effectiveModel, conv);
     if (!rewritten){
       toast('O modelo não retornou texto (comum em modelos de raciocínio) — tente outro modelo.', 'err');
       return;
@@ -2398,6 +2885,7 @@ async function humanizeMessage(msgIndex){
     if (e.name === 'AbortError') toast('Humanização interrompida.', 'warn');
     else toast('Erro ao humanizar: ' + e.message, 'err');
   }finally{
+    clearInterval(hWatchdog);
     delete state.gens[conv.id];
     updateComposerState();
   }
@@ -2414,6 +2902,19 @@ async function sendMessage(){
 
   const conv = getCurrentConv();
   if (state.gens[conv.id]){ toast('Esta conversa já está gerando — interrompa ou aguarde.', 'warn'); return; }
+  conv.draft = '';
+  // easter egg /status: painel local, sem chamada de API
+  if (text.trim() === '/status' && !hasAtt){
+    const upMin = Math.max(1, Math.round((Date.now() - BOOT_TS) / 60000));
+    const mName = state.model === '__router__' ? 'RouteLLM' : (state.models.find(m=>m.id===state.model)?.name || state.model);
+    const totalMsgs = state.conversations.reduce((s,c)=> s + c.messages.filter(x=>x.role==='user'||x.role==='assistant').length, 0);
+    const status = `**VTZ STATUS**\n- Modelo ativo: ${mName}\n- Sessão: ${upMin} min\n- Custo total: $${state.totalCost.toFixed(4)} (R$${(state.totalCost*state.usdToBrl).toFixed(2)})\n- Conversas: ${state.conversations.length} · Mensagens: ${totalMsgs}\n- Janela de contexto: ${state.ctxWindow || 'tudo'}\n- Tools: ${Object.keys(TOOLS).length} · Tema: ${state.theme}`;
+    conv.messages.push({ role:'user', content:text, _local:true, ts:Date.now() });
+    conv.messages.push({ role:'assistant', content:status, _local:true, ts:Date.now() });
+    conv.updatedAt = Date.now();
+    renderChat(); persistConversations();
+    return;
+  }
   let userMsg;
   if (hasAtt){
     const parts = [];
@@ -2427,11 +2928,11 @@ async function sendMessage(){
         appendMessageDOM('assistant', 'Erro ao anexar ' + f.name + ': ' + e.message);
       }
     }
-    userMsg = { role:'user', content: parts, _att: names };
+    userMsg = { role:'user', content: parts, _att: names, ts: Date.now() };
     state.pendingAttachments = [];
     renderAttachChips();
   } else {
-    userMsg = { role:'user', content: text };
+    userMsg = { role:'user', content: text, ts: Date.now() };
   }
 
   conv.messages.push(userMsg);
@@ -2500,9 +3001,20 @@ async function runChatLoop(depth=0, convArg, modelOverride){
   }
   const ctrl = state.gens[conv.id];
 
+  // "Pensando..." aparece imediatamente — inclusive durante o roteamento.
+  // Fica FORA do try pra ser removido no finally, aconteça o que acontecer.
+  const thinking = createThinkingRow(conv);
+  let watchdog = null;
   try{
-    // "Pensando..." aparece imediatamente — inclusive durante o roteamento
-    const thinking = createThinkingRow(conv);
+    /* Watchdog da requisição INTEIRA: cobre o roteamento, a espera pelos headers
+       (caso mais comum de travamento) e o corpo do stream. Antes ele só nascia
+       depois dos headers — um servidor mudo travava o "Pensando…" pra sempre. */
+    let lastByte = Date.now();
+    let timedOut = false;
+    watchdog = setInterval(() => {
+      if (Date.now() - lastByte > STREAM_IDLE_MS){ timedOut = true; try{ ctrl.abort(); }catch(_){} }
+    }, 1000);
+    const timeoutMsg = () => `A API não respondeu em ${STREAM_IDLE_MS/1000}s. Rode "Testar conexão" em Config.`;
 
     const baseModel = modelOverride || conv.model || state.model;
     let effectiveModel = baseModel;
@@ -2513,7 +3025,7 @@ async function runChatLoop(depth=0, convArg, modelOverride){
         let chosen = null;
         try{ chosen = await classifyWithLLM(userText, ctrl.signal); }
         catch(e){
-          if (e.name === 'AbortError'){ thinking.remove(); toast('Geração interrompida', 'warn'); return; }
+          if (e.name === 'AbortError'){ toast(timedOut ? timeoutMsg() : 'Geração interrompida', timedOut ? 'err' : 'warn'); return; }
           console.warn('Router LLM falhou, usando heurística:', e.message);
         }
         if (!chosen){
@@ -2537,80 +3049,102 @@ async function runChatLoop(depth=0, convArg, modelOverride){
     }
     const apiMessages = systemPrompt ? [{role:'system', content: systemPrompt}, ...baseMessages] : baseMessages;
 
-    const useStream = !state.toolsEnabled; // tool-use exige resposta completa
+    const useStream = state.streamOn && !state.toolsEnabled; // tool-use exige resposta completa
     const body = { model: effectiveModel, messages: apiMessages };
     if (state.toolsEnabled) body.tools = Object.values(TOOLS).map(t => t.def);
+    // Busca web nativa do OpenRouter: funciona com qualquer modelo (incl. :free).
+    // Custo do plugin (~US$0,02/req) é cobrado pelo provedor e NÃO aparece no
+    // contador de tokens — declarado no toast ao ativar.
+    if (state.webSearch) body.plugins = [{ id: 'web' }];
     if (useStream){ body.stream = true; body.stream_options = { include_usage: true }; }
 
     let res;
     try{
-      res = await orFetch(body, { signal: ctrl.signal });
+      res = await orFetchRetry(body, { signal: ctrl.signal });
     }catch(e){
-      thinking.remove();
-      if (e.name === 'AbortError'){ toast('Geração interrompida', 'warn'); return; }
+      if (e.name === 'AbortError'){ toast(timedOut ? timeoutMsg() : 'Geração interrompida', timedOut ? 'err' : 'warn'); return; }
       throw e;
     }
+    lastByte = Date.now(); // headers chegaram
     if (!res.ok){
-      thinking.remove();
-      throw new Error(`API ${res.status}: ${(await res.text()).slice(0,200)}`);
+      const errBody = (await res.text()).slice(0,300);
+      throw new Error(`API ${res.status} — ${errBody || 'sem detalhe'}`);
     }
 
     /* ---- Streaming (chat normal) ---- */
     if (useStream){
+      if (!res.body) throw new Error('Streaming indisponível — desative o streaming em Config.');
       let acc = '', usage = null, lastPaint = 0, aborted = false;
       try{
         const reader = res.body.getReader();
         const dec = new TextDecoder();
         let buf = '';
-        while(true){
+        outer: while(true){
           const {done, value} = await reader.read();
           if (done) break;
+          lastByte = Date.now();
           buf += dec.decode(value, {stream:true});
           let nl;
           while((nl = buf.indexOf('\n')) >= 0){
             const line = buf.slice(0, nl).trim();
             buf = buf.slice(nl + 1);
+            if (!line || line.startsWith(':')) continue;        // keep-alive do OpenRouter
             if (!line.startsWith('data:')) continue;
             const payload = line.slice(5).trim();
-            if (payload === '[DONE]') continue;
-            try{
-              const obj = JSON.parse(payload);
-              const delta = obj.choices?.[0]?.delta?.content;
-              if (delta){
-                acc += delta;
-                const now = Date.now();
-                if (now - lastPaint > 60){ thinking.update(acc); lastPaint = now; }
-              }
-              if (obj.usage) usage = obj.usage;
-            }catch(_){ /* linha parcial/keep-alive */ }
+            if (payload === '[DONE]') break outer;              // não espera o socket fechar
+            let obj;
+            try{ obj = JSON.parse(payload); }
+            catch(_){ continue; }                                // linha parcial
+            if (obj.error) throw new Error(obj.error.message || 'erro do provedor');
+            const delta = obj.choices?.[0]?.delta?.content;
+            if (delta){
+              acc += delta;
+              const now = Date.now();
+              if (now - lastPaint > 60){ thinking.update(acc); lastPaint = now; }
+            }
+            if (obj.usage) usage = obj.usage;
           }
         }
       }catch(e){
-        if (e.name === 'AbortError'){ aborted = true; }
-        else { thinking.remove(); throw e; }
+        if (e.name === 'AbortError') aborted = true;
+        else throw e;
       }
-      thinking.remove();
+      clearInterval(watchdog); watchdog = null; // corpo completo — para de vigiar
       trackUsage(usage, effectiveModel);
+      if (!acc){
+        if (timedOut) toast(timeoutMsg(), 'err');
+        else if (aborted) toast('Geração interrompida.', 'warn');
+        else toast('O modelo não retornou texto. Tente outro modelo ou desative o streaming em Config.', 'err');
+        return;
+      }
       if (aborted) toast('Geração interrompida — resposta parcial mantida', 'warn');
-      if (!acc && aborted) return;
 
       const assistantMsg = { role:'assistant', content: acc };
       if (baseModel === '__router__' && conv._routedModel){
         assistantMsg._router = state.models.find(m => m.id === conv._routedModel)?.name || conv._routedModel;
       }
+      assistantMsg.ts = Date.now();
       conv.messages.push(assistantMsg);
       conv.updatedAt = Date.now();
-      if (conv.id === state.currentConvId) appendMessageDOM('assistant', acc, false, conv.messages.length - 1);
+      if (conv.id === state.currentConvId){ appendMessageDOM('assistant', acc, false, conv.messages.length - 1); updateCtxMeter(); }
       persistConversations();
       renderHistoryList();
+      afterAssistantDone(conv);
       return;
     }
 
     /* ---- Não-stream (tools ativas) ---- */
-    const data = await res.json();
-    thinking.remove();
-    const msg = data.choices[0].message;
-    trackUsage(data.usage, effectiveModel);
+    let data;
+    try{ data = await res.json(); }
+    catch(e){
+      if (e.name === 'AbortError'){ toast(timedOut ? timeoutMsg() : 'Geração interrompida', timedOut ? 'err' : 'warn'); return; }
+      throw e;
+    }
+    clearInterval(watchdog); watchdog = null; // resposta completa — tools podem demorar sem serem abortadas
+    if (data.error) throw new Error(data.error.message || 'erro do provedor');
+    const msg = data.choices?.[0]?.message;
+    if (!msg) throw new Error('Resposta da API sem mensagem (formato inesperado).');
+    trackUsage(data.usage, effectiveModel, conv);
 
     if (msg.tool_calls && msg.tool_calls.length){
       conv.messages.push(msg);
@@ -2633,12 +3167,16 @@ async function runChatLoop(depth=0, convArg, modelOverride){
     if (baseModel === '__router__' && conv._routedModel){
       assistantMsg._router = state.models.find(m => m.id === conv._routedModel)?.name || conv._routedModel;
     }
+    assistantMsg.ts = Date.now();
     conv.messages.push(assistantMsg);
     conv.updatedAt = Date.now();
-    if (conv.id === state.currentConvId) appendMessageDOM('assistant', msg.content || '', false, conv.messages.length - 1);
+    if (conv.id === state.currentConvId){ appendMessageDOM('assistant', msg.content || '', false, conv.messages.length - 1); updateCtxMeter(); }
     persistConversations();
     renderHistoryList();
+    afterAssistantDone(conv);
   } finally {
+    if (watchdog) clearInterval(watchdog);
+    thinking.remove(); // "Pensando…" nunca fica pendurado, mesmo com exceção
     if (depth === 0){
       delete state.gens[conv.id];
       updateComposerState();
