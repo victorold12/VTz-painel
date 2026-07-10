@@ -539,7 +539,7 @@
   /* copiar por bloco de código */
   .code-wrap{position:relative;}
   .code-wrap pre{padding-right:80px;}
-  .code-dl{right:44px;}
+  .code-copy.code-dl{right:44px;}
   .code-copy{
     position:absolute; top:8px; right:8px; display:flex; align-items:center; justify-content:center;
     background:var(--w08); border:1px solid var(--line); color:var(--text-dim);
@@ -1961,8 +1961,21 @@ async function runDiagnostics(){
     }
   }catch(e){ push(false, 'POST com stream falhou', e.message); }
 
+  // 5) busca web (plugin do OpenRouter)
+  try{
+    const r = await orFetch({ model, messages:[{role:'user', content:'Qual a data de hoje segundo a web? Responda em 5 palavras.'}], max_tokens: 40, plugins:[{id:'web'}] });
+    const body = await r.text();
+    if (!r.ok) push(false, `Busca web → HTTP ${r.status}`, body.slice(0,200));
+    else {
+      let txt = '';
+      try{ txt = JSON.parse(body).choices?.[0]?.message?.content ?? ''; }catch(_){}
+      push(!!txt, 'Busca web (plugin :web)', txt ? `resposta: "${txt.trim().slice(0,60)}"` : 'HTTP 200 sem texto');
+    }
+  }catch(e){ push(false, 'Busca web falhou', e.message); }
+
   log.push('');
   log.push('Se "sem stream" funciona e "com stream" falha: desmarque Streaming acima.');
+  log.push('Busca web custa ~US$0,02 por mensagem, à parte dos tokens.');
   paint();
 }
 
