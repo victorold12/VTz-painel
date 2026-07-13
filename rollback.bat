@@ -10,6 +10,8 @@ echo.
 echo === VTz LLM - Rollback do Hosting ===
 echo.
 
+cd /d "%~dp0"
+
 where firebase >nul 2>nul
 if errorlevel 1 (
   echo [ERRO] Firebase CLI nao encontrado. Instale:  npm install -g firebase-tools
@@ -25,7 +27,7 @@ if /I not "%CONF%"=="S" (
   exit /b 0
 )
 
-firebase hosting:rollback --project vtz-life-47067
+call firebase hosting:rollback --project vtz-life-47067
 if errorlevel 1 (
   echo.
   echo [AVISO] Rollback automatico falhou nesta versao do CLI.
