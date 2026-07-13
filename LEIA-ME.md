@@ -18,9 +18,14 @@ Abra: https://console.firebase.google.com/project/vtz-life-47067
    Authentication → *Get started* → aba *Sign-in method* → **Google** → *Enable* →
    escolha o e-mail de suporte → *Save*.
 
-2. **Criar o Firestore**
-   Firestore Database → *Create database* → modo **Production** →
-   escolha a região (ex.: `southamerica-east1`) → *Enable*.
+2. **Criar o Firestore** — *neste projeto já existe* (banco `(default)`), então
+   pode pular. Só crie se ainda não houver: Firestore Database → *Create database*
+   → modo **Production** → região (ex.: `southamerica-east1`) → *Enable*.
+
+   > **Importante:** o projeto `vtz-life-47067` já tem outro app usando a coleção
+   > `users` (dados de treino). O VTz LLM grava numa coleção separada
+   > (`vtzllm_users`), então os dois **não se sobrescrevem**. As regras cobrem as
+   > duas coleções, cada usuário só acessa o próprio documento.
 
 3. **Publicar as regras** (feito pelo `deploy.bat`, ou manual)
    Firestore → aba *Rules* → cole o conteúdo de `firestore.rules` → *Publish*.

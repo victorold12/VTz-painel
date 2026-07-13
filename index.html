@@ -2061,7 +2061,7 @@ async function pushToCloud(){
       favorites: state.favorites,
       updatedAt: Date.now(),
     };
-    await fbDb.collection('users').doc(user.uid).set(payload);
+    await fbDb.collection('vtzllm_users').doc(user.uid).set(payload);
     setSyncStatus('Sincronizado ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}));
   }catch(e){ setSyncStatus('Erro no sync: ' + e.message); }
 }
@@ -2069,7 +2069,7 @@ async function pullFromCloud(uid){
   if (!fbDb) return;
   try{
     setSyncStatus('Baixando da nuvem…');
-    const doc = await fbDb.collection('users').doc(uid).get();
+    const doc = await fbDb.collection('vtzllm_users').doc(uid).get();
     if (!doc.exists){ await pushToCloud(); return; }
     const d = doc.data();
     if (Array.isArray(d.conversations)) localStorage.setItem('vtz_conversations', JSON.stringify(d.conversations));

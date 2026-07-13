@@ -1,11 +1,18 @@
 rules_version = '2';
 
 // VTz LLM — regras do Firestore.
-// Cada usuário logado só pode ler e escrever o PRÓPRIO documento em users/{uid}.
-// Ninguém acessa dados de outro usuário. Sem login = sem acesso ao banco.
+// O chat grava numa coleção PRÓPRIA (vtzllm_users), separada da coleção `users`
+// usada pelo outro app do projeto (treino). Assim os dois convivem sem se apagar.
+// Cada usuário logado só acessa o PRÓPRIO documento.
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Dados do VTz LLM (conversas, agentes, skills, favoritos).
+    match /vtzllm_users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Dados do app de treino (já existente). Mantido acessível ao próprio dono.
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
