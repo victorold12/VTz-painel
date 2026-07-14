@@ -188,6 +188,32 @@
   .msg pre{background:var(--input-bg); padding:10px 12px; border-radius:10px; overflow-x:auto; font-family:var(--mono); font-size:12.5px; margin:8px 0;}
   .msg code{font-family:var(--mono); font-size:.9em; background:var(--w08); padding:1px 5px; border-radius:4px;}
   .msg pre code{background:none; padding:0;}
+  /* ===== Markdown formatado na resposta (estilo ChatGPT: limpo e alinhado) ===== */
+  .msg.assistant > *:first-child{margin-top:0;}
+  .msg.assistant > *:last-child{margin-bottom:0;}
+  .msg.assistant p{margin:.6em 0; line-height:1.6;}
+  .msg.assistant h1,.msg.assistant h2,.msg.assistant h3,.msg.assistant h4{
+    font-weight:700; line-height:1.3; margin:1.1em 0 .5em; color:var(--text);}
+  .msg.assistant h1{font-size:1.35em;}
+  .msg.assistant h2{font-size:1.2em;}
+  .msg.assistant h3{font-size:1.07em;}
+  .msg.assistant h4{font-size:1em;}
+  .msg.assistant h1:first-child,.msg.assistant h2:first-child,.msg.assistant h3:first-child{margin-top:0;}
+  .msg.assistant strong{font-weight:700; color:var(--text);}
+  .msg.assistant em{font-style:italic;}
+  .msg.assistant a{color:var(--violet); text-decoration:none; border-bottom:1px solid var(--violet-dim);}
+  .msg.assistant a:hover{border-bottom-color:var(--violet);}
+  .msg.assistant ul,.msg.assistant ol{margin:.5em 0; padding-left:1.5em;}
+  .msg.assistant li{margin:.32em 0; line-height:1.55;}
+  .msg.assistant li::marker{color:var(--violet);}
+  .msg.assistant ul ul,.msg.assistant ol ol,.msg.assistant ul ol,.msg.assistant ol ul{margin:.2em 0;}
+  .msg.assistant blockquote{margin:.7em 0; padding:.15em 0 .15em .9em; border-left:3px solid var(--violet); color:var(--text-dim);}
+  .msg.assistant hr{border:none; border-top:1px solid var(--line); margin:1em 0;}
+  .msg.assistant table{border-collapse:collapse; width:100%; margin:.8em 0; font-size:.95em; display:block; overflow-x:auto;}
+  .msg.assistant th,.msg.assistant td{border:1px solid var(--line); padding:7px 11px; text-align:left; vertical-align:top;}
+  .msg.assistant thead th,.msg.assistant tr:first-child th{background:var(--violet); color:#fff; font-weight:700; border-color:var(--violet);}
+  .msg.assistant tbody tr:nth-child(even){background:var(--w05);}
+  .msg.assistant h2,.msg.assistant h3{padding-bottom:.2em;}
 
   /* ---------- Composer (glass pill) ---------- */
   .composer-wrap{padding:10px 12px calc(12px + env(safe-area-inset-bottom));}
@@ -1619,20 +1645,26 @@ const DEFAULT_GLOBAL_PROMPT = `Você é o VTZ, assistente pessoal do Victor Hugo
    - Apresentação/slides: um "## Título" por slide, seguido de poucos bullets curtos (um conceito por slide). O app gera "Baixar slides (PDF)".
    - Planilha/tabela (ex.: plano de treino): use tabela markdown "| Coluna | ... |" com cabeçalho. Gera Excel e PDF em grade.
    - Documento: títulos ##/### + listas. Gera "Baixar PDF (formatado)".
-   Um TEMPLATE rotulado (ex.: treino ABC pra preencher cargas) é permitido e NÃO conta como inventar dados — só deixe claro que é modelo. Se útil, lembre em uma linha que o download é pelo menu ⋯. (Exceção: só escreva script gerador de arquivo se o usuário pedir explicitamente o código.)`;
+   Um TEMPLATE rotulado (ex.: treino ABC pra preencher cargas) é permitido e NÃO conta como inventar dados — só deixe claro que é modelo. Se útil, lembre em uma linha que o download é pelo menu ⋯. (Exceção: só escreva script gerador de arquivo se o usuário pedir explicitamente o código.)
+10. Formate as respostas com capricho, no estilo de pesquisa do ChatGPT: use "## Seção" para agrupar, **negrito** em nomes/rótulos/preços, listas com bullet (rótulo em negrito + descrição curta) e TABELA markdown pra comparar itens (produtos, preços, specs). Em buscas web, organize por categoria ou faixa de preço, destaque a recomendação final numa seção própria e cite as fontes. Não despeje texto corrido quando dá pra estruturar — mas também não force estrutura em respostas curtas de uma linha.`;
 if (localStorage.getItem('vtz_global_prompt') === null){
   localStorage.setItem('vtz_global_prompt', DEFAULT_GLOBAL_PROMPT);
 }
-/* Migração não-destrutiva: se o prompt salvo (personalizado ou antigo) não tem
-   a regra de geração de arquivos, injeta uma versão compacta preservando o resto.
-   O marcador "menu ⋯" evita reaplicar. */
-const FILE_RULE_MARK = 'menu ⋯';
-const FILE_RULE_TEXT = `9. Você não gera arquivos você mesmo — o VTz LLM converte sua resposta em PDF/slides/Word/Excel pelo menu ⋯ da mensagem. Nunca invente link de download, nunca finja ter salvo arquivo e nunca escreva script gerador (Python/reportlab/.bat) pro usuário rodar. Para planilha/treino use tabela markdown "| Coluna | ... |"; para slides use "## Título" por slide; para documento use ##/### + listas. Template rotulado pra preencher é permitido.`;
+/* Migração não-destrutiva do prompt global: injeta regras novas em prompts já
+   salvos (personalizados ou antigos) preservando o resto. Cada regra tem um
+   marcador único — se já estiver presente, não reaplica (idempotente). */
+const PROMPT_RULES = [
+  { mark: 'menu ⋯',
+    text: '9. Você não gera arquivos você mesmo — o VTz LLM converte sua resposta em PDF/slides/Word/Excel pelo menu ⋯ da mensagem. Nunca invente link de download, nunca finja ter salvo arquivo e nunca escreva script gerador (Python/reportlab/.bat) pro usuário rodar. Para planilha/treino use tabela markdown "| Coluna | ... |"; para slides use "## Título" por slide; para documento use ##/### + listas. Template rotulado pra preencher é permitido.' },
+  { mark: 'estilo de pesquisa',
+    text: '10. Formate as respostas com capricho, no estilo de pesquisa do ChatGPT: use "## Seção" para agrupar, **negrito** em nomes/rótulos/preços, listas com bullet (rótulo em negrito + descrição curta) e TABELA markdown pra comparar itens (produtos, preços, specs). Em buscas web, organize por categoria ou faixa de preço, destaque a recomendação final e cite as fontes. Não despeje texto corrido quando dá pra estruturar — mas não force estrutura em respostas curtas.' },
+];
 (function migrateGlobalPrompt(){
-  const cur = localStorage.getItem('vtz_global_prompt');
-  if (cur && !cur.includes(FILE_RULE_MARK)){
-    localStorage.setItem('vtz_global_prompt', cur.replace(/\s+$/,'') + '\n' + FILE_RULE_TEXT);
-  }
+  let cur = localStorage.getItem('vtz_global_prompt');
+  if (!cur) return;
+  let changed = false;
+  PROMPT_RULES.forEach(r => { if (!cur.includes(r.mark)){ cur = cur.replace(/\s+$/,'') + '\n' + r.text; changed = true; } });
+  if (changed) localStorage.setItem('vtz_global_prompt', cur);
 })();
 
 /* seed de agentes na primeira execução — depois disso são 100% editáveis via CRUD */
