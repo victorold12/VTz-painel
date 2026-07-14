@@ -277,6 +277,12 @@
     color:var(--text); font-size:13px; outline:none;
   }
   .sidebar-search input::placeholder{color:var(--text-faint);}
+  .projects-bar{display:flex; flex-wrap:wrap; gap:6px; padding:8px 12px 4px;}
+  .proj-chip{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--text-dim); background:var(--w05); border:1px solid var(--line); border-radius:999px; padding:4px 10px; cursor:pointer; transition:.15s; max-width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .proj-chip:hover{color:var(--text); border-color:var(--w15);}
+  .proj-chip.active{background:var(--violet); border-color:var(--violet); color:#fff;}
+  .proj-chip .pc-dot{width:7px; height:7px; border-radius:50%; flex:none;}
+  .proj-chip.add{color:var(--text-faint); border-style:dashed;}
   .history-list{flex:1; overflow-y:auto; padding:0 10px 16px;}
   .history-group-label{font-size:11px; color:var(--text-faint); padding:12px 10px 4px; text-transform:uppercase; letter-spacing:.05em;}
   .history-item{
@@ -576,8 +582,52 @@
   @media (prefers-reduced-motion: reduce){ .thinking-label{animation:none; color:var(--text-dim); -webkit-text-fill-color:var(--text-dim);} }
   /* copiar por bloco de código */
   .code-wrap{position:relative;}
-  .code-wrap pre{padding-right:80px;}
+  .code-wrap pre{padding-right:116px;}
   .code-copy.code-dl{right:44px;}
+  .code-copy.code-preview{right:80px;}
+  .html-preview-overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(3px); z-index:80; display:none; align-items:center; justify-content:center; padding:14px;}
+  .html-preview-overlay.open{display:flex;}
+  .hp-panel{width:min(1000px,100%); height:min(88vh,820px); background:var(--surface-2,#fff); border:1px solid var(--line); border-radius:16px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.4);}
+  .hp-bar{display:flex; align-items:center; justify-content:space-between; padding:9px 12px; background:var(--glass-msg); border-bottom:1px solid var(--line);}
+  .hp-title{font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--text-faint);}
+  .hp-actions{display:flex; gap:6px; align-items:center;}
+  .hp-btn{background:var(--w08); border:1px solid var(--line); color:var(--text-dim); border-radius:8px; padding:6px 11px; font-size:12px; cursor:pointer; display:flex; align-items:center;}
+  .hp-btn:hover{color:var(--text);}
+  .hp-btn.hp-close{padding:6px;}
+  .hp-btn svg.icon{width:15px; height:15px;}
+  #hp-frame{flex:1; width:100%; border:none; background:#fff;}
+  .compare-overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(3px); z-index:80; display:none; align-items:center; justify-content:center; padding:14px;}
+  .compare-overlay.open{display:flex;}
+  .cmp-panel{width:min(1100px,100%); height:min(90vh,860px); background:var(--surface,var(--input-bg)); border:1px solid var(--line); border-radius:16px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.4);}
+  .cmp-head{display:flex; align-items:center; justify-content:space-between; padding:11px 14px; border-bottom:1px solid var(--line);}
+  .cmp-title{font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim);}
+  .cmp-controls{padding:12px 14px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:9px;}
+  .cmp-selectors{display:flex; gap:8px; flex-wrap:wrap;}
+  .cmp-selectors select{flex:1; min-width:140px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:9px; padding:8px 10px; font-size:12.5px;}
+  #cmp-prompt{width:100%; min-height:60px; max-height:140px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:10px 12px; font-size:13px; line-height:1.5; resize:vertical;}
+  #cmp-run{align-self:flex-start;}
+  .cmp-cols{flex:1; display:grid; grid-template-columns:repeat(var(--cols,2),minmax(240px,1fr)); gap:0; overflow:auto;}
+  .cmp-col{border-right:1px solid var(--line); display:flex; flex-direction:column; min-width:0;}
+  .cmp-col:last-child{border-right:none;}
+  .cmp-col-head{padding:9px 12px; font-size:12px; font-weight:700; color:var(--violet); border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--glass-msg); backdrop-filter:blur(8px); z-index:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .cmp-col-body{flex:1; padding:12px; font-size:13.5px; line-height:1.55; overflow-y:auto; word-wrap:break-word;}
+  .cmp-col-body.msg, .cmp-col-body{color:var(--text);}
+  .cmp-col-meta{padding:7px 12px; font-size:10.5px; color:var(--text-faint); border-top:1px solid var(--line); font-family:var(--mono); min-height:14px;}
+  .cmp-err{color:#f87d73;}
+  @media(max-width:640px){ .cmp-cols{grid-template-columns:1fr; grid-auto-rows:minmax(200px,auto);} .cmp-col{border-right:none; border-bottom:1px solid var(--line);} }
+  .cmp-col-body h1,.cmp-col-body h2,.cmp-col-body h3{font-size:1.05em; font-weight:700; margin:.7em 0 .35em;}
+  .cmp-col-body p{margin:.5em 0;}
+  .cmp-col-body ul,.cmp-col-body ol{margin:.4em 0; padding-left:1.3em;}
+  .cmp-col-body li{margin:.25em 0;}
+  .cmp-col-body li::marker{color:var(--violet);}
+  .cmp-col-body strong{font-weight:700;}
+  .cmp-col-body a{color:var(--violet);}
+  .cmp-col-body table{border-collapse:collapse; width:100%; margin:.6em 0; font-size:.92em; display:block; overflow-x:auto;}
+  .cmp-col-body th,.cmp-col-body td{border:1px solid var(--line); padding:5px 8px; text-align:left;}
+  .cmp-col-body thead th,.cmp-col-body tr:first-child th{background:var(--violet); color:#fff;}
+  .cmp-col-body pre{background:var(--input-bg); padding:8px 10px; border-radius:8px; overflow-x:auto; font-family:var(--mono); font-size:12px; margin:6px 0;}
+  .cmp-col-body code{font-family:var(--mono); font-size:.88em; background:var(--w08); padding:1px 4px; border-radius:4px;}
+  .cmp-col-body pre code{background:none; padding:0;}
   .code-copy{
     position:absolute; top:8px; right:8px; display:flex; align-items:center; justify-content:center;
     background:var(--w08); border:1px solid var(--line); color:var(--text-dim);
@@ -658,7 +708,8 @@
         <label class="toggle" id="web-label"><input type="checkbox" id="web-toggle"> <span id="web-globe"></span> Web</label>
         <span class="ctx-meter" id="ctx-meter" title="Estimativa de tokens e custo do próximo envio"></span>
         <span id="tools-status"></span>
-        <button id="view-system-btn" style="margin-left:auto; display:flex; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg> system prompt</button>
+        <button id="compare-btn" style="margin-left:auto; display:flex; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><rect x="3" y="4" width="8" height="16" rx="2"/><rect x="13" y="4" width="8" height="16" rx="2"/></svg> comparar</button>
+        <button id="view-system-btn" style="display:flex; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg> system prompt</button>
       </div>
       <div class="attach-chips" id="attach-chips"></div>
       <div class="composer-wrap">
@@ -673,7 +724,11 @@
     </section>
 
     <section id="agent-view" class="view">
-      <div class="new-item-btn" id="new-agent-btn">+ Novo Agente</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <div class="new-item-btn" id="new-agent-btn" style="flex:1;">+ Novo Agente</div>
+        <button id="import-agent-btn" class="secondary" style="white-space:nowrap;">Importar agente</button>
+        <input type="file" id="import-agent-file" accept="application/json,.json" style="display:none;">
+      </div>
       <div id="agents-list"></div>
     </section>
 
@@ -728,6 +783,12 @@
         <p class="hint" style="margin-bottom:10px;">Injetado em toda conversa, antes de agentes e skills — é aqui que você "treina" o comportamento das respostas. Edite à vontade.</p>
         <textarea id="global-prompt-input" style="width:100%; min-height:140px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:12.5px; line-height:1.55; resize:vertical;"></textarea>
         <button id="global-prompt-reset" style="margin-top:8px;">Restaurar padrão</button>
+      </div>
+      <div class="cfg-group">
+        <h3>Memória (o que a IA lembra de você)</h3>
+        <p class="hint" style="margin-bottom:10px;">Fatos seus injetados em TODA conversa — nome, objetivos, preferências, contexto. Um por linha. Corta repetição (estilo ChatGPT/Copilot).</p>
+        <textarea id="memory-input" placeholder="Ex.:&#10;Me chamo Victor Hugo, moro em Maricá-RJ.&#10;Treino à noite, foco em físico atlético.&#10;Jogo Fortnite, Valorant e EA FC.&#10;Prefiro respostas diretas em pt-BR." style="width:100%; min-height:120px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:12.5px; line-height:1.6; resize:vertical;"></textarea>
+        <p class="hint" id="memory-count" style="margin-top:6px;">—</p>
       </div>
       <div class="cfg-group">
         <h3>Diagnóstico</h3>
@@ -811,6 +872,7 @@
     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
     <input type="text" id="history-search-input" placeholder="Buscar conversas...">
   </div>
+  <div class="projects-bar" id="projects-bar"></div>
   <div class="history-list" id="history-list"></div>
   <div class="sidebar-footer"><div class="avatar">VH</div> Victor Hugo</div>
 </aside>
@@ -985,6 +1047,10 @@ const ICONS = {
   download: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
   globe: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
   doc: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>',
+  volume: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
+  play: '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 4 20 12 6 20 6 4"/></svg>',
+  brain: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 1 5 3 3 0 0 0 4 2 3 3 0 0 0 3-1V4a3 3 0 0 0-3-1z"/><path d="M15 3a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-1 5 3 3 0 0 1-4 2 3 3 0 0 1-3-1"/></svg>',
+  upload: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
 };
 function iconHTML(name){ return ICONS[name] || ICONS.bot; }
 /* migra ícones antigos em emoji (versões anteriores do painel) pros novos ícones SVG */
@@ -1018,6 +1084,9 @@ const state = {
   costByModel: JSON.parse(localStorage.getItem('vtz_cost_by_model') || '{}'),
   tagFilter: '',
   soundOn: localStorage.getItem('vtz_sound') === '1',
+  memories: JSON.parse(localStorage.getItem('vtz_memories') || '[]'), // fatos sobre o Victor, injetados em toda conversa
+  projects: JSON.parse(localStorage.getItem('vtz_projects') || '[]'), // pastas de conversa
+  projectFilter: localStorage.getItem('vtz_project_filter') || '',      // '' = todos
 };
 const BOOT_TS = Date.now();
 if (localStorage.getItem('vtz_templates') === null){
@@ -1616,7 +1685,165 @@ function enhanceCodeBlocks(scope){
       setTimeout(() => dl.classList.remove('ok'), 1200);
     };
     wrap.appendChild(dl);
+
+    // Canvas: prévia ao vivo pra blocos que são HTML/SVG
+    const looksHtml = /^html?$|^svg$|^xml$/i.test(lang) || /<(!doctype|html|body|head|div|section|svg|h[1-6]|table|canvas|style)\b/i.test(pre.innerText);
+    if (looksHtml){
+      const pv = document.createElement('button');
+      pv.className = 'code-copy code-preview';
+      pv.setAttribute('aria-label','Ver prévia');
+      pv.innerHTML = iconHTML('play');
+      pv.onclick = () => openHtmlPreview(pre.innerText);
+      wrap.appendChild(pv);
+    }
   });
+}
+
+/* Canvas — renderiza HTML/SVG numa iframe isolada (sandbox), estilo Gemini Canvas. */
+function openHtmlPreview(html){
+  let ov = document.getElementById('html-preview-overlay');
+  if (!ov){
+    ov = document.createElement('div');
+    ov.id = 'html-preview-overlay';
+    ov.className = 'html-preview-overlay';
+    ov.innerHTML = `
+      <div class="hp-panel">
+        <div class="hp-bar">
+          <span class="hp-title">Prévia</span>
+          <div class="hp-actions">
+            <button class="hp-btn" id="hp-open">Abrir em nova aba</button>
+            <button class="hp-btn hp-close" id="hp-close" aria-label="Fechar">${iconHTML('close')}</button>
+          </div>
+        </div>
+        <iframe id="hp-frame" sandbox="allow-scripts allow-modals" referrerpolicy="no-referrer"></iframe>
+      </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if (e.target === ov) closeHtmlPreview(); });
+    ov.querySelector('#hp-close').onclick = closeHtmlPreview;
+  }
+  const frame = ov.querySelector('#hp-frame');
+  frame.srcdoc = html;
+  ov.querySelector('#hp-open').onclick = () => {
+    const blob = new Blob([html], { type:'text/html' });
+    window.open(URL.createObjectURL(blob), '_blank');
+  };
+  ov.classList.add('open');
+}
+function closeHtmlPreview(){
+  const ov = document.getElementById('html-preview-overlay');
+  if (ov){ ov.classList.remove('open'); ov.querySelector('#hp-frame').srcdoc = ''; }
+}
+
+/* Voz — lê a resposta em voz alta (TTS nativo do navegador). Clicar de novo para. */
+function speakMessage(raw, btnEl){
+  const synth = window.speechSynthesis;
+  if (!synth){ toast('Voz não suportada neste navegador.', 'warn'); return; }
+  if (synth.speaking || synth.pending){
+    synth.cancel();
+    if (speakMessage._on){ speakMessage._on = false; return; }  // clicou no mesmo: só para
+  }
+  let text = contentToText(raw).replace(/```[\s\S]*?```/g, '. bloco de código omitido. ');
+  text = stripMd(text).replace(/[|#>*_`~]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4500);
+  if (!text) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'pt-BR'; u.rate = 1.06; u.pitch = 1;
+  const voices = synth.getVoices();
+  const pt = voices.find(v => /pt[-_]?BR/i.test(v.lang)) || voices.find(v => /^pt/i.test(v.lang));
+  if (pt) u.voice = pt;
+  u.onend = () => { speakMessage._on = false; };
+  speakMessage._on = true;
+  synth.speak(u);
+  toast('Lendo a resposta…');
+}
+
+/* ---------- Comparar modelos lado a lado (Model Council) ---------- */
+function compareModelOptions(){
+  const list = (state.models && state.models.length ? state.models : FALLBACK_MODELS);
+  // só modelos que produzem texto (exclui os só-imagem)
+  return list.filter(m => {
+    const out = m.architecture?.output_modalities;
+    return !out || out.includes('text');
+  });
+}
+function openCompare(){
+  if (!state.apiKey){ toast('Configure a chave do OpenRouter primeiro.', 'warn'); switchView('config'); return; }
+  let ov = document.getElementById('compare-overlay');
+  if (!ov){
+    ov = document.createElement('div');
+    ov.id = 'compare-overlay';
+    ov.className = 'compare-overlay';
+    ov.innerHTML = `
+      <div class="cmp-panel">
+        <div class="cmp-head">
+          <span class="cmp-title">Comparar modelos lado a lado</span>
+          <button class="hp-btn hp-close" id="cmp-close" aria-label="Fechar">${iconHTML('close')}</button>
+        </div>
+        <div class="cmp-controls">
+          <div class="cmp-selectors" id="cmp-selectors"></div>
+          <textarea id="cmp-prompt" placeholder="Escreva a pergunta pra mandar pra todos ao mesmo tempo…"></textarea>
+          <button class="primary" id="cmp-run">Comparar</button>
+        </div>
+        <div class="cmp-cols" id="cmp-cols"></div>
+      </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); });
+    ov.querySelector('#cmp-close').onclick = () => ov.classList.remove('open');
+    ov.querySelector('#cmp-run').onclick = runCompare;
+  }
+  const opts = compareModelOptions();
+  const optHtml = opts.map(m => `<option value="${esc(m.id)}">${esc(m.name || m.id)}</option>`).join('');
+  const sel = ov.querySelector('#cmp-selectors');
+  sel.innerHTML = '';
+  const def = [opts[0]?.id, opts[1]?.id, ''];
+  for (let i = 0; i < 3; i++){
+    const s = document.createElement('select');
+    s.className = 'cmp-model';
+    s.innerHTML = `<option value="">— ${i < 2 ? 'escolha um modelo' : 'modelo (opcional)'} —</option>` + optHtml;
+    if (def[i]) s.value = def[i];
+    sel.appendChild(s);
+  }
+  const conv = getCurrentConv();
+  const lastUser = conv ? [...conv.messages].reverse().find(m => m.role === 'user') : null;
+  if (lastUser) ov.querySelector('#cmp-prompt').value = contentToText(lastUser.content);
+  ov.classList.add('open');
+}
+async function runCompare(){
+  const ov = document.getElementById('compare-overlay');
+  const uniq = [...new Set([...ov.querySelectorAll('.cmp-model')].map(s => s.value).filter(Boolean))];
+  const promptText = ov.querySelector('#cmp-prompt').value.trim();
+  if (!uniq.length){ toast('Escolha ao menos 1 modelo.', 'warn'); return; }
+  if (!promptText){ toast('Escreva a pergunta.', 'warn'); return; }
+  const cols = ov.querySelector('#cmp-cols');
+  cols.innerHTML = '';
+  cols.style.setProperty('--cols', uniq.length);
+  const colEls = {};
+  uniq.forEach(id => {
+    const name = compareModelOptions().find(m => m.id === id)?.name || id;
+    const col = document.createElement('div');
+    col.className = 'cmp-col';
+    col.innerHTML = `<div class="cmp-col-head">${esc(name)}</div><div class="cmp-col-body"><span class="thinking-label">Pensando…</span></div><div class="cmp-col-meta"></div>`;
+    cols.appendChild(col);
+    colEls[id] = col;
+  });
+  await Promise.all(uniq.map(async id => {
+    const col = colEls[id];
+    const body = col.querySelector('.cmp-col-body');
+    const meta = col.querySelector('.cmp-col-meta');
+    const t0 = performance.now();
+    try{
+      const res = await orFetchRetry({ model: id, messages:[{ role:'user', content: promptText }] });
+      if (!res.ok){ body.innerHTML = `<span class="cmp-err">Erro HTTP ${res.status}</span>`; return; }
+      const data = await res.json();
+      const msg = contentToText(data.choices?.[0]?.message?.content || '(sem texto)');
+      body.innerHTML = safeRenderMarkdown(msg);
+      enhanceCodeBlocks(body);
+      trackUsage(data.usage, id, getCurrentConv());
+      const secs = ((performance.now() - t0) / 1000).toFixed(1);
+      const pricing = getModelPricing(id);
+      const cost = data.usage ? ((data.usage.prompt_tokens||0)*pricing.prompt + (data.usage.completion_tokens||0)*pricing.completion) : 0;
+      meta.textContent = `${secs}s · ~$${cost.toFixed(4)}`;
+    }catch(e){ body.innerHTML = `<span class="cmp-err">${esc(e.message)}</span>`; }
+  }));
 }
 
 /* seed de skills na primeira execução */
@@ -1951,6 +2178,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateSessionPanel();
 
   ensureConversation();
+  renderProjectsBar();
   renderHistoryList();
   renderChat();
   updateCostBadge();
@@ -2043,6 +2271,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // agentes
   document.getElementById('new-agent-btn').onclick = () => openAgentModal(null);
+  document.getElementById('import-agent-btn').onclick = () => document.getElementById('import-agent-file').click();
+  document.getElementById('import-agent-file').onchange = (e) => { const f = e.target.files[0]; if (f) importAgentFile(f); e.target.value = ''; };
   document.getElementById('agent-cancel-btn').onclick = closeAgentModal;
   document.getElementById('agent-save-btn').onclick = saveAgentFromModal;
   document.getElementById('agent-icon-input').addEventListener('change', updateAgentIconPreview);
@@ -2067,6 +2297,21 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('vtz_global_prompt', DEFAULT_GLOBAL_PROMPT);
     toast('Estilo restaurado pro padrão.');
   };
+  // memória
+  const memInput = document.getElementById('memory-input');
+  const memCount = document.getElementById('memory-count');
+  const renderMemCount = () => {
+    const n = state.memories.length;
+    memCount.textContent = n ? `${n} lembrança${n>1?'s':''} ativa${n>1?'s':''} — injetadas em toda conversa.` : 'Nenhuma lembrança ainda.';
+  };
+  memInput.value = state.memories.join('\n');
+  renderMemCount();
+  memInput.addEventListener('change', () => {
+    state.memories = memInput.value.split('\n').map(s => s.trim()).filter(Boolean);
+    localStorage.setItem('vtz_memories', JSON.stringify(state.memories));
+    renderMemCount();
+    toast('Memória salva.');
+  });
   document.getElementById('agent-modal').addEventListener('click', (e) => { if (e.target.id === 'agent-modal') closeAgentModal(); });
 
   // busca no histórico (debounced)
@@ -2148,6 +2393,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sp = conv ? buildSystemPrompt(conv) : null;
     openSelectText(sp || 'Nenhum system prompt ativo nesta conversa (sem agente e sem skill acionada).');
   };
+  document.getElementById('compare-btn').onclick = openCompare;
 
   // backup / restore
   document.getElementById('export-backup-btn').onclick = exportBackup;
@@ -2191,7 +2437,7 @@ function getCurrentConv(){
   return state.conversations.find(c => c.id === state.currentConvId);
 }
 function newConversation(silent){
-  const conv = { id: uid(), title:'Nova conversa', messages:[], updatedAt: Date.now() };
+  const conv = { id: uid(), title:'Nova conversa', messages:[], updatedAt: Date.now(), projectId: state.projectFilter || null };
   state.conversations.unshift(conv);
   state.currentConvId = conv.id;
   persistConversations();
@@ -2245,6 +2491,7 @@ function openConvMenu(convId){
         toast(conv.pinned ? 'Conversa fixada.' : 'Conversa desafixada.');
       } },
     { icon:'wand', label:'Renomear', run: () => renameConversation(convId) },
+    { icon:'folder', label:'Mover para projeto…', run: () => openProjectPicker(convId) },
     { icon:'file', label:'Exportar .md', run: () => exportConversationMarkdown(conv) },
     { icon:'close', label:'Excluir conversa', run: () => { if (confirm(`Excluir "${conv.title}"?`)) deleteConversation(convId); } },
   ];
@@ -2254,6 +2501,29 @@ function openConvMenu(convId){
     btn.innerHTML = iconHTML(it.icon) + ' ' + esc(it.label);
     btn.onclick = () => { closeMsgMenu(); it.run(); };
     menu.appendChild(btn);
+  });
+  document.getElementById('msg-menu-overlay').classList.add('open');
+}
+/* Sub-menu: escolher o projeto de uma conversa (ou criar um novo na hora) */
+function openProjectPicker(convId){
+  const conv = state.conversations.find(c => c.id === convId);
+  if (!conv) return;
+  const menu = document.getElementById('msg-menu');
+  menu.innerHTML = '';
+  const addItem = (label, done, run) => {
+    const btn = document.createElement('button');
+    btn.className = 'msg-menu-item' + (done ? ' done' : '');
+    btn.innerHTML = iconHTML('folder') + ' ' + esc(label);
+    btn.onclick = () => { closeMsgMenu(); run(); };
+    menu.appendChild(btn);
+  };
+  const set = (pid) => { conv.projectId = pid; persistConversations(); renderHistoryList(); toast(pid ? 'Movida pro projeto.' : 'Removida do projeto.'); };
+  addItem('Sem projeto', !conv.projectId, () => set(null));
+  state.projects.forEach(p => addItem(p.name, conv.projectId === p.id, () => set(p.id)));
+  addItem('＋ Novo projeto…', false, () => {
+    const before = state.projects.length;
+    createProject();
+    if (state.projects.length > before){ conv.projectId = state.projects[state.projects.length-1].id; persistConversations(); renderHistoryList(); }
   });
   document.getElementById('msg-menu-overlay').classList.add('open');
 }
@@ -2344,6 +2614,8 @@ async function pushToCloud(){
       agents: state.agents, skills: state.skills,
       globalPrompt: localStorage.getItem('vtz_global_prompt') || '',
       favorites: state.favorites,
+      memories: state.memories,
+      projects: state.projects,
       updatedAt: Date.now(),
     };
     await fbDb.collection('vtzllm_users').doc(user.uid).set(payload);
@@ -2362,8 +2634,10 @@ async function pullFromCloud(uid){
     if (Array.isArray(d.skills)){ state.skills = d.skills; localStorage.setItem('vtz_skills', JSON.stringify(d.skills)); }
     if (typeof d.globalPrompt === 'string') localStorage.setItem('vtz_global_prompt', d.globalPrompt);
     if (Array.isArray(d.favorites)){ state.favorites = d.favorites; localStorage.setItem('vtz_favorites', JSON.stringify(d.favorites)); }
+    if (Array.isArray(d.memories)){ state.memories = d.memories; localStorage.setItem('vtz_memories', JSON.stringify(d.memories)); }
+    if (Array.isArray(d.projects)){ state.projects = d.projects; localStorage.setItem('vtz_projects', JSON.stringify(d.projects)); }
     state.conversations = JSON.parse(localStorage.getItem('vtz_conversations') || '[]');
-    renderHistoryList(); renderChat();
+    renderProjectsBar(); renderHistoryList(); renderChat();
     setSyncStatus('Sincronizado ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}));
     toast('Dados da nuvem carregados.');
   }catch(e){ setSyncStatus('Erro ao baixar: ' + e.message); }
@@ -2518,11 +2792,60 @@ function dateBucket(ts){
   if (days < 30) return Math.floor(days/7) + ' semanas atrás';
   return Math.floor(days/30) + ' meses atrás';
 }
+/* ---------- Projetos / Pastas de conversa ---------- */
+const PROJECT_COLORS = ['#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6','#a855f7'];
+function persistProjects(){ localStorage.setItem('vtz_projects', JSON.stringify(state.projects)); scheduleCloudSync?.(); }
+function createProject(){
+  const name = (prompt('Nome do projeto (ex.: Treino, Incubadora, Jogos):') || '').trim();
+  if (!name) return;
+  const sp = (prompt('Instrução própria deste projeto (opcional — injetada em toda conversa dele). Deixe vazio se não quiser:') || '').trim();
+  const proj = { id: uid(), name: name.slice(0,40), color: PROJECT_COLORS[state.projects.length % PROJECT_COLORS.length], systemPrompt: sp };
+  state.projects.push(proj);
+  persistProjects();
+  state.projectFilter = proj.id; localStorage.setItem('vtz_project_filter', proj.id);
+  renderProjectsBar(); renderHistoryList();
+  toast(`Projeto "${proj.name}" criado.`);
+}
+function deleteProject(id){
+  const p = state.projects.find(x => x.id === id); if (!p) return;
+  if (!confirm(`Excluir o projeto "${p.name}"? As conversas dele voltam pra "Todos", não são apagadas.`)) return;
+  state.projects = state.projects.filter(x => x.id !== id);
+  state.conversations.forEach(c => { if (c.projectId === id) c.projectId = null; });
+  if (state.projectFilter === id){ state.projectFilter = ''; localStorage.setItem('vtz_project_filter',''); }
+  persistProjects(); persistConversations();
+  renderProjectsBar(); renderHistoryList();
+}
+function setProjectFilter(id){
+  state.projectFilter = id; localStorage.setItem('vtz_project_filter', id);
+  renderProjectsBar(); renderHistoryList();
+}
+function renderProjectsBar(){
+  const bar = document.getElementById('projects-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  const mk = (label, id, color) => {
+    const c = document.createElement('span');
+    c.className = 'proj-chip' + (state.projectFilter === id ? ' active' : '');
+    if (color) c.innerHTML = `<span class="pc-dot" style="background:${color}"></span>`;
+    c.appendChild(document.createTextNode(label));
+    c.onclick = () => setProjectFilter(id);
+    if (id){ c.oncontextmenu = (e) => { e.preventDefault(); deleteProject(id); }; c.title = 'Clique para filtrar · clique-direito/segure para excluir'; }
+    return c;
+  };
+  bar.appendChild(mk('Todos', '', null));
+  state.projects.forEach(p => bar.appendChild(mk(p.name, p.id, p.color)));
+  const add = document.createElement('span');
+  add.className = 'proj-chip add';
+  add.textContent = '+ Projeto';
+  add.onclick = createProject;
+  bar.appendChild(add);
+}
 function renderHistoryList(){
   const query = (document.getElementById('history-search-input')?.value || '').trim().toLowerCase();
   const el = document.getElementById('history-list');
   el.innerHTML = '';
   let sorted = [...state.conversations].sort((a,b) => b.updatedAt - a.updatedAt);
+  if (state.projectFilter) sorted = sorted.filter(c => c.projectId === state.projectFilter);
   if (query){
     sorted = sorted.filter(conv =>
       conv.title.toLowerCase().includes(query) ||
@@ -2643,6 +2966,38 @@ function importBackup(file){
 }
 
 function persistAgents(){ localStorage.setItem('vtz_agents', JSON.stringify(state.agents)); }
+/* Exporta um agente como JSON — vira o "marketplace pessoal": compartilha por arquivo. */
+function exportAgent(agent){
+  const clean = { vtzAgent:1, name:agent.name, desc:agent.desc, icon:agent.icon, systemPrompt:agent.systemPrompt, model:agent.model||'', photo:agent.photo||null };
+  const safe = (agent.name||'agente').replace(/[^\w\-]+/g,'-').toLowerCase();
+  downloadTextFile(`agente-${safe}.json`, JSON.stringify(clean, null, 2));
+  toast('Agente exportado.');
+}
+/* Importa um agente de um arquivo .json (aceita o formato exportado ou um objeto simples). */
+function importAgentFile(file){
+  const fr = new FileReader();
+  fr.onload = () => {
+    try{
+      const o = JSON.parse(fr.result);
+      if (!o || (!o.systemPrompt && !o.name)) throw new Error('arquivo não parece um agente');
+      const agent = {
+        id: uid(),
+        name: (o.name || 'Agente importado').slice(0,60),
+        desc: (o.desc || '').slice(0,200),
+        icon: o.icon || 'bot',
+        systemPrompt: o.systemPrompt || '',
+        model: o.model || '',
+        photo: o.photo || null,
+      };
+      state.agents.unshift(agent);
+      persistAgents();
+      renderAgents();
+      toast(`Agente "${agent.name}" importado.`);
+    }catch(e){ toast('Falha ao importar: ' + e.message, 'err'); }
+  };
+  fr.onerror = () => toast('Não consegui ler o arquivo.', 'err');
+  fr.readAsText(file);
+}
 
 function renderAgents(){
   const el = document.getElementById('agents-list');
@@ -2663,6 +3018,7 @@ function renderAgents(){
         <div class="icon">${agent.photo ? `<img src="${agent.photo}" alt="" class="agent-photo">` : iconHTML(agent.icon)}</div>
         <div class="agent-card-actions">
           <button class="edit-agent-btn">Editar</button>
+          <button class="export-agent-btn">Exportar</button>
           <button class="delete-agent-btn">Excluir</button>
         </div>
       </div>
@@ -2670,6 +3026,7 @@ function renderAgents(){
       <div class="desc">${esc(agent.desc)}</div>
     `;
     card.querySelector('.edit-agent-btn').onclick = (e) => { e.stopPropagation(); openAgentModal(agent); };
+    card.querySelector('.export-agent-btn').onclick = (e) => { e.stopPropagation(); exportAgent(agent); };
     card.querySelector('.delete-agent-btn').onclick = (e) => {
       e.stopPropagation();
       if (confirm(`Excluir agente "${agent.name}"?`)){
@@ -2826,6 +3183,11 @@ function buildSystemPrompt(conv){
   const parts = [];
   const globalP = (localStorage.getItem('vtz_global_prompt') || '').trim();
   if (globalP) parts.push(globalP);
+  if (state.memories && state.memories.length){
+    parts.push('[Memória sobre o usuário — leve em conta sempre, sem repetir de volta a menos que perguntado]\n' + state.memories.map(m => '- ' + m).join('\n'));
+  }
+  const proj = conv.projectId && state.projects.find(p => p.id === conv.projectId);
+  if (proj && proj.systemPrompt) parts.push(`[Projeto: ${proj.name}]\n${proj.systemPrompt}`);
   if (conv.systemPrompt) parts.push(conv.systemPrompt);
   const lastUser = [...conv.messages].reverse().find(m => m.role === 'user');
   const lastText = contentToText(lastUser?.content || '').toLowerCase();
@@ -3275,6 +3637,7 @@ function openMsgMenu(msgIndex){
     }});
   }
   if (isAssistant){
+    items.push({ icon:'volume', label:'Ouvir resposta', run: () => speakMessage(msg.content) });
     items.push({ icon:'refresh', label:'Regenerar', run: () => openRegenSheet(msgIndex) });
     items.push({ icon:'wand', label:'Humanizar', run: () => humanizeMessage(msgIndex) });
   }
