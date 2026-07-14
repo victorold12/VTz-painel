@@ -1301,15 +1301,31 @@ function downloadPdf(text, name){
 const VTZ_VIOLET = [139, 92, 246];
 function getJsPDF(){ return window.jspdf?.jsPDF || window.jsPDF || null; }
 
-/* Parseia markdown em blocos estruturados (independe do DOM). */
+/* Helpers de markdown inline (compartilhados por PDF e Word). */
+function mdLinkify(s){ return String(s).replace(/\[(.+?)\]\((.+?)\)/g,'$1 ($2)'); }
+function stripMd(s){ return mdLinkify(s).replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1').replace(/`(.+?)`/g,'$1'); }
+/* Quebra "texto **negrito** e `código`" em segmentos com estilo. */
+function inlineSegments(s){
+  s = mdLinkify(s);
+  const segs = [], re = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+  let last = 0, m;
+  while ((m = re.exec(s)) !== null){
+    if (m.index > last) segs.push({ text: s.slice(last, m.index) });
+    if (m[2] !== undefined) segs.push({ text: m[2], bold: true });
+    else if (m[3] !== undefined) segs.push({ text: m[3], italic: true });
+    else if (m[4] !== undefined) segs.push({ text: m[4], code: true });
+    last = re.lastIndex;
+  }
+  if (last < s.length) segs.push({ text: s.slice(last) });
+  return segs.length ? segs : [{ text: s }];
+}
+
+/* Parseia markdown em blocos estruturados (independe do DOM).
+   Títulos e tabelas ficam em texto plano; parágrafos e listas guardam o
+   markdown inline (**negrito**, *itálico*, `código`) pra render com estilo. */
 function mdToBlocks(md){
   const blocks = [];
   const lines = String(md).replace(/\r/g,'').split('\n');
-  const stripInline = s => s
-    .replace(/\*\*(.+?)\*\*/g,'$1')
-    .replace(/\*(.+?)\*/g,'$1')
-    .replace(/`(.+?)`/g,'$1')
-    .replace(/\[(.+?)\]\((.+?)\)/g,'$1 ($2)');
   let i = 0;
   while (i < lines.length){
     const ln = lines[i], t = ln.trim();
@@ -1321,7 +1337,7 @@ function mdToBlocks(md){
     if (/^\s*\|.*\|\s*$/.test(ln)){                 // tabela
       const rows = [];
       while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])){
-        const cells = lines[i].trim().replace(/^\||\|$/g,'').split('|').map(c => stripInline(c.trim()));
+        const cells = lines[i].trim().replace(/^\||\|$/g,'').split('|').map(c => stripMd(c.trim()));
         const isSep = cells.every(c => /^:?-+:?$/.test(c.replace(/\s/g,'')));
         if (!isSep) rows.push(cells);
         i++;
@@ -1330,11 +1346,11 @@ function mdToBlocks(md){
     }
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(t)){ blocks.push({ type:'hr' }); i++; continue; }
     const h = t.match(/^(#{1,4})\s+(.*)$/);
-    if (h){ blocks.push({ type:'h', level: h[1].length, text: stripInline(h[2]) }); i++; continue; }
+    if (h){ blocks.push({ type:'h', level: h[1].length, text: stripMd(h[2]) }); i++; continue; }
     const li = t.match(/^([-*+]|\d+\.)\s+(.*)$/);
-    if (li){ blocks.push({ type:'li', ordered: /\d+\./.test(li[1]), text: stripInline(li[2]) }); i++; continue; }
+    if (li){ blocks.push({ type:'li', ordered: /\d+\./.test(li[1]), text: mdLinkify(li[2]) }); i++; continue; }
     if (t === ''){ blocks.push({ type:'gap' }); i++; continue; }
-    blocks.push({ type:'p', text: stripInline(t) }); i++;
+    blocks.push({ type:'p', text: mdLinkify(t) }); i++;
   }
   return blocks;
 }
@@ -1375,16 +1391,35 @@ function downloadRichPdf(md, name){
   const M = 48, CW = pw - M*2;
   let y = M;
   const need = h => { if (y + h > ph - M){ doc.addPage(); y = M; } };
-  const drawText = (text, { size=11, style='normal', color=[30,30,30], lh=15, indent=0, bullet=null }={}) => {
-    const wrapW = CW - indent - (bullet ? 14 : 0);
-    doc.setFont('helvetica', style); doc.setFontSize(size);
-    doc.splitTextToSize(text, wrapW).forEach((line, idx) => {
+  const drawText = (raw, { size=11, style='normal', color=[30,30,30], lh=15, indent=0, bullet=null }={}) => {
+    const forceBold = style === 'bold';
+    const maxW = CW - indent - (bullet ? 14 : 0);
+    const x0 = M + indent + (bullet ? 14 : 0);
+    const setFontFor = w => {
+      const b = forceBold || w.bold, it = w.italic;
+      const st = b && it ? 'bolditalic' : b ? 'bold' : it ? 'italic' : 'normal';
+      doc.setFont(w.code ? 'courier' : 'helvetica', (w.code && !b) ? 'normal' : st);
+      doc.setFontSize(size);
+    };
+    // tokeniza os segmentos inline em palavras que carregam o estilo
+    const words = [];
+    inlineSegments(raw).forEach(s => String(s.text).split(/(\s+)/).forEach(w => { if (w !== '') words.push(Object.assign({ t:w }, s)); }));
+    let line = [], lineW = 0, firstLine = true;
+    const flush = () => {
       need(lh);
-      if (bullet && idx === 0){ doc.setTextColor(...VTZ_VIOLET); doc.text(bullet, M+indent, y); }
-      doc.setTextColor(...color);
-      doc.text(line, M + indent + (bullet ? 14 : 0), y);
-      y += lh;
+      if (bullet && firstLine){ doc.setFont('helvetica','normal'); doc.setFontSize(size); doc.setTextColor(...VTZ_VIOLET); doc.text(bullet, M+indent, y); }
+      let x = x0;
+      line.forEach(w => { setFontFor(w); doc.setTextColor(...color); doc.text(w.t, x, y); x += doc.getTextWidth(w.t); });
+      y += lh; line = []; lineW = 0; firstLine = false;
+    };
+    words.forEach(w => {
+      setFontFor(w);
+      const ww = doc.getTextWidth(w.t);
+      if (lineW + ww > maxW && line.length && w.t.trim() !== ''){ flush(); }
+      if (!line.length && w.t.trim() === '') return;      // ignora espaço no início da linha
+      line.push(w); lineW += ww;
     });
+    if (line.length) flush();
   };
   mdToBlocks(md).forEach(b => {
     switch(b.type){
@@ -1457,7 +1492,7 @@ function downloadSlidesPdf(md, name){
       const isH = b.type === 'h', isLi = b.type === 'li';
       doc.setFont('helvetica', isH ? 'bold' : 'normal');
       doc.setFontSize(isH ? 16 : 15); doc.setTextColor(35,35,45);
-      const text = (isLi ? '•  ' : '') + (b.text || '');
+      const text = (isLi ? '•  ' : '') + stripMd(b.text || '');
       doc.splitTextToSize(text, CW).forEach(line => {
         if (y > ph - M) return;                     // slide deve ser conciso; excedente não estoura
         doc.text(line, M, y); y += isH ? 26 : 24;
@@ -1470,17 +1505,43 @@ function downloadSlidesPdf(md, name){
   });
   triggerDownload(name, doc.output('blob'));
 }
-/* .docx da resposta — via docx.js. Linhas viram parágrafos; ``` viram monospace */
-function downloadDocx(text, name){
+/* .docx formatado — via docx.js. Markdown vira documento Word real:
+   títulos com estilo, tabelas em grade, listas, código e negrito/itálico. */
+function downloadDocx(md, name){
   if (typeof docx === 'undefined'){ toast('Biblioteca de Word não carregou (offline?).', 'err'); return; }
-  const { Document, Packer, Paragraph, TextRun } = docx;
-  let mono = false;
-  const paras = text.split('\n').map(line => {
-    if (line.trim().startsWith('```')){ mono = !mono; return new Paragraph({ text:'' }); }
-    return new Paragraph({ children:[ new TextRun({ text: line || ' ', font: mono ? 'Consolas' : 'Calibri', size: mono ? 20 : 22 }) ] });
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
+  const VIOLET = '8B5CF6';
+  const HMAP = { 1:HeadingLevel.HEADING_1, 2:HeadingLevel.HEADING_2, 3:HeadingLevel.HEADING_3, 4:HeadingLevel.HEADING_4 };
+  const runs = raw => inlineSegments(raw).map(s => new TextRun({
+    text: s.text, bold: !!s.bold, italics: !!s.italic,
+    font: s.code ? 'Consolas' : 'Calibri', size: s.code ? 20 : 22,
+  }));
+  const children = [];
+  mdToBlocks(md).forEach(b => {
+    if (b.type === 'h'){
+      children.push(new Paragraph({ heading: HMAP[b.level] || HeadingLevel.HEADING_4, spacing:{ before:160, after:80 }, children:[ new TextRun({ text:b.text, bold:true }) ] }));
+    } else if (b.type === 'p'){
+      children.push(new Paragraph({ spacing:{ after:120 }, children: runs(b.text) }));
+    } else if (b.type === 'li'){
+      children.push(new Paragraph({ bullet:{ level:0 }, children: runs(b.text) }));
+    } else if (b.type === 'code'){
+      b.lines.forEach(l => children.push(new Paragraph({ shading:{ fill:'F2F2F6' }, children:[ new TextRun({ text: l || ' ', font:'Consolas', size:20 }) ] })));
+      children.push(new Paragraph({ text:'' }));
+    } else if (b.type === 'table'){
+      const cols = Math.max(...b.rows.map(r => r.length));
+      const rows = b.rows.map((r, ri) => new TableRow({ children: Array.from({ length: cols }).map((_, c) => new TableCell({
+        width:{ size: Math.floor(100/cols), type: WidthType.PERCENTAGE },
+        shading: ri === 0 ? { fill: VIOLET } : (ri % 2 === 0 ? { fill:'F5F4FA' } : undefined),
+        children:[ new Paragraph({ children:[ new TextRun({ text: r[c] || '', bold: ri === 0, color: ri === 0 ? 'FFFFFF' : '000000', size:20 }) ] }) ],
+      })) }));
+      children.push(new Table({ width:{ size:100, type: WidthType.PERCENTAGE }, rows }));
+      children.push(new Paragraph({ text:'' }));
+    } else if (b.type === 'hr'){
+      children.push(new Paragraph({ border:{ bottom:{ color:'CCCCCC', space:1, style: BorderStyle.SINGLE, size:6 } } }));
+    }
   });
-  const d = new Document({ sections:[{ children: paras }] });
-  Packer.toBlob(d).then(blob => triggerDownload(name, blob));
+  const d = new Document({ sections:[{ children }] });
+  Packer.toBlob(d).then(blob => triggerDownload(name, blob)).catch(e => toast('Falha ao gerar Word: ' + e.message, 'err'));
 }
 /* Extrai blocos ```lang ... ``` do markdown cru (independe do DOM) */
 function extractCodeBlocks(markdown){
