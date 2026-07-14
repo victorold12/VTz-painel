@@ -1294,6 +1294,182 @@ function downloadPdf(text, name){
   });
   triggerDownload(name, doc.output('blob'));
 }
+
+/* ===== Renderizador de PDF formatado + slides (client-side, jsPDF) =====
+   O modelo escreve markdown; estas funções convertem em PDF com layout real
+   (títulos, listas, tabelas em grade, código, slides). Sem backend, sem link falso. */
+const VTZ_VIOLET = [139, 92, 246];
+function getJsPDF(){ return window.jspdf?.jsPDF || window.jsPDF || null; }
+
+/* Parseia markdown em blocos estruturados (independe do DOM). */
+function mdToBlocks(md){
+  const blocks = [];
+  const lines = String(md).replace(/\r/g,'').split('\n');
+  const stripInline = s => s
+    .replace(/\*\*(.+?)\*\*/g,'$1')
+    .replace(/\*(.+?)\*/g,'$1')
+    .replace(/`(.+?)`/g,'$1')
+    .replace(/\[(.+?)\]\((.+?)\)/g,'$1 ($2)');
+  let i = 0;
+  while (i < lines.length){
+    const ln = lines[i], t = ln.trim();
+    if (t.startsWith('```')){                       // bloco de código
+      const code = []; i++;
+      while (i < lines.length && !lines[i].trim().startsWith('```')){ code.push(lines[i]); i++; }
+      i++; blocks.push({ type:'code', lines: code }); continue;
+    }
+    if (/^\s*\|.*\|\s*$/.test(ln)){                 // tabela
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])){
+        const cells = lines[i].trim().replace(/^\||\|$/g,'').split('|').map(c => stripInline(c.trim()));
+        const isSep = cells.every(c => /^:?-+:?$/.test(c.replace(/\s/g,'')));
+        if (!isSep) rows.push(cells);
+        i++;
+      }
+      if (rows.length) blocks.push({ type:'table', rows }); continue;
+    }
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(t)){ blocks.push({ type:'hr' }); i++; continue; }
+    const h = t.match(/^(#{1,4})\s+(.*)$/);
+    if (h){ blocks.push({ type:'h', level: h[1].length, text: stripInline(h[2]) }); i++; continue; }
+    const li = t.match(/^([-*+]|\d+\.)\s+(.*)$/);
+    if (li){ blocks.push({ type:'li', ordered: /\d+\./.test(li[1]), text: stripInline(li[2]) }); i++; continue; }
+    if (t === ''){ blocks.push({ type:'gap' }); i++; continue; }
+    blocks.push({ type:'p', text: stripInline(t) }); i++;
+  }
+  return blocks;
+}
+
+/* Desenha uma tabela em grade. Retorna o novo y. addPage() devolve o y do topo. */
+function pdfDrawTable(doc, rows, x0, y, totalW, pageBottom, addPage){
+  const cols = Math.max(...rows.map(r => r.length));
+  const colW = totalW / cols, cellPad = 4, lineH = 12;
+  rows.forEach((row, ri) => {
+    const wrapped = []; let maxLines = 1;
+    for (let c = 0; c < cols; c++){
+      doc.setFont('helvetica', ri===0?'bold':'normal'); doc.setFontSize(9);
+      const w = doc.splitTextToSize(String(row[c]||''), colW - cellPad*2);
+      wrapped.push(w); maxLines = Math.max(maxLines, w.length);
+    }
+    const rowH = maxLines*lineH + cellPad*2;
+    if (y + rowH > pageBottom){ y = addPage(); }
+    if (ri===0){ doc.setFillColor(...VTZ_VIOLET); doc.rect(x0,y,totalW,rowH,'F'); }
+    else if (ri%2===0){ doc.setFillColor(245,244,250); doc.rect(x0,y,totalW,rowH,'F'); }
+    for (let c = 0; c < cols; c++){
+      const x = x0 + c*colW;
+      doc.setDrawColor(210,206,222); doc.setLineWidth(0.5); doc.rect(x,y,colW,rowH);
+      doc.setFont('helvetica', ri===0?'bold':'normal'); doc.setFontSize(9);
+      if (ri===0) doc.setTextColor(255,255,255); else doc.setTextColor(45,45,55);
+      (wrapped[c]||[]).forEach((line,li) => doc.text(line, x+cellPad, y+cellPad+lineH*(li+1)-3));
+    }
+    y += rowH;
+  });
+  return y + 8;
+}
+
+/* PDF de documento formatado (retrato): títulos, listas, tabelas, código. */
+function downloadRichPdf(md, name){
+  const J = getJsPDF();
+  if (!J){ toast('Biblioteca de PDF não carregou (offline?).', 'err'); return; }
+  const doc = new J({ unit:'pt', format:'a4' });
+  const pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
+  const M = 48, CW = pw - M*2;
+  let y = M;
+  const need = h => { if (y + h > ph - M){ doc.addPage(); y = M; } };
+  const drawText = (text, { size=11, style='normal', color=[30,30,30], lh=15, indent=0, bullet=null }={}) => {
+    const wrapW = CW - indent - (bullet ? 14 : 0);
+    doc.setFont('helvetica', style); doc.setFontSize(size);
+    doc.splitTextToSize(text, wrapW).forEach((line, idx) => {
+      need(lh);
+      if (bullet && idx === 0){ doc.setTextColor(...VTZ_VIOLET); doc.text(bullet, M+indent, y); }
+      doc.setTextColor(...color);
+      doc.text(line, M + indent + (bullet ? 14 : 0), y);
+      y += lh;
+    });
+  };
+  mdToBlocks(md).forEach(b => {
+    switch(b.type){
+      case 'h': {
+        const map = { 1:[19,10], 2:[15,8], 3:[13,6], 4:[11,5] };
+        const [sz, sp] = map[b.level] || map[4];
+        y += sp;
+        drawText(b.text, { size:sz, style:'bold', color: b.level<=2 ? VTZ_VIOLET : [40,40,40], lh: sz+4 });
+        y += sp*0.5; break;
+      }
+      case 'p': drawText(b.text); y += 4; break;
+      case 'li': drawText(b.text, { indent:12, bullet: b.ordered ? '›' : '•' }); break;
+      case 'table': y = pdfDrawTable(doc, b.rows, M, y, CW, ph - M, () => { doc.addPage(); return M; }); break;
+      case 'code': {
+        doc.setFont('courier','normal'); doc.setFontSize(9);
+        const wrappedAll = [];
+        b.lines.forEach(l => doc.splitTextToSize(l || ' ', CW - 16).forEach(x => wrappedAll.push(x)));
+        const boxH = wrappedAll.length*12 + 12;
+        need(Math.min(boxH, ph - M*2));
+        doc.setFillColor(244,244,246); doc.rect(M, y, CW, boxH, 'F');
+        doc.setTextColor(60,60,70);
+        let cy = y + 14;
+        wrappedAll.forEach(ll => { if (cy > ph - M){ doc.addPage(); cy = M + 14; } doc.text(ll, M+8, cy); cy += 12; });
+        y = cy + 8; break;
+      }
+      case 'hr': y += 6; need(1); doc.setDrawColor(220,218,228); doc.line(M, y, pw-M, y); y += 10; break;
+      case 'gap': y += 6; break;
+    }
+  });
+  triggerDownload(name, doc.output('blob'));
+}
+
+/* Divide markdown em slides: cada '# ' ou '## ' inicia um slide; '---' também. */
+function slideChunks(md){
+  const blocks = mdToBlocks(md), slides = [];
+  let cur = null;
+  const push = () => { if (cur && (cur.title || cur.body.length)) slides.push(cur); };
+  blocks.forEach(b => {
+    if (b.type === 'h' && b.level <= 2){ push(); cur = { title: b.text, body: [] }; return; }
+    if (b.type === 'hr'){ push(); cur = { title:'', body: [] }; return; }
+    if (!cur) cur = { title:'', body: [] };
+    if (b.type !== 'gap') cur.body.push(b);
+  });
+  push();
+  return slides.length ? slides : [{ title:'', body: blocks.filter(b => b.type !== 'gap') }];
+}
+
+/* PDF de slides (paisagem): 1 seção por página, título em faixa violeta, rodapé numerado. */
+function downloadSlidesPdf(md, name){
+  const J = getJsPDF();
+  if (!J){ toast('Biblioteca de PDF não carregou (offline?).', 'err'); return; }
+  const doc = new J({ unit:'pt', format:'a4', orientation:'landscape' });
+  const pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
+  const M = 56, CW = pw - M*2;
+  const slides = slideChunks(md);
+  slides.forEach((s, si) => {
+    if (si > 0) doc.addPage();
+    doc.setFillColor(250,249,253); doc.rect(0,0,pw,ph,'F');
+    doc.setFillColor(...VTZ_VIOLET); doc.rect(0,0,pw,68,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(255,255,255);
+    doc.text(doc.splitTextToSize(s.title || `Slide ${si+1}`, CW)[0], M, 44);
+    let y = 110;
+    s.body.forEach(b => {
+      if (b.type === 'table'){ y = pdfDrawTable(doc, b.rows, M, y, CW, ph - M, () => M); return; }
+      if (b.type === 'code'){
+        doc.setFont('courier','normal'); doc.setFontSize(11); doc.setTextColor(60,60,70);
+        b.lines.forEach(l => { if (y < ph - M){ doc.text(String(l).slice(0,120), M, y); y += 18; } });
+        return;
+      }
+      const isH = b.type === 'h', isLi = b.type === 'li';
+      doc.setFont('helvetica', isH ? 'bold' : 'normal');
+      doc.setFontSize(isH ? 16 : 15); doc.setTextColor(35,35,45);
+      const text = (isLi ? '•  ' : '') + (b.text || '');
+      doc.splitTextToSize(text, CW).forEach(line => {
+        if (y > ph - M) return;                     // slide deve ser conciso; excedente não estoura
+        doc.text(line, M, y); y += isH ? 26 : 24;
+      });
+      if (isH) y += 4;
+    });
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(150,148,160);
+    doc.text('VTz LLM', M, ph - 24);
+    doc.text(`${si+1} / ${slides.length}`, pw - M - 32, ph - 24);
+  });
+  triggerDownload(name, doc.output('blob'));
+}
 /* .docx da resposta — via docx.js. Linhas viram parágrafos; ``` viram monospace */
 function downloadDocx(text, name){
   if (typeof docx === 'undefined'){ toast('Biblioteca de Word não carregou (offline?).', 'err'); return; }
@@ -1378,7 +1554,11 @@ const DEFAULT_GLOBAL_PROMPT = `Você é o VTZ, assistente pessoal do Victor Hugo
 6. Headers e listas só quando facilitarem leitura rápida.
 7. Se não souber, diga que não sabe — nunca invente dados.
 8. Pedidos explícitos de teste, benchmark ou experimento (ex.: "gere um texto longo pra testar o streaming") devem ser atendidos literalmente, sem questionar o propósito.
-9. Você NÃO gera arquivos binários (PDF, Word, Excel, imagens) nem tem sandbox/sistema de arquivos. Nunca invente links de download nem finja ter salvo um arquivo. Se o usuário pedir um PDF/Word/Excel, produza o CONTEÚDO em texto/markdown e avise: para baixar, ele usa o menu ⋯ da mensagem → "Baixar como PDF/Word/Excel" (a conversão é feita no próprio navegador do VTz LLM).`;
+9. Você não salva arquivos nem tem sandbox — mas o VTz LLM converte a SUA resposta em PDF/slides/Word/Excel no navegador (menu ⋯ da mensagem). Nunca invente link de download nem finja ter salvo arquivo. Em vez disso, ESTRUTURE a resposta para render bem:
+   - Apresentação/slides: um "## Título" por slide, seguido de poucos bullets curtos (um conceito por slide). O app gera "Baixar slides (PDF)".
+   - Planilha/tabela (ex.: plano de treino): use tabela markdown "| Coluna | ... |" com cabeçalho. Gera Excel e PDF em grade.
+   - Documento: títulos ##/### + listas. Gera "Baixar PDF (formatado)".
+   Se útil, lembre em uma linha que o download é pelo menu ⋯.`;
 if (localStorage.getItem('vtz_global_prompt') === null){
   localStorage.setItem('vtz_global_prompt', DEFAULT_GLOBAL_PROMPT);
 }
@@ -2978,7 +3158,8 @@ function openMsgMenu(msgIndex){
   items.push({ icon:'download', label:'Baixar mensagem (.md)', run: () => {
     downloadTextFile(`vtz-mensagem-${msgIndex+1}.md`, rawText);
   }});
-  items.push({ icon:'file', label:'Baixar como PDF', run: () => downloadPdf(rawText, `vtz-${msgIndex+1}.pdf`) });
+  items.push({ icon:'file', label:'Baixar PDF (formatado)', run: () => downloadRichPdf(rawText, `vtz-${msgIndex+1}.pdf`) });
+  items.push({ icon:'file', label:'Baixar slides (PDF)', run: () => downloadSlidesPdf(rawText, `vtz-slides-${msgIndex+1}.pdf`) });
   items.push({ icon:'file', label:'Baixar como Word (.docx)', run: () => downloadDocx(rawText, `vtz-${msgIndex+1}.docx`) });
   if (extractMarkdownTables(rawText).length){
     items.push({ icon:'file', label:'Baixar tabela (.xlsx)', run: () => downloadXlsx(rawText, `vtz-${msgIndex+1}.xlsx`) });
