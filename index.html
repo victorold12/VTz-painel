@@ -1623,6 +1623,17 @@ const DEFAULT_GLOBAL_PROMPT = `Você é o VTZ, assistente pessoal do Victor Hugo
 if (localStorage.getItem('vtz_global_prompt') === null){
   localStorage.setItem('vtz_global_prompt', DEFAULT_GLOBAL_PROMPT);
 }
+/* Migração não-destrutiva: se o prompt salvo (personalizado ou antigo) não tem
+   a regra de geração de arquivos, injeta uma versão compacta preservando o resto.
+   O marcador "menu ⋯" evita reaplicar. */
+const FILE_RULE_MARK = 'menu ⋯';
+const FILE_RULE_TEXT = `9. Você não gera arquivos você mesmo — o VTz LLM converte sua resposta em PDF/slides/Word/Excel pelo menu ⋯ da mensagem. Nunca invente link de download, nunca finja ter salvo arquivo e nunca escreva script gerador (Python/reportlab/.bat) pro usuário rodar. Para planilha/treino use tabela markdown "| Coluna | ... |"; para slides use "## Título" por slide; para documento use ##/### + listas. Template rotulado pra preencher é permitido.`;
+(function migrateGlobalPrompt(){
+  const cur = localStorage.getItem('vtz_global_prompt');
+  if (cur && !cur.includes(FILE_RULE_MARK)){
+    localStorage.setItem('vtz_global_prompt', cur.replace(/\s+$/,'') + '\n' + FILE_RULE_TEXT);
+  }
+})();
 
 /* seed de agentes na primeira execução — depois disso são 100% editáveis via CRUD */
 if (localStorage.getItem('vtz_agents') === null){
