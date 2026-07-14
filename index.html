@@ -6,6 +6,14 @@
 <title>VTz LLM</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.11/purify.min.js"></script>
+<!-- Geração de arquivos binários no navegador (sem backend, todos open source) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"></script>
+<!-- Firebase (login opcional + sync na nuvem) — SDK compat via CDN -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --void:#000000;
@@ -274,6 +282,10 @@
   .picker-sorts{padding-top:0; padding-bottom:12px;}
   .picker-sorts .picker-tab{font-size:11.5px; padding:6px 12px; border:1px solid var(--line); background:transparent;}
   .picker-sorts .picker-tab.active{background:var(--violet-dim); color:var(--violet); border-color:var(--violet);}
+  .picker-sorts .sort-order{
+    display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px;
+    margin-left:2px; border-radius:50%; background:var(--violet); color:#fff; font-size:9px; font-weight:800; vertical-align:1px;
+  }
   .picker-tab{
     flex-shrink:0; box-sizing:border-box; min-height:32px; display:inline-flex; align-items:center;
     background:var(--w06); border:none; color:var(--text-dim); font-size:12.5px; font-weight:700;
@@ -549,6 +561,18 @@
   .code-copy.ok{color:#4ade80; border-color:rgba(74,222,128,.4); opacity:1;}
   .code-copy svg.icon{width:14px; height:14px;}
   .composer textarea:disabled{opacity:.55; cursor:not-allowed;}
+  /* Fontes da busca web */
+  .msg-sources{margin-top:12px; padding-top:10px; border-top:1px solid var(--line);}
+  .sources-head{display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--text-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:.04em;}
+  .sources-head svg.icon{width:13px; height:13px;}
+  .sources-grid{display:flex; flex-direction:column; gap:6px;}
+  .source-card{display:flex; align-items:center; gap:9px; padding:8px 10px; background:var(--glass-card); border:1px solid var(--line); border-radius:10px; text-decoration:none; transition:.15s;}
+  .source-card:hover{border-color:var(--violet); background:var(--w06);}
+  .source-card img{width:18px; height:18px; border-radius:4px; flex-shrink:0;}
+  .source-card .src-body{display:flex; flex-direction:column; min-width:0; flex:1;}
+  .source-card .src-title{font-size:12.5px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .source-card .src-host{font-size:10.5px; color:var(--text-faint);}
+  .source-card .src-n{font-size:10px; font-weight:800; color:var(--text-faint); flex-shrink:0;}
   /* Modo desempenho: remove os dois maiores custos de GPU (blur composto + blobs animados) */
   body.perf .liquid-bg{display:none;}
   body.perf *{backdrop-filter:none !important; -webkit-backdrop-filter:none !important;}
@@ -695,6 +719,18 @@
           Perto do limite. Quando estourar, novas conversas param de salvar. Arquive as antigas — as fixadas são preservadas.
         </p>
         <button class="danger" id="archive-btn" style="margin-top:10px;">Arquivar antigas (manter 15 recentes)</button>
+      </div>
+      <div class="cfg-group">
+        <h3>Conta e nuvem (opcional)</h3>
+        <p class="hint" style="margin-bottom:10px;" id="account-hint">Sem login, tudo fica só neste navegador. Com login Google, suas conversas, agentes e skills sincronizam na nuvem e aparecem em qualquer aparelho.</p>
+        <div id="account-signed-out">
+          <button id="google-signin-btn">Entrar com Google</button>
+        </div>
+        <div id="account-signed-in" style="display:none;">
+          <p class="hint" style="margin-bottom:8px;">Conectado como <strong id="account-email">—</strong></p>
+          <p class="hint" id="sync-status" style="margin-bottom:10px; color:var(--text-faint);">—</p>
+          <button class="secondary" id="google-signout-btn">Sair</button>
+        </div>
       </div>
       <div class="cfg-group">
         <h3>Backup</h3>
@@ -945,7 +981,7 @@ const state = {
   favorites: JSON.parse(localStorage.getItem('vtz_favorites') || '[]'),
   usdToBrl: parseFloat(localStorage.getItem('vtz_usd_brl') || '5.50'),
   theme: localStorage.getItem('vtz_theme') || 'dark',
-  pickerSort: 'default',
+  pickerSorts: [], // até 2 presets combináveis, em ordem de prioridade (1º = primário, 2º = desempate)
   pendingAttachments: [],
   ctxWindow: parseInt(localStorage.getItem('vtz_ctx_window') || '24', 10),
   streamOn: localStorage.getItem('vtz_stream') !== '0',
@@ -1199,6 +1235,9 @@ function downloadTextFile(name, text){
   const ext = (name.split('.').pop() || '').toLowerCase();
   const mime = (EXT_MIME[ext] || 'text/plain') + ';charset=utf-8';
   const blob = new Blob([text], { type: mime });
+  triggerDownload(name, blob);
+}
+function triggerDownload(name, blob){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = name;
@@ -1206,6 +1245,66 @@ function downloadTextFile(name, text){
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+/* Extrai tabelas markdown (| a | b |) em matriz de linhas/colunas */
+function extractMarkdownTables(md){
+  const tables = [];
+  const lines = md.split('\n');
+  let cur = null;
+  for (const ln of lines){
+    const isRow = /^\s*\|.*\|\s*$/.test(ln);
+    if (isRow){
+      const cells = ln.trim().replace(/^\||\|$/g,'').split('|').map(c => c.trim());
+      if (/^:?-{2,}:?$/.test(cells.join('').replace(/[\s|]/g,'')) || cells.every(c => /^:?-+:?$/.test(c))) continue; // separador
+      (cur = cur || []).push(cells);
+    } else if (cur){
+      if (cur.length > 1) tables.push(cur);
+      cur = null;
+    }
+  }
+  if (cur && cur.length > 1) tables.push(cur);
+  return tables;
+}
+/* .xlsx da 1ª tabela da resposta (ou de todas, uma aba cada) — via SheetJS */
+function downloadXlsx(md, name){
+  if (typeof XLSX === 'undefined'){ toast('Biblioteca de planilha não carregou (offline?).', 'err'); return; }
+  const tables = extractMarkdownTables(md);
+  if (!tables.length){ toast('Nenhuma tabela encontrada na resposta.', 'warn'); return; }
+  const wb = XLSX.utils.book_new();
+  tables.forEach((t, i) => {
+    const ws = XLSX.utils.aoa_to_sheet(t);
+    XLSX.utils.book_append_sheet(wb, ws, `Tabela ${i+1}`);
+  });
+  const out = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+  triggerDownload(name, new Blob([out], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+}
+/* .pdf da resposta (texto) — via jsPDF, com quebra de página automática */
+function downloadPdf(text, name){
+  const J = window.jspdf?.jsPDF || window.jsPDF;
+  if (!J){ toast('Biblioteca de PDF não carregou (offline?).', 'err'); return; }
+  const doc = new J({ unit:'pt', format:'a4' });
+  const margin = 48, width = doc.internal.pageSize.getWidth() - margin*2;
+  const pageH = doc.internal.pageSize.getHeight() - margin;
+  doc.setFont('helvetica'); doc.setFontSize(11);
+  const lines = doc.splitTextToSize(text, width);
+  let y = margin;
+  lines.forEach(line => {
+    if (y > pageH){ doc.addPage(); y = margin; }
+    doc.text(line, margin, y); y += 16;
+  });
+  triggerDownload(name, doc.output('blob'));
+}
+/* .docx da resposta — via docx.js. Linhas viram parágrafos; ``` viram monospace */
+function downloadDocx(text, name){
+  if (typeof docx === 'undefined'){ toast('Biblioteca de Word não carregou (offline?).', 'err'); return; }
+  const { Document, Packer, Paragraph, TextRun } = docx;
+  let mono = false;
+  const paras = text.split('\n').map(line => {
+    if (line.trim().startsWith('```')){ mono = !mono; return new Paragraph({ text:'' }); }
+    return new Paragraph({ children:[ new TextRun({ text: line || ' ', font: mono ? 'Consolas' : 'Calibri', size: mono ? 20 : 22 }) ] });
+  });
+  const d = new Document({ sections:[{ children: paras }] });
+  Packer.toBlob(d).then(blob => triggerDownload(name, blob));
 }
 /* Extrai blocos ```lang ... ``` do markdown cru (independe do DOM) */
 function extractCodeBlocks(markdown){
@@ -1327,6 +1426,8 @@ if (localStorage.getItem('vtz_agents') === null){
 
 /* ---------- RouteLLM caseiro ---------- */
 const ROUTER_MODEL = {id:'__router__', name:'RouteLLM (automático)'};
+const ROUTER_FREE_MODEL = {id:'__router_free__', name:'RouteLLM Free (só grátis)'};
+const FUSION_MODEL = {id:'__fusion__', name:'Fusion (2 IAs em paralelo)'};
 
 function classifyTier(text){
   const t = (text||'').toLowerCase();
@@ -1469,15 +1570,24 @@ function rankScore(modelId, rankList){
 function totalPricePerM(m){
   return (parseFloat(m.pricing?.prompt||0) + parseFloat(m.pricing?.completion||0)) * 1e6;
 }
+/* Presets combináveis (até 2): cada um tem cmp (ordena) e/ou filter (restringe).
+   Ao combinar, o 1º selecionado é o critério primário e o 2º desempata. */
 const SORT_PRESETS = [
-  { key:'default', label:'Padrão' },
-  { key:'codex',   label:'Codex',        sort:(a,b) => rankScore(a.id,CODEX_RANK) - rankScore(b.id,CODEX_RANK) },
-  { key:'cheap',   label:'Custo ↓',      sort:(a,b) => totalPricePerM(a) - totalPricePerM(b) },
-  { key:'perf',    label:'Performance',  sort:(a,b) => rankScore(a.id,PERF_RANK) - rankScore(b.id,PERF_RANK) },
-  { key:'context', label:'Contexto ↑',   sort:(a,b) => (b.context_length||0) - (a.context_length||0) },
-  { key:'new',     label:'Recentes',     sort:(a,b) => (b.created||0) - (a.created||0) },
-  { key:'free',    label:'Grátis',       filter:(m) => totalPricePerM(m) === 0 },
+  { key:'codex',   label:'Codex',       cmp:(a,b) => rankScore(a.id,CODEX_RANK) - rankScore(b.id,CODEX_RANK) },
+  { key:'cheap',   label:'Custo ↓',     cmp:(a,b) => totalPricePerM(a) - totalPricePerM(b) },
+  { key:'perf',    label:'Performance', cmp:(a,b) => rankScore(a.id,PERF_RANK) - rankScore(b.id,PERF_RANK) },
+  { key:'context', label:'Contexto ↑',  cmp:(a,b) => (b.context_length||0) - (a.context_length||0) },
+  { key:'new',     label:'Recentes',    cmp:(a,b) => (b.created||0) - (a.created||0) },
+  { key:'free',    label:'Grátis',      filter:(m) => totalPricePerM(m) === 0 },
 ];
+const MAX_SORTS = 2;
+/* Alterna um preset na seleção (máx 2). Clicar de novo remove; um 3º empurra o mais antigo. */
+function togglePickerSort(key){
+  const i = state.pickerSorts.indexOf(key);
+  if (i >= 0){ state.pickerSorts.splice(i, 1); return; }
+  state.pickerSorts.push(key);
+  if (state.pickerSorts.length > MAX_SORTS) state.pickerSorts.shift();
+}
 
 /* ---------- Tema claro/escuro ---------- */
 function applyTheme(theme){
@@ -1499,6 +1609,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   applyTheme(state.theme);
   document.getElementById('theme-btn').onclick = toggleTheme;
+
+  // Firebase (login opcional): só ativa se o SDK e a config real estiverem presentes
+  if (initFirebase()){
+    document.getElementById('google-signin-btn').onclick = signInGoogle;
+    document.getElementById('google-signout-btn').onclick = signOutGoogle;
+  } else {
+    const hint = document.getElementById('account-hint');
+    if (hint) hint.textContent = 'Sync na nuvem indisponível: configure o Firebase (chave real) pra ativar o login. Sem isso, tudo continua salvo neste navegador.';
+    const btn = document.getElementById('google-signin-btn');
+    if (btn){ btn.disabled = true; btn.textContent = 'Login indisponível (configurar Firebase)'; }
+  }
 
   // sugestões da tela inicial: ícones + envio real ao clicar
   const sugIcons = ['bank','cpu','gamepad','dumbbell'];
@@ -1877,6 +1998,90 @@ function persistConversations(){
     }
   }
   updateSessionPanel();
+  scheduleCloudSync();
+}
+
+/* ---------- Login opcional + sync na nuvem (Firebase) ----------
+   Sem login: nada muda, tudo no localStorage. Com login Google: conversas,
+   agentes e skills sobem pro Firestore e descem em qualquer aparelho.
+   100% grátis dentro dos limites gratuitos do Firebase. */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDcdaOggw9ZWsayQmxcmKVf81-n-w0mlT0",
+  authDomain: "vtz-life-47067.firebaseapp.com",
+  projectId: "vtz-life-47067",
+  storageBucket: "vtz-life-47067.firebasestorage.app",
+  messagingSenderId: "601252874771",
+  appId: "1:601252874771:web:e4280dadb331f176d10de6",
+};
+let fbAuth = null, fbDb = null, cloudSyncTimer = null;
+function initFirebase(){
+  if (typeof firebase === 'undefined' || !firebase.initializeApp){ console.warn('Firebase não carregou.'); return false; }
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fbAuth = firebase.auth();
+    fbDb = firebase.firestore();
+    fbAuth.onAuthStateChanged(onAuthChanged);
+    return true;
+  }catch(e){ console.warn('Firebase init falhou:', e.message); return false; }
+}
+function onAuthChanged(user){
+  const out = document.getElementById('account-signed-out');
+  const inn = document.getElementById('account-signed-in');
+  if (user){
+    if (out) out.style.display = 'none';
+    if (inn) inn.style.display = 'block';
+    const em = document.getElementById('account-email'); if (em) em.textContent = user.email || user.displayName || 'conta Google';
+    pullFromCloud(user.uid);
+  } else {
+    if (out) out.style.display = 'block';
+    if (inn) inn.style.display = 'none';
+  }
+}
+async function signInGoogle(){
+  if (!fbAuth){ toast('Login indisponível (Firebase não configurado).', 'err'); return; }
+  try{ await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); toast('Conectado. Sincronizando…'); }
+  catch(e){ toast('Falha no login: ' + e.message, 'err'); }
+}
+async function signOutGoogle(){ if (fbAuth){ await fbAuth.signOut(); toast('Desconectado. Dados continuam neste navegador.'); } }
+function setSyncStatus(txt){ const el = document.getElementById('sync-status'); if (el) el.textContent = txt; }
+function scheduleCloudSync(){
+  if (!fbAuth?.currentUser || !fbDb) return;
+  clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = setTimeout(pushToCloud, 1500);
+}
+async function pushToCloud(){
+  const user = fbAuth?.currentUser;
+  if (!user || !fbDb) return;
+  try{
+    setSyncStatus('Sincronizando…');
+    const payload = {
+      conversations: JSON.parse(localStorage.getItem('vtz_conversations') || '[]'),
+      agents: state.agents, skills: state.skills,
+      globalPrompt: localStorage.getItem('vtz_global_prompt') || '',
+      favorites: state.favorites,
+      updatedAt: Date.now(),
+    };
+    await fbDb.collection('vtzllm_users').doc(user.uid).set(payload);
+    setSyncStatus('Sincronizado ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}));
+  }catch(e){ setSyncStatus('Erro no sync: ' + e.message); }
+}
+async function pullFromCloud(uid){
+  if (!fbDb) return;
+  try{
+    setSyncStatus('Baixando da nuvem…');
+    const doc = await fbDb.collection('vtzllm_users').doc(uid).get();
+    if (!doc.exists){ await pushToCloud(); return; }
+    const d = doc.data();
+    if (Array.isArray(d.conversations)) localStorage.setItem('vtz_conversations', JSON.stringify(d.conversations));
+    if (Array.isArray(d.agents)){ state.agents = d.agents; localStorage.setItem('vtz_agents', JSON.stringify(d.agents)); }
+    if (Array.isArray(d.skills)){ state.skills = d.skills; localStorage.setItem('vtz_skills', JSON.stringify(d.skills)); }
+    if (typeof d.globalPrompt === 'string') localStorage.setItem('vtz_global_prompt', d.globalPrompt);
+    if (Array.isArray(d.favorites)){ state.favorites = d.favorites; localStorage.setItem('vtz_favorites', JSON.stringify(d.favorites)); }
+    state.conversations = JSON.parse(localStorage.getItem('vtz_conversations') || '[]');
+    renderHistoryList(); renderChat();
+    setSyncStatus('Sincronizado ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}));
+    toast('Dados da nuvem carregados.');
+  }catch(e){ setSyncStatus('Erro ao baixar: ' + e.message); }
 }
 
 /* ---------- Diagnóstico de conexão ----------
@@ -2232,7 +2437,7 @@ function openAgentModal(existing){
   document.getElementById('agent-modal').dataset.editId = existing?.id || '';
   agentPhotoDraft = existing?.photo || null;
   const sel = document.getElementById('agent-model-select');
-  sel.innerHTML = '<option value="">Padrão do app</option><option value="__router__">RouteLLM (automático)</option>';
+  sel.innerHTML = '<option value="">Padrão do app</option><option value="__router__">RouteLLM (automático)</option><option value="__router_free__">RouteLLM Free (só grátis)</option><option value="__fusion__">Fusion (2 IAs em paralelo)</option>';
   state.models.filter(m => !isImageModel(m)).forEach(m => {
     const o = document.createElement('option');
     o.value = m.id; o.textContent = m.name || m.id;
@@ -2423,8 +2628,9 @@ function isImageModel(m){
   return outs.includes('image');
 }
 function updateModelLabel(){
-  if (state.model === '__router__'){
-    document.getElementById('current-model-label').innerHTML = `<span style="display:inline-flex; margin-right:5px; vertical-align:-3px; color:var(--violet);">${iconHTML('shuffle')}</span>RouteLLM`;
+  const SPECIAL = { '__router__':'RouteLLM', '__router_free__':'RouteLLM Free', '__fusion__':'Fusion' };
+  if (SPECIAL[state.model]){
+    document.getElementById('current-model-label').innerHTML = `<span style="display:inline-flex; margin-right:5px; vertical-align:-3px; color:var(--violet);">${iconHTML('shuffle')}</span>${SPECIAL[state.model]}`;
     return;
   }
   const m = state.models.find(x => x.id === state.model);
@@ -2477,11 +2683,20 @@ function renderPickerTabs(){
 function renderPickerSorts(){
   const el = document.getElementById('picker-sorts');
   el.innerHTML = '';
+  // chip "Padrão" = limpar combinação
+  const def = document.createElement('button');
+  def.className = 'picker-tab' + (state.pickerSorts.length === 0 ? ' active' : '');
+  def.textContent = 'Padrão';
+  def.onclick = () => { state.pickerSorts = []; renderPickerSorts(); renderPickerList(); };
+  el.appendChild(def);
+
   SORT_PRESETS.forEach(p => {
+    const pos = state.pickerSorts.indexOf(p.key); // -1, 0 ou 1
     const btn = document.createElement('button');
-    btn.className = 'picker-tab' + (state.pickerSort === p.key ? ' active' : '');
-    btn.textContent = p.label;
-    btn.onclick = () => { state.pickerSort = p.key; renderPickerSorts(); renderPickerList(); };
+    btn.className = 'picker-tab' + (pos >= 0 ? ' active' : '');
+    // mostra a ordem quando há 2 combinados (1 = primário, 2 = desempate)
+    btn.innerHTML = esc(p.label) + (pos >= 0 && state.pickerSorts.length > 1 ? ` <span class="sort-order">${pos+1}</span>` : '');
+    btn.onclick = () => { togglePickerSort(p.key); renderPickerSorts(); renderPickerList(); };
     el.appendChild(btn);
   });
 }
@@ -2493,19 +2708,30 @@ function renderPickerList(){
   if (state.pickerTab === 'fav') list = list.filter(m => isFavorite(m.id));
   if (q) list = list.filter(m => m.id.toLowerCase().includes(q) || (m.name||'').toLowerCase().includes(q));
 
-  const preset = SORT_PRESETS.find(p => p.key === state.pickerSort) || SORT_PRESETS[0];
-  if (preset.filter) list = list.filter(preset.filter);
-  if (preset.sort){
-    // preset ativo manda na ordem — senão a ordenação vira aleatória misturada com favoritos
-    list = [...list].sort(preset.sort);
+  const active = state.pickerSorts.map(k => SORT_PRESETS.find(p => p.key === k)).filter(Boolean);
+  if (active.length){
+    // filtros de todos os presets ativos se acumulam (ex: "Grátis" + "Codex")
+    active.forEach(p => { if (p.filter) list = list.filter(p.filter); });
+    // ordena em cascata: 1º critério manda; empate -> 2º critério desempata
+    const cmps = active.filter(p => p.cmp).map(p => p.cmp);
+    if (cmps.length){
+      list = [...list].sort((a,b) => {
+        for (const cmp of cmps){ const d = cmp(a,b); if (d !== 0) return d; }
+        return 0;
+      });
+    }
   } else {
-    // sem preset: favoritos sempre no topo (dentro de qualquer aba)
+    // sem preset: favoritos sempre no topo
     list = [...list].sort((a,b) => (isFavorite(b.id)?1:0) - (isFavorite(a.id)?1:0));
   }
 
-  const showRouter = state.pickerTab !== 'image' && state.pickerTab !== 'fav' && state.pickerSort === 'default'
-    && (!q || ROUTER_MODEL.name.toLowerCase().includes(q) || 'routellm'.includes(q));
-  const displayList = showRouter ? [ROUTER_MODEL, ...list] : list;
+  const specials = [];
+  if (state.pickerTab !== 'image' && state.pickerTab !== 'fav' && state.pickerSorts.length === 0){
+    const match = (m) => !q || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
+      || 'routellm fusion'.includes(q);
+    [ROUTER_MODEL, ROUTER_FREE_MODEL, FUSION_MODEL].forEach(sp => { if (match(sp)) specials.push(sp); });
+  }
+  const displayList = [...specials, ...list];
 
   const el = document.getElementById('picker-list');
   el.innerHTML = '';
@@ -2514,26 +2740,31 @@ function renderPickerList(){
     empty.className = 'picker-empty';
     empty.textContent = state.pickerTab === 'fav'
       ? 'Nenhum favorito ainda. Toque na estrela de um modelo pra fixar aqui.'
-      : (state.pickerSort === 'free' ? 'Nenhum modelo grátis nesta categoria.' : 'Nenhum modelo encontrado.');
+      : (state.pickerSorts.includes('free') ? 'Nenhum modelo grátis com esses filtros.' : 'Nenhum modelo encontrado.');
     el.appendChild(empty);
     return;
   }
   displayList.forEach(m => {
-    const isRouter = m.id === '__router__';
-    const badge = isRouter
-      ? `<span class="provider-badge" style="background:var(--violet)">${iconHTML('shuffle')}</span>`
+    const SPECIAL_DESC = {
+      '__router__': 'roteia pra melhor IA da tarefa',
+      '__router_free__': 'roteia só entre modelos grátis',
+      '__fusion__': '2 IAs em paralelo, fundidas na melhor resposta',
+    };
+    const isSpecial = !!SPECIAL_DESC[m.id];
+    const badge = isSpecial
+      ? `<span class="provider-badge" style="background:var(--violet)">${iconHTML(m.id==='__fusion__'?'shuffle':'shuffle')}</span>`
       : providerBadgeHTML(m.id);
-    const price = isRouter ? '' : formatPriceBRL(m);
+    const price = isSpecial ? '' : formatPriceBRL(m);
     const row = document.createElement('div');
     row.className = 'model-row' + (m.id === state.model ? ' selected' : '');
     row.innerHTML = `
       ${badge}
       <div class="model-info">
         <span class="name">${esc(m.name||m.id)}</span>
-        <span class="id">${isRouter ? 'roteamento automático por heurística' : esc(m.id)}</span>
+        <span class="id">${isSpecial ? SPECIAL_DESC[m.id] : esc(m.id)}</span>
         ${price ? `<span class="price">${price}</span>` : ''}
       </div>
-      ${isRouter ? '' : `<button class="fav-btn ${isFavorite(m.id)?'faved':''}" title="Favoritar">${isFavorite(m.id)?'★':'☆'}</button>`}
+      ${isSpecial ? '' : `<button class="fav-btn ${isFavorite(m.id)?'faved':''}" title="Favoritar">${isFavorite(m.id)?'★':'☆'}</button>`}
       ${m.id === state.model ? '<span class="check">✓</span>' : ''}
     `;
     const favBtn = row.querySelector('.fav-btn');
@@ -2587,7 +2818,7 @@ function renderChat(){
   log.style.display = 'flex';
   conv.messages.forEach((m, i) => {
     if (m.role === 'user' || m.role === 'assistant'){
-      if (m._router) appendRouterBadge(m._router);
+      if (m._router) appendRouterBadge(m._router, null, null, true);
       appendMessageDOM(m.role, m.content, false, i);
     }
   });
@@ -2606,14 +2837,17 @@ function safeRenderMarkdown(content){
   div.textContent = content || '';
   return div.innerHTML.replace(/\n/g, '<br>');
 }
-function appendRouterBadge(modelName, conv, beforeEl){
+function appendRouterBadge(modelName, conv, beforeEl, fullText){
   if (conv && conv.id !== state.currentConvId) return null;
   const log = document.getElementById('chat-log');
   document.getElementById('empty-state').style.display = 'none';
   log.style.display = 'flex';
   const badge = document.createElement('div');
   badge.className = 'router-badge';
-  badge.innerHTML = `<span class="rb-icon">${iconHTML('shuffle')}</span><span>RouteLLM <span style="color:var(--text-faint)">►</span> <span class="rb-model">${esc(modelName)}</span></span>`;
+  const inner = fullText
+    ? `<span class="rb-model">${esc(modelName)}</span>`
+    : `RouteLLM <span style="color:var(--text-faint)">►</span> <span class="rb-model">${esc(modelName)}</span>`;
+  badge.innerHTML = `<span class="rb-icon">${iconHTML('shuffle')}</span><span>${inner}</span>`;
   if (beforeEl && beforeEl.parentElement === log) log.insertBefore(badge, beforeEl);
   else log.appendChild(badge);
   return badge;
@@ -2667,6 +2901,31 @@ function appendMessageDOM(role, content, isTool, msgIndex){
     bubble.appendChild(note);
   }
 
+  // fontes da busca web (estilo Claude: favicon + título, clicável)
+  if (msgObj && msgObj._sources && msgObj._sources.length){
+    const sources = document.createElement('div');
+    sources.className = 'msg-sources';
+    const head = document.createElement('div');
+    head.className = 'sources-head';
+    head.innerHTML = iconHTML('globe') + ` ${msgObj._sources.length} fonte${msgObj._sources.length>1?'s':''} da web`;
+    sources.appendChild(head);
+    const grid = document.createElement('div');
+    grid.className = 'sources-grid';
+    msgObj._sources.forEach((s, i) => {
+      let host = '';
+      try{ host = new URL(s.url).hostname.replace('www.',''); }catch(_){ host = s.url; }
+      const a = document.createElement('a');
+      a.className = 'source-card';
+      a.href = s.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.innerHTML = `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32" alt="" onerror="this.style.display='none'">`
+        + `<span class="src-body"><span class="src-title">${esc(s.title || host)}</span><span class="src-host">${esc(host)}</span></span>`
+        + `<span class="src-n">${i+1}</span>`;
+      grid.appendChild(a);
+    });
+    sources.appendChild(grid);
+    bubble.appendChild(sources);
+  }
+
   const acts = document.createElement('div');
   acts.className = 'msg-acts';
   const copyBtn = document.createElement('button');
@@ -2718,6 +2977,11 @@ function openMsgMenu(msgIndex){
   items.push({ icon:'download', label:'Baixar mensagem (.md)', run: () => {
     downloadTextFile(`vtz-mensagem-${msgIndex+1}.md`, rawText);
   }});
+  items.push({ icon:'file', label:'Baixar como PDF', run: () => downloadPdf(rawText, `vtz-${msgIndex+1}.pdf`) });
+  items.push({ icon:'file', label:'Baixar como Word (.docx)', run: () => downloadDocx(rawText, `vtz-${msgIndex+1}.docx`) });
+  if (extractMarkdownTables(rawText).length){
+    items.push({ icon:'file', label:'Baixar tabela (.xlsx)', run: () => downloadXlsx(rawText, `vtz-${msgIndex+1}.xlsx`) });
+  }
   if (blocks.length){
     items.push({ icon:'download', label:`Baixar código${blocks.length>1?'s':''} (${blocks.length} arquivo${blocks.length>1?'s':''})`, run: () => {
       blocks.forEach((b, i) => setTimeout(() => downloadTextFile(guessFilename(b.code, b.lang, i+1), b.code), i * 250));
@@ -2965,7 +3229,7 @@ async function sendMessage(){
    Diferente do tier fixo: o classificador recebe a mensagem + a lista de candidatos
    e devolve JSON com o modelo escolhido. Se falhar (rede, JSON inválido), cai na
    heurística antiga como rede de segurança. */
-function routerCandidates(){
+function routerCandidates(freeOnly){
   // shortlist de candidatos reais presentes no catálogo, com o "papel" de cada um
   const wanted = [
     ['claude-opus',   'código complexo, arquitetura, análise profunda'],
@@ -2981,13 +3245,34 @@ function routerCandidates(){
     const m = state.models.find(x => x.id.includes(pat) && !isImageModel(x));
     if (m && !picks.some(p => p.id === m.id)) picks.push({ id: m.id, role });
   }
+  if (freeOnly) return freeCandidates();
   return picks;
 }
-async function classifyWithLLM(userText, signal){
-  const candidates = routerCandidates();
+/* Só modelos gratuitos, com um "papel" inferido do id — usado pelo RouteLLM Free */
+function freeCandidates(){
+  const free = state.models.filter(m => isFreeModel(m) && !isImageModel(m));
+  const role = (id) => {
+    const s = id.toLowerCase();
+    if (s.includes('r1') || s.includes('reason') || s.includes('think')) return 'raciocínio e matemática';
+    if (s.includes('coder') || s.includes('code')) return 'código';
+    if (s.includes('70b') || s.includes('72b') || s.includes('large') || s.includes('405b')) return 'tarefas complexas';
+    if (s.includes('mini') || s.includes('small') || s.includes('8b') || s.includes('flash')) return 'conversas rápidas';
+    return 'uso geral';
+  };
+  // no máximo 12 candidatos pra não estourar o prompt do classificador
+  return free.slice(0, 12).map(m => ({ id: m.id, role: role(m.id) }));
+}
+function isFreeModel(m){
+  if (!m) return false;
+  if (typeof m.id === 'string' && m.id.endsWith(':free')) return true;
+  const p = m.pricing;
+  return p && parseFloat(p.prompt||0) === 0 && parseFloat(p.completion||0) === 0;
+}
+async function classifyWithLLM(userText, signal, freeOnly){
+  const candidates = routerCandidates(freeOnly);
   if (!candidates.length) return null;
-  // classificador: prefere um modelo grátis (custo zero); senão o tier fast configurado
-  const freeModel = state.models.find(m => m.id.endsWith(':free') && !isImageModel(m));
+  // classificador: sempre um modelo grátis (custo zero); senão o tier fast configurado
+  const freeModel = state.models.find(m => isFreeModel(m) && !isImageModel(m));
   const classifier = freeModel?.id || state.routerConfig.fast;
   if (!classifier) return null;
   const listText = candidates.map(c => `- ${c.id} (${c.role})`).join('\n');
@@ -3001,6 +3286,61 @@ async function classifyWithLLM(userText, signal){
   const parsed = JSON.parse(raw);
   const chosen = candidates.find(c => c.id === parsed.model);
   return chosen ? chosen.id : null;
+}
+
+/* ---------- Fusion: 2 modelos EM PARALELO + fusão por um 3º barato ----------
+   Sem o delay do debate sequencial: as duas respostas são pedidas ao mesmo tempo
+   (Promise.all), então o tempo total ≈ o do modelo mais lento, não a soma. Um
+   modelo grátis funde as duas na melhor versão. */
+function fusionPair(){
+  // um forte + um rápido/barato distinto, ambos presentes no catálogo
+  const strong = state.models.find(m => /claude-opus|gpt-5\.5|claude-sonnet-5|gemini-3/.test(m.id) && !isImageModel(m))
+              || state.models.find(m => !isImageModel(m) && !isFreeModel(m));
+  const fast = state.models.find(m => /deepseek|gemini-2\.5-flash|gpt-5-mini|llama-3\.3/.test(m.id) && !isImageModel(m) && m.id !== strong?.id)
+            || state.models.find(m => !isImageModel(m) && m.id !== strong?.id);
+  return [strong, fast].filter(Boolean).map(m => m.id);
+}
+async function runFusion(conv, ctrl, thinking){
+  const models = fusionPair();
+  if (models.length < 2){ throw new Error('Preciso de ao menos 2 modelos no catálogo pra fundir.'); }
+  const systemPrompt = buildSystemPrompt(conv);
+  let base = sanitizeForApi(conv.messages);
+  if (state.ctxWindow > 0 && base.length > state.ctxWindow){
+    base = base.slice(-state.ctxWindow);
+    while (base.length && base[0].role !== 'user') base.shift();
+  }
+  const msgs = systemPrompt ? [{role:'system', content: systemPrompt}, ...base] : base;
+
+  thinking.update('Consultando 2 modelos em paralelo…');
+  // dispara as duas ao MESMO tempo
+  const calls = models.map(model =>
+    orFetch({ model, messages: msgs }, { signal: ctrl.signal })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => ({ model, text: d?.choices?.[0]?.message?.content || '', usage: d?.usage }))
+      .catch(() => ({ model, text: '', usage: null }))
+  );
+  const results = await Promise.all(calls);
+  results.forEach(r => trackUsage(r.usage, r.model));
+  const valid = results.filter(r => r.text.trim());
+  if (!valid.length) throw new Error('Nenhum dos modelos respondeu.');
+  if (valid.length === 1) return { text: valid[0].text, models, fusedBy: null };
+
+  // funde com um modelo grátis (ou o fast do par se não houver free)
+  const freeModel = state.models.find(m => isFreeModel(m) && !isImageModel(m));
+  const fuser = freeModel?.id || models[1];
+  thinking.update('Fundindo as respostas na melhor versão…');
+  const lastUser = contentToText([...conv.messages].reverse().find(m => m.role==='user')?.content || '');
+  const fuseSystem = `Você recebe a mesma pergunta respondida por ${valid.length} modelos de IA diferentes. Produza UMA resposta final, a melhor possível: combine os acertos de cada uma, corrija erros, elimine redundância e contradições. Responda no idioma da pergunta, direto, sem citar "modelo A/B" nem explicar que houve fusão — entregue só a resposta final.`;
+  const fuseUser = `PERGUNTA:\n${lastUser}\n\n` + valid.map((r,i) => `RESPOSTA ${i+1} (${r.model}):\n${r.text}`).join('\n\n---\n\n');
+  const fr = await orFetch({ model: fuser, messages:[
+    { role:'system', content: fuseSystem },
+    { role:'user', content: fuseUser }
+  ]}, { signal: ctrl.signal });
+  if (!fr.ok) return { text: valid[0].text, models, fusedBy: null }; // fusão falhou: devolve a melhor bruta
+  const fd = await fr.json();
+  trackUsage(fd.usage, fuser);
+  const fused = fd.choices?.[0]?.message?.content?.trim();
+  return { text: fused || valid[0].text, models, fusedBy: fused ? fuser : null };
 }
 
 async function runChatLoop(depth=0, convArg, modelOverride){
@@ -3030,24 +3370,49 @@ async function runChatLoop(depth=0, convArg, modelOverride){
     const timeoutMsg = () => `A API não respondeu em ${STREAM_IDLE_MS/1000}s. Rode "Testar conexão" em Config.`;
 
     const baseModel = modelOverride || conv.model || state.model;
+
+    // ---- Fusion: caminho próprio (paralelo + fusão), não usa streaming ----
+    if (baseModel === '__fusion__' && depth === 0){
+      const out = await runFusion(conv, ctrl, thinking);
+      clearInterval(watchdog); watchdog = null;
+      const label = out.fusedBy
+        ? `Fusion: ${out.models.map(id => state.models.find(m=>m.id===id)?.name || id).join(' + ')} → fundido`
+        : `Fusion: ${out.models.map(id => state.models.find(m=>m.id===id)?.name || id).join(' + ')}`;
+      appendRouterBadge(label, conv, thinking.el, true);
+      const assistantMsg = { role:'assistant', content: out.text, _router: label };
+      conv.messages.push(assistantMsg);
+      conv.updatedAt = Date.now();
+      if (conv.id === state.currentConvId){ appendMessageDOM('assistant', out.text, false, conv.messages.length - 1); updateCtxMeter(); }
+      persistConversations();
+      renderHistoryList();
+      return;
+    }
+
     let effectiveModel = baseModel;
-    if (baseModel === '__router__'){
+    if (baseModel === '__router__' || baseModel === '__router_free__'){
+      const freeOnly = baseModel === '__router_free__';
       const lastUser = [...conv.messages].reverse().find(m => m.role === 'user');
       const userText = contentToText(lastUser?.content || '');
       if (depth === 0){
         let chosen = null;
-        try{ chosen = await classifyWithLLM(userText, ctrl.signal); }
+        try{ chosen = await classifyWithLLM(userText, ctrl.signal, freeOnly); }
         catch(e){
           if (e.name === 'AbortError'){ toast(timedOut ? timeoutMsg() : 'Geração interrompida', timedOut ? 'err' : 'warn'); return; }
           console.warn('Router LLM falhou, usando heurística:', e.message);
         }
         if (!chosen){
-          const {modelId} = resolveRouterModel(userText);
-          chosen = modelId;
+          if (freeOnly){
+            const fc = freeCandidates();
+            chosen = fc[0]?.id;
+          } else {
+            const {modelId} = resolveRouterModel(userText);
+            chosen = modelId;
+          }
         }
+        if (!chosen) throw new Error(freeOnly ? 'Nenhum modelo grátis disponível no catálogo.' : 'Roteamento falhou.');
         conv._routedModel = chosen;
         const chosenName = state.models.find(m => m.id === chosen)?.name || chosen;
-        appendRouterBadge(chosenName, conv, thinking.el);
+        appendRouterBadge((freeOnly ? 'RouteLLM Free' : 'RouteLLM') + ' ► ' + chosenName, conv, thinking.el, true);
       }
       effectiveModel = conv._routedModel || state.routerConfig.balanced;
     }
@@ -3087,7 +3452,7 @@ async function runChatLoop(depth=0, convArg, modelOverride){
     /* ---- Streaming (chat normal) ---- */
     if (useStream){
       if (!res.body) throw new Error('Streaming indisponível — desative o streaming em Config.');
-      let acc = '', usage = null, lastPaint = 0, aborted = false;
+      let acc = '', usage = null, lastPaint = 0, aborted = false, annotations = [];
       try{
         const reader = res.body.getReader();
         const dec = new TextDecoder();
@@ -3109,7 +3474,19 @@ async function runChatLoop(depth=0, convArg, modelOverride){
             try{ obj = JSON.parse(payload); }
             catch(_){ continue; }                                // linha parcial
             if (obj.error) throw new Error(obj.error.message || 'erro do provedor');
-            const delta = obj.choices?.[0]?.delta?.content;
+            const dmsg = obj.choices?.[0]?.delta;
+            const delta = dmsg?.content;
+            // fontes da busca web chegam como annotations no delta
+            if (dmsg?.annotations?.length){
+              for (const an of dmsg.annotations){
+                const u = an.url_citation || an;
+                if (u?.url && !annotations.some(x => x.url === u.url)) annotations.push({ url:u.url, title:u.title || u.url });
+              }
+              if (!acc){
+                const hosts = annotations.slice(0,4).map(a => { try{ return new URL(a.url).hostname.replace('www.',''); }catch(_){ return ''; } }).filter(Boolean);
+                thinking.update('Pesquisando na web… ' + hosts.join(' · '));
+              }
+            }
             if (delta){
               acc += delta;
               const now = Date.now();
@@ -3133,8 +3510,10 @@ async function runChatLoop(depth=0, convArg, modelOverride){
       if (aborted) toast('Geração interrompida — resposta parcial mantida', 'warn');
 
       const assistantMsg = { role:'assistant', content: acc };
-      if (baseModel === '__router__' && conv._routedModel){
-        assistantMsg._router = state.models.find(m => m.id === conv._routedModel)?.name || conv._routedModel;
+      if (annotations.length) assistantMsg._sources = annotations;
+      if ((baseModel === '__router__' || baseModel === '__router_free__') && conv._routedModel){
+        const nm = state.models.find(m => m.id === conv._routedModel)?.name || conv._routedModel;
+        assistantMsg._router = (baseModel === '__router_free__' ? 'RouteLLM Free ► ' : 'RouteLLM ► ') + nm;
       }
       assistantMsg.ts = Date.now();
       conv.messages.push(assistantMsg);
@@ -3177,8 +3556,9 @@ async function runChatLoop(depth=0, convArg, modelOverride){
     }
 
     const assistantMsg = { role:'assistant', content: msg.content || '' };
-    if (baseModel === '__router__' && conv._routedModel){
-      assistantMsg._router = state.models.find(m => m.id === conv._routedModel)?.name || conv._routedModel;
+    if ((baseModel === '__router__' || baseModel === '__router_free__') && conv._routedModel){
+      const nm = state.models.find(m => m.id === conv._routedModel)?.name || conv._routedModel;
+      assistantMsg._router = (baseModel === '__router_free__' ? 'RouteLLM Free ► ' : 'RouteLLM ► ') + nm;
     }
     assistantMsg.ts = Date.now();
     conv.messages.push(assistantMsg);
@@ -3208,7 +3588,8 @@ function updateCostBadge(){
 function updateSessionPanel(){
   const conv = getCurrentConv();
   const m = state.models.find(x => x.id === state.model);
-  const modelLabel = state.model === '__router__' ? 'RouteLLM' : (m?.name || state.model || '—');
+  const SPECIAL_NAMES = { '__router__':'RouteLLM', '__router_free__':'RouteLLM Free', '__fusion__':'Fusion' };
+  const modelLabel = SPECIAL_NAMES[state.model] || m?.name || state.model || '—';
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   set('sp-model', modelLabel.length > 18 ? modelLabel.slice(0,17) + '…' : modelLabel);
   set('sp-cost', '$' + state.totalCost.toFixed(4));
