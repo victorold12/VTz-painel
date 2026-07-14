@@ -668,6 +668,13 @@
   .msg-sources{margin-top:12px; padding-top:10px; border-top:1px solid var(--line);}
   .source-card .src-thumb{width:44px; height:44px; object-fit:cover; border-radius:8px; flex-shrink:0;}
   .source-card.has-thumb > img:not(.src-thumb){display:none;}
+  .msg-images{margin-top:12px; padding-top:10px; border-top:1px solid var(--line);}
+  .img-strip{display:flex; gap:8px; overflow-x:auto; padding:8px 0 4px; scrollbar-width:thin;}
+  .img-strip::-webkit-scrollbar{height:6px;}
+  .img-strip::-webkit-scrollbar-thumb{background:var(--w15); border-radius:3px;}
+  .img-strip a{flex:none; display:block; border-radius:10px; overflow:hidden; border:1px solid var(--line); line-height:0;}
+  .img-strip img{width:150px; height:110px; object-fit:cover; display:block; transition:.15s;}
+  .img-strip a:hover img{transform:scale(1.04);}
   .sources-head{display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--text-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:.04em;}
   .sources-head svg.icon{width:13px; height:13px;}
   .sources-grid{display:flex; flex-direction:column; gap:6px;}
@@ -1957,6 +1964,7 @@ async function deepResearch(topic){
     if (conv.title === 'Nova conversa' || !conv.title) conv.title = topic.slice(0, 40);
     conv.updatedAt = Date.now();
     persistConversations(); renderChat(); renderHistoryList();
+    attachTopicImages(conv.messages[aIdx], topic, conv);  // imagens sobre o tema (via backend)
     toast('Pesquisa profunda concluída.');
   }catch(e){
     conv.messages[aIdx].content = '**Falha na pesquisa profunda:** ' + e.message;
@@ -1966,6 +1974,22 @@ async function deepResearch(topic){
 }
 
 /* ---------- Integração com o backend VTz OS (opcional) ---------- */
+/* Busca imagens sobre o tema (via backend) e anexa à mensagem. */
+async function attachTopicImages(msgObj, query, conv){
+  if (!backendUrl() || !query || !msgObj) return;
+  try{
+    const r = await fetch(backendUrl() + '/api/images', {
+      method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ q: query, max: 10 }),
+    });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.results && d.results.length){
+      msgObj._images = d.results;
+      persistConversations();
+      renderChat();
+    }
+  }catch(_){}
+}
 async function testBackend(){
   const out = document.getElementById('backend-status');
   const url = backendUrl();
@@ -2017,6 +2041,7 @@ async function backendDeepResearch(topic){
     }
     if (conv.title === 'Nova conversa' || !conv.title) conv.title = topic.slice(0, 40);
     conv.updatedAt = Date.now(); persistConversations(); renderChat(); renderHistoryList();
+    attachTopicImages(conv.messages[aIdx], topic, conv);  // imagens sobre o tema
     toast('Pesquisa profunda (backend) concluída.');
   }catch(e){
     conv.messages[aIdx].content = '**Falha na pesquisa profunda (backend):** ' + e.message + '\n\n(o backend está no ar e com CORS liberado?)';
@@ -3850,6 +3875,29 @@ function appendMessageDOM(role, content, isTool, msgIndex){
   }
 
   // fontes da busca web (estilo Claude: favicon + título, clicável)
+  if (msgObj && msgObj._images && msgObj._images.length){
+    const box = document.createElement('div');
+    box.className = 'msg-images';
+    const head = document.createElement('div');
+    head.className = 'sources-head';
+    head.innerHTML = iconHTML('image') + ` Imagens`;
+    box.appendChild(head);
+    const strip = document.createElement('div');
+    strip.className = 'img-strip';
+    msgObj._images.forEach(im => {
+      const a = document.createElement('a');
+      a.href = im.source || im.image; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.title = im.title || '';
+      const img = document.createElement('img');
+      img.src = im.thumbnail || im.image; img.alt = im.title || ''; img.loading = 'lazy';
+      img.onerror = () => a.remove();
+      a.appendChild(img);
+      strip.appendChild(a);
+    });
+    box.appendChild(strip);
+    bubble.appendChild(box);
+  }
+
   if (msgObj && msgObj._sources && msgObj._sources.length){
     const sources = document.createElement('div');
     sources.className = 'msg-sources';
@@ -4487,6 +4535,11 @@ async function runChatLoop(depth=0, convArg, modelOverride){
       if (conv.id === state.currentConvId){ appendMessageDOM('assistant', acc, false, conv.messages.length - 1); updateCtxMeter(); }
       persistConversations();
       renderHistoryList();
+      // busca web + backend: anexa imagens sobre o tema (a pergunta do usuário)
+      if (annotations.length && backendUrl()){
+        const q = contentToText([...conv.messages].reverse().find(m => m.role === 'user')?.content || '');
+        attachTopicImages(assistantMsg, q, conv);
+      }
       afterAssistantDone(conv);
       return;
     }
