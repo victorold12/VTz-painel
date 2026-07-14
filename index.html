@@ -666,6 +666,8 @@
   .qa-btn:hover{background:var(--violet); color:#fff;}
   /* Fontes da busca web */
   .msg-sources{margin-top:12px; padding-top:10px; border-top:1px solid var(--line);}
+  .source-card .src-thumb{width:44px; height:44px; object-fit:cover; border-radius:8px; flex-shrink:0;}
+  .source-card.has-thumb > img:not(.src-thumb){display:none;}
   .sources-head{display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--text-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:.04em;}
   .sources-head svg.icon{width:13px; height:13px;}
   .sources-grid{display:flex; flex-direction:column; gap:6px;}
@@ -826,6 +828,13 @@
         <p class="hint" style="margin-bottom:10px;">Fatos seus injetados em TODA conversa — nome, objetivos, preferências, contexto. Um por linha. Corta repetição (estilo ChatGPT/Copilot).</p>
         <textarea id="memory-input" placeholder="Ex.:&#10;Me chamo Victor Hugo, moro em Maricá-RJ.&#10;Treino à noite, foco em físico atlético.&#10;Jogo Fortnite, Valorant e EA FC.&#10;Prefiro respostas diretas em pt-BR." style="width:100%; min-height:120px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:12.5px; line-height:1.6; resize:vertical;"></textarea>
         <p class="hint" id="memory-count" style="margin-top:6px;">—</p>
+      </div>
+      <div class="cfg-group">
+        <h3>Backend VTz OS (opcional)</h3>
+        <p class="hint" style="margin-bottom:10px;">URL do servidor (repo <b>servidor</b>). Com ele ligado: busca com imagem da fonte, pesquisa profunda no servidor e conectores. Sem ele, tudo funciona local. Ex.: <code>http://localhost:8000</code></p>
+        <input type="text" id="backend-url-input" placeholder="https://seu-backend.exemplo.com" style="font-family:var(--mono);">
+        <button class="primary" id="backend-test-btn" style="margin-top:8px;">Testar backend</button>
+        <pre id="backend-status" style="display:none; margin-top:10px; background:var(--input-bg); border:1px solid var(--line); border-radius:10px; padding:11px; font-size:11px; line-height:1.6; white-space:pre-wrap; word-break:break-word;"></pre>
       </div>
       <div class="cfg-group">
         <h3>Diagnóstico</h3>
@@ -1127,7 +1136,9 @@ const state = {
   projects: JSON.parse(localStorage.getItem('vtz_projects') || '[]'), // pastas de conversa
   projectFilter: localStorage.getItem('vtz_project_filter') || '',      // '' = todos
   searchFocus: localStorage.getItem('vtz_search_focus') || '',          // foco da busca web
+  backendUrl: (localStorage.getItem('vtz_backend_url') || '').replace(/\/+$/, ''), // VTz OS backend (opcional)
 };
+function backendUrl(){ return state.backendUrl || ''; }
 /* Foco de busca: direciona o modelo pra priorizar certas fontes (viés, não filtro rígido). */
 const SEARCH_FOCUS = {
   reddit:   { label:'Reddit', hint:'priorize discussões e opiniões reais de usuários no Reddit (site:reddit.com)' },
@@ -1905,7 +1916,8 @@ async function startDeepResearch(){
   if (!topic){ toast('Escreva o tema da pesquisa no campo de mensagem primeiro.', 'warn'); input.focus(); return; }
   if (!state.apiKey){ toast('Configure a chave do OpenRouter primeiro.', 'warn'); switchView('config'); return; }
   input.value = '';
-  deepResearch(topic);
+  if (backendUrl()) backendDeepResearch(topic);  // server-side, mais robusto
+  else deepResearch(topic);                       // fallback client-side
 }
 async function deepResearch(topic){
   const conv = getCurrentConv(); if (!conv) return;
@@ -1950,6 +1962,66 @@ async function deepResearch(topic){
     conv.messages[aIdx].content = '**Falha na pesquisa profunda:** ' + e.message;
     persistConversations(); renderChat();
     toast('Pesquisa profunda falhou: ' + e.message, 'err');
+  }
+}
+
+/* ---------- Integração com o backend VTz OS (opcional) ---------- */
+async function testBackend(){
+  const out = document.getElementById('backend-status');
+  const url = backendUrl();
+  out.style.display = 'block';
+  if (!url){ out.textContent = 'Nenhuma URL configurada acima.'; return; }
+  out.textContent = 'Testando ' + url + '…';
+  try{
+    const health = await fetch(url + '/api/health').then(r => r.json());
+    let conn = {};
+    try{ conn = await fetch(url + '/api/connectors/status').then(r => r.json()); }catch(_){}
+    out.textContent = 'OK ✓  backend no ar.\n' + JSON.stringify(health, null, 1) +
+      '\n\nConectores configurados:\n' + JSON.stringify(conn, null, 1);
+  }catch(e){
+    out.textContent = 'Falhou: ' + e.message +
+      '\n\nCheque: backend rodando? URL certa? ALLOWED_ORIGINS liberou o domínio deste site?';
+  }
+}
+/* Deep research usando o servidor (mais robusto, com progresso via SSE). */
+async function backendDeepResearch(topic){
+  const conv = getCurrentConv(); if (!conv) return;
+  conv.messages.push({ role:'user', content: '🔬 Pesquisa profunda: ' + topic });
+  const aIdx = conv.messages.push({ role:'assistant', content: '_Conectando ao backend…_' }) - 1;
+  conv.updatedAt = Date.now(); persistConversations(); renderChat();
+  const set = (t) => { conv.messages[aIdx].content = t; renderChat(); };
+  const sources = [];
+  let subs = [];
+  try{
+    const r = await fetch(backendUrl() + '/api/deep-research', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'X-OR-Key': state.apiKey },
+      body: JSON.stringify({ topic, model: deepResearchModel() }),
+    });
+    if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
+    const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = '';
+    while (true){
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream:true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0){
+        const line = buf.slice(0, idx).trim(); buf = buf.slice(idx + 2);
+        if (!line.startsWith('data:')) continue;
+        let ev; try{ ev = JSON.parse(line.slice(5)); }catch(_){ continue; }
+        if (ev.event === 'subquestions'){ subs = ev.items || []; set('🔬 _Pesquisando:_\n' + subs.map(s => '- ' + s).join('\n')); }
+        else if (ev.event === 'status'){ set('🔬 _' + ev.message + '_' + (subs.length ? '\n\n' + subs.map(s => '- ' + s).join('\n') : '')); }
+        else if (ev.event === 'finding'){ (ev.sources || []).forEach(u => { if (u && !sources.includes(u)) sources.push(u); }); }
+        else if (ev.event === 'report'){ conv.messages[aIdx].content = ev.markdown; if (sources.length) conv.messages[aIdx]._sources = sources.map(u => ({ url:u, title:u })); }
+        else if (ev.event === 'error'){ throw new Error(ev.message); }
+      }
+    }
+    if (conv.title === 'Nova conversa' || !conv.title) conv.title = topic.slice(0, 40);
+    conv.updatedAt = Date.now(); persistConversations(); renderChat(); renderHistoryList();
+    toast('Pesquisa profunda (backend) concluída.');
+  }catch(e){
+    conv.messages[aIdx].content = '**Falha na pesquisa profunda (backend):** ' + e.message + '\n\n(o backend está no ar e com CORS liberado?)';
+    persistConversations(); renderChat();
+    toast('Backend falhou: ' + e.message, 'err');
   }
 }
 
@@ -2419,6 +2491,15 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMemCount();
     toast('Memória salva.');
   });
+  // backend VTz OS
+  const beInput = document.getElementById('backend-url-input');
+  beInput.value = state.backendUrl;
+  beInput.addEventListener('change', () => {
+    state.backendUrl = beInput.value.trim().replace(/\/+$/, '');
+    localStorage.setItem('vtz_backend_url', state.backendUrl);
+    toast(state.backendUrl ? 'Backend salvo.' : 'Backend removido (volta ao modo local).');
+  });
+  document.getElementById('backend-test-btn').onclick = testBackend;
   document.getElementById('agent-modal').addEventListener('click', (e) => { if (e.target.id === 'agent-modal') closeAgentModal(); });
 
   // busca no histórico (debounced)
@@ -3791,6 +3872,22 @@ function appendMessageDOM(role, content, isTool, msgIndex){
     });
     sources.appendChild(grid);
     bubble.appendChild(sources);
+    // Com backend: busca a og:image de cada fonte (o navegador não pega por CORS).
+    if (backendUrl()){
+      msgObj._sources.slice(0, 8).forEach((s, i) => {
+        fetch(backendUrl() + '/api/scrape', {
+          method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ url: s.url }),
+        }).then(r => r.ok ? r.json() : null).then(d => {
+          if (!d || !d.image) return;
+          const card = grid.children[i]; if (!card) return;
+          const img = document.createElement('img');
+          img.className = 'src-thumb'; img.src = d.image; img.alt = ''; img.loading = 'lazy';
+          img.onerror = () => { img.remove(); card.classList.remove('has-thumb'); };
+          card.classList.add('has-thumb');
+          card.insertBefore(img, card.firstChild);
+        }).catch(() => {});
+      });
+    }
   }
 
   const acts = document.createElement('div');
