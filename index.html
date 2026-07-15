@@ -419,6 +419,12 @@
   .cfg-nav-item:hover{background:var(--w06); color:var(--text);}
   .cfg-nav-item.active{background:var(--violet-dim); color:var(--violet);}
   .cfg-nav-item svg.icon{width:17px; height:17px; flex-shrink:0;}
+  .cfg-nav-label{font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.09em; color:var(--text-faint); padding:14px 12px 5px;}
+  .cfg-nav-label:first-child{padding-top:2px;}
+  .skl-item{display:flex; align-items:center; gap:10px; padding:9px 11px; background:var(--w05); border:1px solid var(--line); border-radius:10px; margin-bottom:6px; flex-wrap:wrap;}
+  .skl-name{font-size:13px; font-weight:700; color:var(--text);}
+  .skl-desc{font-size:11.5px; color:var(--text-dim); flex:1; min-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .skl-open{font-size:11.5px; color:var(--violet); text-decoration:none; margin-left:auto; white-space:nowrap;}
   .cfg-content{flex:1; min-width:0;}
   .cfg-content .cfg-group[hidden]{display:none;}
   .cfg-group{
@@ -654,6 +660,7 @@
     .cfg-nav{flex-direction:row; overflow-x:auto; min-width:0; width:100%; gap:6px; position:static; scrollbar-width:none; padding-bottom:2px;}
     .cfg-nav::-webkit-scrollbar{display:none;}
     .cfg-nav-item{flex:none; white-space:nowrap; padding:8px 12px;}
+    .cfg-nav-label{display:none;}
     /* overlays ocupam melhor a tela pequena */
     .hp-panel, .cmp-panel{height:92vh; width:100%; border-radius:14px;}
     .cmp-selectors{flex-direction:column;}
@@ -909,6 +916,33 @@
       <div class="cfg-group" data-cat="dados">
         <h3>Ambiente</h3>
         <p class="hint" id="env-detail">Detectando contexto...</p>
+      </div>
+      <div class="cfg-group" data-cat="skills">
+        <h3>Minhas skills</h3>
+        <p class="hint" style="margin-bottom:10px;">Skills são instruções reutilizáveis acionadas por palavra-chave ou switch. O CRUD completo fica na aba Skills.</p>
+        <button class="primary" id="goto-skills-btn">Gerenciar minhas skills</button>
+      </div>
+      <div class="cfg-group" data-cat="skills">
+        <h3>Biblioteca skills.sh</h3>
+        <p class="hint" style="margin-bottom:10px;">Catálogo público de skills de agente (<a href="https://skills.sh" target="_blank" rel="noopener" style="color:var(--violet);">skills.sh</a>). Carregar o catálogo exige o Backend VTz OS ligado; instalar por URL funciona sem backend.</p>
+        <button class="primary" id="skillsh-load-btn">Carregar catálogo</button>
+        <div id="skillsh-list" style="margin-top:10px;"></div>
+        <label class="hint" style="display:block; margin:14px 0 4px;">Instalar por URL — cole o link RAW de um SKILL.md do GitHub</label>
+        <input type="text" id="skill-url-input" placeholder="https://raw.githubusercontent.com/.../SKILL.md" style="font-family:var(--mono);">
+        <button id="skill-url-install-btn" style="margin-top:8px;">Instalar da URL</button>
+      </div>
+      <div class="cfg-group" data-cat="conectores">
+        <h3>Conectores</h3>
+        <p class="hint" style="margin-bottom:10px;">Notion, Figma e Google (Gmail/Drive) rodam no Backend VTz OS com as SUAS chaves (todas gratuitas — instruções no README do repo servidor). Aqui você vê o status.</p>
+        <button class="primary" id="connectors-refresh-btn">Ver status</button>
+        <div id="connectors-status" style="margin-top:10px;"></div>
+      </div>
+      <div class="cfg-group" data-cat="mcps">
+        <h3>MCPs</h3>
+        <p class="hint" style="margin-bottom:10px;">Conecte um servidor MCP (Streamable HTTP) via Backend VTz OS e veja as ferramentas que ele expõe. Servidores MCP locais (stdio) não entram aqui — são o caminho do app instalado.</p>
+        <input type="text" id="mcp-url-input" placeholder="https://servidor-mcp.exemplo.com/mcp" style="font-family:var(--mono);">
+        <button class="primary" id="mcp-list-btn" style="margin-top:8px;">Listar ferramentas</button>
+        <pre id="mcp-out" style="display:none; margin-top:10px; background:var(--input-bg); border:1px solid var(--line); border-radius:10px; padding:11px; font-size:11px; line-height:1.6; white-space:pre-wrap; word-break:break-word; max-height:300px; overflow-y:auto;"></pre>
       </div>
       </div><!-- /cfg-content -->
      </div><!-- /cfg-shell -->
@@ -2562,6 +2596,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('backend-test-btn').onclick = testBackend;
   setupConfigNav();
   setupAccountMenu();
+  document.getElementById('goto-skills-btn').onclick = () => { switchView('skills'); toggleSidebar(false); };
+  document.getElementById('skillsh-load-btn').onclick = loadSkillsLibrary;
+  document.getElementById('skill-url-install-btn').onclick = installSkillFromUrl;
+  document.getElementById('connectors-refresh-btn').onclick = refreshConnectorsStatus;
+  document.getElementById('mcp-list-btn').onclick = mcpListTools;
   document.getElementById('agent-modal').addEventListener('click', (e) => { if (e.target.id === 'agent-modal') closeAgentModal(); });
 
   // busca no histórico (debounced)
@@ -3820,12 +3859,17 @@ function setupConfigNav(){
   const nav = document.getElementById('cfg-nav');
   if (!nav) return;
   const cats = [
-    { cat:'conexao',   label:'Conexão',       icon:'globe' },
-    { cat:'respostas', label:'Respostas',     icon:'sparkle' },
-    { cat:'custo',     label:'Custo',         icon:'chart' },
-    { cat:'backend',   label:'Backend VTz OS',icon:'cpu' },
-    { cat:'conta',     label:'Conta & Nuvem', icon:'bank' },
-    { cat:'dados',     label:'Dados & Backup',icon:'folder' },
+    { section:'Configurações' },
+    { cat:'conexao',   label:'Geral',          icon:'sliders' },
+    { cat:'conta',     label:'Conta',          icon:'bank' },
+    { cat:'custo',     label:'Cobrança & Uso', icon:'chart' },
+    { cat:'respostas', label:'Respostas',      icon:'sparkle' },
+    { cat:'dados',     label:'Dados & Backup', icon:'folder' },
+    { cat:'backend',   label:'Backend VTz OS', icon:'cpu' },
+    { section:'Personalizar' },
+    { cat:'skills',    label:'Habilidades',    icon:'zap' },
+    { cat:'conectores',label:'Conectores',     icon:'globe' },
+    { cat:'mcps',      label:'MCPs',           icon:'paperclip' },
   ];
   const groups = [...document.querySelectorAll('#config-view .cfg-group')];
   const show = (cat) => {
@@ -3835,6 +3879,13 @@ function setupConfigNav(){
   };
   nav.innerHTML = '';
   cats.forEach(c => {
+    if (c.section){
+      const l = document.createElement('div');
+      l.className = 'cfg-nav-label';
+      l.textContent = c.section;
+      nav.appendChild(l);
+      return;
+    }
     const b = document.createElement('button');
     b.className = 'cfg-nav-item';
     b.dataset.cat = c.cat;
@@ -3843,6 +3894,96 @@ function setupConfigNav(){
     nav.appendChild(b);
   });
   show('conexao');
+}
+
+/* ---------- Biblioteca skills.sh + instalação por URL ---------- */
+async function loadSkillsLibrary(){
+  const box = document.getElementById('skillsh-list');
+  if (!backendUrl()){
+    box.innerHTML = '<p class="hint">Precisa do Backend VTz OS ligado (aba Backend). Sem ele, use a instalação por URL abaixo.</p>';
+    return;
+  }
+  box.innerHTML = '<p class="hint">Carregando catálogo…</p>';
+  try{
+    const d = await fetch(backendUrl() + '/api/skillsh').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    const items = d.skills || [];
+    if (!items.length){ box.innerHTML = '<p class="hint">Catálogo vazio — o skills.sh pode ter mudado o formato. Use a instalação por URL.</p>'; return; }
+    box.innerHTML = '';
+    items.slice(0, 40).forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'skl-item';
+      row.innerHTML = `<span class="skl-name">${esc(it.name)}</span>` +
+        (it.desc ? `<span class="skl-desc">${esc(it.desc)}</span>` : '') +
+        `<a class="skl-open" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Abrir ↗</a>`;
+      box.appendChild(row);
+    });
+    const note = document.createElement('p');
+    note.className = 'hint'; note.style.marginTop = '8px';
+    note.textContent = 'Abra a skill no skills.sh, copie o link RAW do SKILL.md dela (no GitHub) e cole abaixo pra instalar.';
+    box.appendChild(note);
+  }catch(e){ box.innerHTML = '<p class="hint">Falha ao carregar: ' + esc(e.message) + '</p>'; }
+}
+/* Instala uma skill de um SKILL.md raw do GitHub (CORS liberado no raw). */
+async function installSkillFromUrl(){
+  const input = document.getElementById('skill-url-input');
+  let url = input.value.trim();
+  if (!url){ toast('Cole a URL do SKILL.md primeiro.', 'warn'); return; }
+  // converte URL de blob do GitHub pra raw automaticamente
+  url = url.replace(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\//, 'https://raw.githubusercontent.com/$1/$2/');
+  try{
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const text = await r.text();
+    if (text.length > 60000) throw new Error('arquivo grande demais pra uma skill');
+    // frontmatter YAML: name + description
+    let name = '', desc = '';
+    const fm = text.match(/^---\s*\n([\s\S]*?)\n---/);
+    if (fm){
+      name = (fm[1].match(/^name:\s*(.+)$/m) || [])[1]?.trim().replace(/^["']|["']$/g, '') || '';
+      desc = (fm[1].match(/^description:\s*(.+)$/m) || [])[1]?.trim().replace(/^["']|["']$/g, '') || '';
+    }
+    if (!name){
+      const h1 = text.match(/^#\s+(.+)$/m);
+      name = h1 ? h1[1].trim() : (url.split('/').slice(-2, -1)[0] || 'Skill importada');
+    }
+    state.skills.push({ id: uid(), name: name.slice(0, 60), trigger:'', instructions: text, active:false, _sourceUrl: url, _desc: desc.slice(0, 200) });
+    persistSkills();
+    if (typeof renderSkills === 'function') renderSkills();
+    input.value = '';
+    toast(`Skill "${name}" instalada. Ative na aba Skills (switch) ou defina palavras-chave.`);
+  }catch(e){ toast('Falha ao instalar: ' + e.message, 'err'); }
+}
+/* Status dos conectores (via backend). */
+async function refreshConnectorsStatus(){
+  const box = document.getElementById('connectors-status');
+  if (!backendUrl()){ box.innerHTML = '<p class="hint">Precisa do Backend VTz OS ligado (aba Backend).</p>'; return; }
+  box.innerHTML = '<p class="hint">Consultando…</p>';
+  try{
+    const d = await fetch(backendUrl() + '/api/connectors/status').then(r => r.json());
+    const rows = Object.entries(d).map(([k, v]) =>
+      `<div class="skl-item"><span class="skl-name">${esc(k)}</span><span class="skl-desc">${v ? '✅ configurado' : '⚪ sem chave (ver README do servidor)'}</span></div>`).join('');
+    box.innerHTML = rows || '<p class="hint">Nenhum conector reportado.</p>';
+  }catch(e){ box.innerHTML = '<p class="hint">Falha: ' + esc(e.message) + '</p>'; }
+}
+/* Lista ferramentas de um servidor MCP (via backend). */
+async function mcpListTools(){
+  const out = document.getElementById('mcp-out');
+  const url = document.getElementById('mcp-url-input').value.trim();
+  out.style.display = 'block';
+  if (!backendUrl()){ out.textContent = 'Precisa do Backend VTz OS ligado (aba Backend).'; return; }
+  if (!url){ out.textContent = 'Cole a URL do servidor MCP acima.'; return; }
+  out.textContent = 'Conectando ao MCP…';
+  try{
+    const r = await fetch(backendUrl() + '/api/mcp/tools', {
+      method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ server_url: url }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+    const tools = d.tools || [];
+    out.textContent = tools.length
+      ? tools.map(t => `• ${t.name}${t.description ? ' — ' + t.description : ''}`).join('\n')
+      : JSON.stringify(d, null, 1);
+  }catch(e){ out.textContent = 'Falha: ' + e.message; }
 }
 /* Super Gems — botões de ação rápida de um agente, acima do composer. */
 function renderQuickActions(agent){
