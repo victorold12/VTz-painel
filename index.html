@@ -401,6 +401,14 @@
 
   /* ---------- Config tab ---------- */
   #config-view{padding:20px; overflow-y:auto; align-items:flex-start;}
+  .cfg-shell{display:flex; gap:20px; align-items:flex-start; max-width:920px; margin:0 auto;}
+  .cfg-nav{display:flex; flex-direction:column; gap:2px; min-width:196px; position:sticky; top:0;}
+  .cfg-nav-item{display:flex; align-items:center; gap:10px; text-align:left; background:transparent; border:none; color:var(--text-dim); font-size:13.5px; font-weight:600; padding:10px 12px; border-radius:10px; cursor:pointer; transition:.15s; width:100%;}
+  .cfg-nav-item:hover{background:var(--w06); color:var(--text);}
+  .cfg-nav-item.active{background:var(--violet-dim); color:var(--violet);}
+  .cfg-nav-item svg.icon{width:17px; height:17px; flex-shrink:0;}
+  .cfg-content{flex:1; min-width:0;}
+  .cfg-content .cfg-group[hidden]{display:none;}
   .cfg-group{
     background:var(--glass-card); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
     border:1px solid var(--w06);
@@ -630,6 +638,10 @@
     .qa-btn{flex:none;}
     /* 16px nos campos evita o zoom automático do iOS ao focar */
     #chat-input, .cfg-group input, .cfg-group textarea, #cmp-prompt, #memory-input, #global-prompt-input, .modal input, .modal textarea{font-size:16px;}
+    .cfg-shell{flex-direction:column; gap:12px;}
+    .cfg-nav{flex-direction:row; overflow-x:auto; min-width:0; width:100%; gap:6px; position:static; scrollbar-width:none; padding-bottom:2px;}
+    .cfg-nav::-webkit-scrollbar{display:none;}
+    .cfg-nav-item{flex:none; white-space:nowrap; padding:8px 12px;}
     /* overlays ocupam melhor a tela pequena */
     .hp-panel, .cmp-panel{height:92vh; width:100%; border-radius:14px;}
     .cmp-selectors{flex-direction:column;}
@@ -793,14 +805,17 @@
     </section>
 
     <section id="config-view" class="view">
-      <div class="cfg-group">
+     <div class="cfg-shell">
+      <nav class="cfg-nav" id="cfg-nav"></nav>
+      <div class="cfg-content">
+      <div class="cfg-group" data-cat="conexao">
         <h3>OpenRouter API Key</h3>
         <input type="password" id="api-key-input" placeholder="sk-or-v1-...">
         <button class="primary" id="save-key-btn">Salvar</button>
         <button class="danger" id="clear-key-btn">Remover</button>
         <p class="hint">A key fica só no localStorage deste navegador.</p>
       </div>
-      <div class="cfg-group">
+      <div class="cfg-group" data-cat="conexao">
         <h3>RouteLLM (automático)</h3>
         <p class="hint" style="margin-bottom:10px;">Roteamento por heurística local — sem custo extra de classificação. Escolha qual modelo real cada tier usa.</p>
         <label class="hint">Rápido (mensagens curtas)</label>
@@ -810,7 +825,7 @@
         <label class="hint">Potente (código / análise longa)</label>
         <select id="router-power-select"></select>
       </div>
-      <div class="cfg-group">
+      <div class="cfg-group" data-cat="custo">
         <h3>Custo</h3>
         <p class="hint" id="cost-detail">Total gasto (estimado): $0.0000</p>
         <label class="hint" style="display:block; margin:12px 0 4px;">Câmbio USD → BRL (usado nos preços do seletor de modelos)</label>
@@ -824,26 +839,26 @@
         </select>
         <button class="danger" id="reset-cost-btn" style="margin-top:10px;">Zerar contador</button>
       </div>
-      <div class="cfg-group">
+      <div class="cfg-group" data-cat="respostas">
         <h3>Estilo de resposta (system prompt global)</h3>
         <p class="hint" style="margin-bottom:10px;">Injetado em toda conversa, antes de agentes e skills — é aqui que você "treina" o comportamento das respostas. Edite à vontade.</p>
         <textarea id="global-prompt-input" style="width:100%; min-height:140px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:12.5px; line-height:1.55; resize:vertical;"></textarea>
         <button id="global-prompt-reset" style="margin-top:8px;">Restaurar padrão</button>
       </div>
-      <div class="cfg-group">
+      <div class="cfg-group" data-cat="respostas">
         <h3>Memória (o que a IA lembra de você)</h3>
         <p class="hint" style="margin-bottom:10px;">Fatos seus injetados em TODA conversa — nome, objetivos, preferências, contexto. Um por linha. Corta repetição (estilo ChatGPT/Copilot).</p>
         <textarea id="memory-input" placeholder="Ex.:&#10;Me chamo Victor Hugo, moro em Maricá-RJ.&#10;Treino à noite, foco em físico atlético.&#10;Jogo Fortnite, Valorant e EA FC.&#10;Prefiro respostas diretas em pt-BR." style="width:100%; min-height:120px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:12.5px; line-height:1.6; resize:vertical;"></textarea>
         <p class="hint" id="memory-count" style="margin-top:6px;">—</p>
       </div>
-      <div class="cfg-group">
+      <div class="cfg-group" data-cat="backend">
         <h3>Backend VTz OS (opcional)</h3>
         <p class="hint" style="margin-bottom:10px;">URL do servidor (repo <b>servidor</b>). Com ele ligado: busca com imagem da fonte, pesquisa profunda no servidor e conectores. Sem ele, tudo funciona local. Ex.: <code>http://localhost:8000</code></p>
         <input type="text" id="backend-url-input" placeholder="https://seu-backend.exemplo.com" style="font-family:var(--mono);">
         <button class="primary" id="backend-test-btn" style="margin-top:8px;">Testar backend</button>
         <pre id="backend-status" style="display:none; margin-top:10px; background:var(--input-bg); border:1px solid var(--line); border-radius:10px; padding:11px; font-size:11px; line-height:1.6; white-space:pre-wrap; word-break:break-word;"></pre>
       </div>
-      <div class="cfg-group">
+      <div class="cfg-group" data-cat="conexao">
         <h3>Diagnóstico</h3>
         <p class="hint" style="margin-bottom:10px;">Roda um teste real contra a API e mostra exatamente o que funciona e o que falha.</p>
         <label class="toggle" style="margin-bottom:10px;"><input type="checkbox" id="stream-toggle" checked> Streaming (resposta ao vivo)</label>
@@ -851,7 +866,7 @@
         <button id="diag-btn">Testar conexão</button>
         <pre id="diag-out" style="display:none; margin-top:10px; background:var(--input-bg); border:1px solid var(--line); border-radius:10px; padding:11px; font-size:11px; line-height:1.6; white-space:pre-wrap; word-break:break-word; max-height:280px; overflow-y:auto;"></pre>
       </div>
-      <div class="cfg-group">
+      <div class="cfg-group" data-cat="dados">
         <h3>Armazenamento</h3>
         <p class="hint" id="storage-label" style="margin-bottom:8px;">—</p>
         <div class="storage-track"><div class="storage-bar" id="storage-bar"></div></div>
@@ -860,7 +875,7 @@
         </p>
         <button class="danger" id="archive-btn" style="margin-top:10px;">Arquivar antigas (manter 15 recentes)</button>
       </div>
-      <div class="cfg-group">
+      <div class="cfg-group" data-cat="conta">
         <h3>Conta e nuvem (opcional)</h3>
         <p class="hint" style="margin-bottom:10px;" id="account-hint">Sem login, tudo fica só neste navegador. Com login Google, suas conversas, agentes e skills sincronizam na nuvem e aparecem em qualquer aparelho.</p>
         <div id="account-signed-out">
@@ -872,17 +887,19 @@
           <button class="secondary" id="google-signout-btn">Sair</button>
         </div>
       </div>
-      <div class="cfg-group">
+      <div class="cfg-group" data-cat="dados">
         <h3>Backup</h3>
         <p class="hint" style="margin-bottom:10px;">Este painel roda só no navegador — limpar o cache apaga conversas, skills e agentes. Exporte periodicamente.</p>
         <button class="primary" id="export-backup-btn">Exportar tudo (.json)</button>
         <button id="import-backup-btn">Importar backup</button>
         <input type="file" id="import-backup-file" accept="application/json" style="display:none;">
       </div>
-      <div class="cfg-group">
+      <div class="cfg-group" data-cat="dados">
         <h3>Ambiente</h3>
         <p class="hint" id="env-detail">Detectando contexto...</p>
       </div>
+      </div><!-- /cfg-content -->
+     </div><!-- /cfg-shell -->
     </section>
     <section id="analytics-view" class="view">
       <div class="metrics-grid" id="metrics-grid"></div>
@@ -2525,6 +2542,7 @@ document.addEventListener('DOMContentLoaded', () => {
     toast(state.backendUrl ? 'Backend salvo.' : 'Backend removido (volta ao modo local).');
   });
   document.getElementById('backend-test-btn').onclick = testBackend;
+  setupConfigNav();
   document.getElementById('agent-modal').addEventListener('click', (e) => { if (e.target.id === 'agent-modal') closeAgentModal(); });
 
   // busca no histórico (debounced)
@@ -3739,6 +3757,36 @@ function renderPickerList(){
 }
 
 /* ---------- Chat rendering ---------- */
+/* Config em abas (estilo painel de configurações): navegação à esquerda,
+   painel à direita. Os grupos têm data-cat; a nav mostra/esconde por categoria. */
+function setupConfigNav(){
+  const nav = document.getElementById('cfg-nav');
+  if (!nav) return;
+  const cats = [
+    { cat:'conexao',   label:'Conexão',       icon:'globe' },
+    { cat:'respostas', label:'Respostas',     icon:'sparkle' },
+    { cat:'custo',     label:'Custo',         icon:'chart' },
+    { cat:'backend',   label:'Backend VTz OS',icon:'cpu' },
+    { cat:'conta',     label:'Conta & Nuvem', icon:'bank' },
+    { cat:'dados',     label:'Dados & Backup',icon:'folder' },
+  ];
+  const groups = [...document.querySelectorAll('#config-view .cfg-group')];
+  const show = (cat) => {
+    groups.forEach(g => { g.hidden = g.dataset.cat !== cat; });
+    nav.querySelectorAll('.cfg-nav-item').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+    if (cat === 'dados') updateStorageMeter();
+  };
+  nav.innerHTML = '';
+  cats.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'cfg-nav-item';
+    b.dataset.cat = c.cat;
+    b.innerHTML = iconHTML(c.icon) + '<span>' + esc(c.label) + '</span>';
+    b.onclick = () => show(c.cat);
+    nav.appendChild(b);
+  });
+  show('conexao');
+}
 /* Super Gems — botões de ação rápida de um agente, acima do composer. */
 function renderQuickActions(agent){
   const el = document.getElementById('quick-actions');
