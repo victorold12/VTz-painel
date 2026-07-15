@@ -874,6 +874,8 @@
         <h3>Backend VTz OS (opcional)</h3>
         <p class="hint" style="margin-bottom:10px;">URL do servidor (repo <b>servidor</b>). Se você rodar o backend na sua máquina, o site <b>detecta sozinho</b> em <code>localhost:8000</code> — só preencha aqui se usar outra URL (ex.: backend publicado na nuvem). Com ele ligado: busca com imagem da fonte, pesquisa profunda no servidor e conectores.</p>
         <input type="text" id="backend-url-input" placeholder="https://seu-backend.exemplo.com" style="font-family:var(--mono);">
+        <label class="hint" style="display:block; margin:12px 0 4px;">Token de acesso (só se você configurou BACKEND_TOKEN no servidor — protege contra uso indevido por terceiros)</label>
+        <input type="password" id="backend-token-input" placeholder="cole o mesmo valor de BACKEND_TOKEN" style="font-family:var(--mono);">
         <button class="primary" id="backend-test-btn" style="margin-top:8px;">Testar backend</button>
         <pre id="backend-status" style="display:none; margin-top:10px; background:var(--input-bg); border:1px solid var(--line); border-radius:10px; padding:11px; font-size:11px; line-height:1.6; white-space:pre-wrap; word-break:break-word;"></pre>
       </div>
@@ -1229,8 +1231,15 @@ const state = {
   projectFilter: localStorage.getItem('vtz_project_filter') || '',      // '' = todos
   searchFocus: localStorage.getItem('vtz_search_focus') || '',          // foco da busca web
   backendUrl: (localStorage.getItem('vtz_backend_url') || '').replace(/\/+$/, ''), // VTz OS backend (opcional)
+  backendToken: localStorage.getItem('vtz_backend_token') || '', // token de acesso, se o backend exigir
 };
 function backendUrl(){ return state.backendUrl || ''; }
+/* Monta headers pra chamadas ao backend, incluindo o token de acesso quando configurado. */
+function backendHeaders(extra){
+  const h = Object.assign({}, extra || {});
+  if (state.backendToken) h['X-Backend-Token'] = state.backendToken;
+  return h;
+}
 /* Foco de busca: direciona o modelo pra priorizar certas fontes (viés, não filtro rígido). */
 const SEARCH_FOCUS = {
   reddit:   { label:'Reddit', hint:'priorize discussões e opiniões reais de usuários no Reddit (site:reddit.com)' },
@@ -2087,7 +2096,7 @@ async function attachTopicImages(msgObj, query, conv){
   if (!backendUrl() || !query || !msgObj) return;
   try{
     const r = await fetch(backendUrl() + '/api/images', {
-      method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ q: query, max: 10 }),
+      method:'POST', headers: backendHeaders({ 'Content-Type':'application/json' }), body: JSON.stringify({ q: query, max: 10 }),
     });
     if (!r.ok) return;
     const d = await r.json();
@@ -2106,10 +2115,14 @@ async function testBackend(){
   out.textContent = 'Testando ' + url + '…';
   try{
     const health = await fetch(url + '/api/health').then(r => r.json());
-    let conn = {};
-    try{ conn = await fetch(url + '/api/connectors/status').then(r => r.json()); }catch(_){}
+    let conn = {}, connErr = '';
+    try{
+      const cr = await fetch(url + '/api/connectors/status', { headers: backendHeaders() });
+      if (cr.status === 401) connErr = '\n\n⚠ Token exigido pelo backend e ausente/errado — preencha o campo acima.';
+      else conn = await cr.json();
+    }catch(_){}
     out.textContent = 'OK ✓  backend no ar.\n' + JSON.stringify(health, null, 1) +
-      '\n\nConectores configurados:\n' + JSON.stringify(conn, null, 1);
+      '\n\nConectores configurados:\n' + JSON.stringify(conn, null, 1) + connErr;
   }catch(e){
     out.textContent = 'Falhou: ' + e.message +
       '\n\nCheque: backend rodando? URL certa? ALLOWED_ORIGINS liberou o domínio deste site?';
@@ -2127,7 +2140,7 @@ async function backendDeepResearch(topic){
   try{
     const r = await fetch(backendUrl() + '/api/deep-research', {
       method:'POST',
-      headers:{ 'Content-Type':'application/json', 'X-OR-Key': state.apiKey },
+      headers: backendHeaders({ 'Content-Type':'application/json', 'X-OR-Key': state.apiKey }),
       body: JSON.stringify({ topic, model: deepResearchModel() }),
     });
     if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
@@ -2631,6 +2644,13 @@ document.addEventListener('DOMContentLoaded', () => {
     state.backendUrl = beInput.value.trim().replace(/\/+$/, '');
     localStorage.setItem('vtz_backend_url', state.backendUrl);
     toast(state.backendUrl ? 'Backend salvo.' : 'Backend removido (volta ao modo local).');
+  });
+  const beTokenInput = document.getElementById('backend-token-input');
+  beTokenInput.value = state.backendToken;
+  beTokenInput.addEventListener('change', () => {
+    state.backendToken = beTokenInput.value.trim();
+    localStorage.setItem('vtz_backend_token', state.backendToken);
+    toast(state.backendToken ? 'Token salvo.' : 'Token removido.');
   });
   document.getElementById('backend-test-btn').onclick = testBackend;
   setupConfigNav();
@@ -3948,7 +3968,7 @@ async function loadSkillsLibrary(){
   }
   box.innerHTML = '<p class="hint">Carregando catálogo…</p>';
   try{
-    const d = await fetch(backendUrl() + '/api/skillsh').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    const d = await fetch(backendUrl() + '/api/skillsh', { headers: backendHeaders() }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
     const items = d.skills || [];
     if (!items.length){ box.innerHTML = '<p class="hint">Catálogo vazio — o skills.sh pode ter mudado o formato. Use a instalação por URL.</p>'; return; }
     box.innerHTML = '';
@@ -4003,7 +4023,7 @@ async function refreshConnectorsStatus(){
   if (!backendUrl()){ box.innerHTML = '<p class="hint">Backend não encontrado. Rode o backend (run.bat) ou configure a URL na aba Backend.</p>'; return; }
   box.innerHTML = '<p class="hint">Consultando…</p>';
   try{
-    const d = await fetch(backendUrl() + '/api/connectors/status').then(r => r.json());
+    const d = await fetch(backendUrl() + '/api/connectors/status', { headers: backendHeaders() }).then(r => r.json());
     const rows = Object.entries(d).map(([k, v]) =>
       `<div class="skl-item"><span class="skl-name">${esc(k)}</span><span class="skl-desc">${v ? '✅ configurado' : '⚪ sem chave'}</span></div>`).join('');
     box.innerHTML = rows || '<p class="hint">Nenhum conector reportado.</p>';
@@ -4023,7 +4043,7 @@ async function saveConnectorKeys(){
   if (!Object.keys(payload).length){ toast('Nada pra salvar — preencha ao menos um campo.', 'warn'); return; }
   try{
     const r = await fetch(backendUrl() + '/api/connectors/config', {
-      method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload),
+      method:'POST', headers: backendHeaders({ 'Content-Type':'application/json' }), body: JSON.stringify(payload),
     });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     ['conn-notion','conn-figma','conn-gid','conn-gsecret'].forEach(id => document.getElementById(id).value = '');
@@ -4036,7 +4056,7 @@ async function connectGoogle(){
   if (!backendUrl()){ await autoDetectBackend(); }
   if (!backendUrl()){ toast('Ligue o backend primeiro (run.bat).', 'warn'); return; }
   try{
-    const r = await fetch(backendUrl() + '/api/connectors/google/authorize');
+    const r = await fetch(backendUrl() + '/api/connectors/google/authorize', { headers: backendHeaders() });
     const d = await r.json();
     if (!r.ok || !d.url) throw new Error(d.detail || 'Configure o Client ID/Secret e salve antes.');
     window.open(d.url, '_blank');
@@ -4054,7 +4074,7 @@ async function mcpListTools(){
   out.textContent = 'Conectando ao MCP…';
   try{
     const r = await fetch(backendUrl() + '/api/mcp/tools', {
-      method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ server_url: url }),
+      method:'POST', headers: backendHeaders({ 'Content-Type':'application/json' }), body: JSON.stringify({ server_url: url }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
@@ -4249,7 +4269,7 @@ function appendMessageDOM(role, content, isTool, msgIndex){
     if (backendUrl()){
       msgObj._sources.slice(0, 8).forEach((s, i) => {
         fetch(backendUrl() + '/api/scrape', {
-          method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ url: s.url }),
+          method:'POST', headers: backendHeaders({ 'Content-Type':'application/json' }), body: JSON.stringify({ url: s.url }),
         }).then(r => r.ok ? r.json() : null).then(d => {
           if (!d || !d.image) return;
           const card = grid.children[i]; if (!card) return;
