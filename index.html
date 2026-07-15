@@ -292,8 +292,20 @@
   .history-item:hover, .history-item.active{background:var(--w06); color:var(--text);}
   .history-item .title{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;}
   .history-item .menu-dot{color:var(--text-faint); padding:2px 6px; font-weight:700;}
-  .sidebar-footer{padding:12px 16px; border-top:1px solid var(--line); font-size:12.5px; color:var(--text-dim); display:flex; align-items:center; gap:8px;}
-  .sidebar-footer .avatar{width:26px; height:26px; border-radius:50%; background:var(--violet); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff;}
+  .account-wrap{position:relative;}
+  .sidebar-footer{width:100%; padding:12px 16px; border:none; border-top:1px solid var(--line); font-size:12.5px; color:var(--text-dim); display:flex; align-items:center; gap:8px; background:transparent; cursor:pointer; text-align:left; transition:.15s;}
+  .sidebar-footer:hover{background:var(--w06); color:var(--text);}
+  .sidebar-footer .avatar{width:26px; height:26px; border-radius:50%; background:var(--violet); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; flex-shrink:0;}
+  .sidebar-footer .acc-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .sidebar-footer .acc-chev{width:15px; height:15px; opacity:.6; transition:transform .2s;}
+  .account-wrap.open .acc-chev{transform:rotate(180deg);}
+  .account-menu{position:absolute; left:10px; right:10px; bottom:calc(100% + 6px); background:var(--glass-modal); backdrop-filter:blur(30px) saturate(160%); -webkit-backdrop-filter:blur(30px) saturate(160%); border:1px solid var(--line); border-radius:14px; padding:6px; display:none; flex-direction:column; gap:1px; box-shadow:0 12px 40px rgba(0,0,0,.35); z-index:40;}
+  .account-wrap.open .account-menu{display:flex;}
+  .acc-head{padding:9px 12px 8px; font-size:11.5px; color:var(--text-faint); border-bottom:1px solid var(--line); margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .acc-item{display:flex; align-items:center; gap:10px; padding:9px 12px; border:none; background:transparent; color:var(--text); font-size:13px; border-radius:9px; cursor:pointer; text-align:left; width:100%;}
+  .acc-item:hover{background:var(--w06);}
+  .acc-item svg.icon{width:16px; height:16px; color:var(--text-dim);}
+  .acc-item.danger{color:var(--danger);}
 
   /* ---------- Model picker overlay (glass) ---------- */
   .picker-overlay{position:fixed; inset:0; background:rgba(0,0,0,.65); backdrop-filter:blur(2px); z-index:50; display:none; align-items:flex-end; justify-content:center;}
@@ -936,7 +948,6 @@
     <button class="side-nav-item" data-view="image"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imagem</button>
     <button class="side-nav-item" data-view="skills"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Skills</button>
     <button class="side-nav-item" data-view="analytics"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="19" y1="20" x2="19" y2="9"/></svg> Analytics</button>
-    <button class="side-nav-item" data-view="config"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/></svg> Config</button>
   </nav>
   <div class="sidebar-search">
     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -944,7 +955,14 @@
   </div>
   <div class="projects-bar" id="projects-bar"></div>
   <div class="history-list" id="history-list"></div>
-  <div class="sidebar-footer"><div class="avatar">VH</div> Victor Hugo</div>
+  <div class="account-wrap">
+    <div class="account-menu" id="account-menu"></div>
+    <button class="sidebar-footer" id="account-btn" aria-label="Conta e configurações">
+      <div class="avatar">VH</div>
+      <span class="acc-name" id="footer-name">Victor Hugo</span>
+      <svg class="icon acc-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+    </button>
+  </div>
 </aside>
 
 <!-- Model picker overlay -->
@@ -2543,6 +2561,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('backend-test-btn').onclick = testBackend;
   setupConfigNav();
+  setupAccountMenu();
   document.getElementById('agent-modal').addEventListener('click', (e) => { if (e.target.id === 'agent-modal') closeAgentModal(); });
 
   // busca no histórico (debounced)
@@ -2647,7 +2666,7 @@ function switchView(name){
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.side-nav-item').forEach(b => b.classList.remove('active'));
   document.getElementById(name + '-view').classList.add('active');
-  document.querySelector(`.side-nav-item[data-view="${name}"]`).classList.add('active');
+  document.querySelector(`.side-nav-item[data-view="${name}"]`)?.classList.add('active');
   if (name === 'analytics') renderAnalytics();
   if (name === 'config') updateStorageMeter();
 }
@@ -2823,15 +2842,53 @@ function initFirebase(){
 function onAuthChanged(user){
   const out = document.getElementById('account-signed-out');
   const inn = document.getElementById('account-signed-in');
+  const accHead = document.getElementById('acc-head');
+  const accSignout = document.getElementById('acc-signout');
+  const footerName = document.getElementById('footer-name');
   if (user){
     if (out) out.style.display = 'none';
     if (inn) inn.style.display = 'block';
     const em = document.getElementById('account-email'); if (em) em.textContent = user.email || user.displayName || 'conta Google';
+    if (accHead) accHead.textContent = user.email || user.displayName || 'conta Google';
+    if (accSignout) accSignout.style.display = 'flex';
+    if (footerName) footerName.textContent = user.displayName || user.email || 'Victor Hugo';
     pullFromCloud(user.uid);
   } else {
     if (out) out.style.display = 'block';
     if (inn) inn.style.display = 'none';
+    if (accHead) accHead.textContent = 'Conta local (sem login)';
+    if (accSignout) accSignout.style.display = 'none';
+    if (footerName) footerName.textContent = 'Victor Hugo';
   }
+}
+/* Menu de conta no rodapé (estilo painel de conta): abre Configurações etc. */
+function setupAccountMenu(){
+  const wrap = document.querySelector('.account-wrap');
+  const btn = document.getElementById('account-btn');
+  const menu = document.getElementById('account-menu');
+  if (!wrap || !btn || !menu) return;
+  const close = () => wrap.classList.remove('open');
+  const items = [
+    { icon:'sliders', label:'Configurações', run: () => { switchView('config'); toggleSidebar(false); } },
+    { icon:'chart',   label:'Analytics',     run: () => { switchView('analytics'); toggleSidebar(false); } },
+    { icon:'sun',     label:'Alternar tema', run: () => toggleTheme() },
+    { icon:'download',label:'Exportar backup', run: () => exportBackup() },
+    { icon:'close',   label:'Sair', danger:true, signout:true, run: () => signOutGoogle() },
+  ];
+  const head = document.createElement('div');
+  head.className = 'acc-head'; head.id = 'acc-head';
+  head.textContent = 'Conta local (sem login)';
+  menu.appendChild(head);
+  items.forEach(it => {
+    const b = document.createElement('button');
+    b.className = 'acc-item' + (it.danger ? ' danger' : '');
+    if (it.signout){ b.id = 'acc-signout'; b.style.display = 'none'; }
+    b.innerHTML = iconHTML(it.icon) + '<span>' + esc(it.label) + '</span>';
+    b.onclick = () => { close(); it.run(); };
+    menu.appendChild(b);
+  });
+  btn.onclick = (e) => { e.stopPropagation(); wrap.classList.toggle('open'); };
+  document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) close(); });
 }
 async function signInGoogle(){
   if (!fbAuth){ toast('Login indisponível (Firebase não configurado).', 'err'); return; }
