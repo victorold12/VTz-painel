@@ -957,6 +957,19 @@
         </div>
         <div id="connectors-status" style="margin-top:10px;"></div>
         <p class="hint" style="margin-top:10px;">As chaves não voltam do backend por segurança — os campos ficam vazios; o status abaixo mostra o que já está salvo. Deixe um campo em branco pra manter, ou apague uma chave salva enviando um espaço.</p>
+
+        <h3 style="margin-top:22px;">Buscar nos conectores</h3>
+        <p class="hint" style="margin-bottom:10px;">Depois de configurar (e conectar o Google), busque aqui suas páginas do Notion, e-mails ou arquivos do Drive — e mande o resultado direto pro chat como contexto.</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <select id="conn-source" style="flex:0 0 auto; width:auto;">
+            <option value="notion">Notion</option>
+            <option value="gmail">Gmail</option>
+            <option value="drive">Google Drive</option>
+          </select>
+          <input type="text" id="conn-query" placeholder="Buscar… (ex.: reunião, projeto X)" style="flex:1; min-width:160px;">
+          <button class="primary" id="conn-search-btn" style="flex:0 0 auto;">Buscar</button>
+        </div>
+        <div id="conn-results" style="margin-top:10px; display:flex; flex-direction:column; gap:6px;"></div>
       </div>
       <div class="cfg-group" data-cat="mcps">
         <h3>MCPs</h3>
@@ -2832,6 +2845,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('connectors-refresh-btn').onclick = refreshConnectorsStatus;
   document.getElementById('connectors-save-btn').onclick = saveConnectorKeys;
   document.getElementById('google-connect-btn').onclick = connectGoogle;
+  document.getElementById('conn-search-btn').onclick = searchConnector;
+  document.getElementById('conn-query').addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); searchConnector(); } });
   document.getElementById('mcp-list-btn').onclick = mcpListTools;
   document.getElementById('agent-modal').addEventListener('click', (e) => { if (e.target.id === 'agent-modal') closeAgentModal(); });
 
@@ -4214,9 +4229,17 @@ async function refreshConnectorsStatus(){
   box.innerHTML = '<p class="hint">Consultando…</p>';
   try{
     const d = await fetch(backendUrl() + '/api/connectors/status', { headers: backendHeaders() }).then(r => r.json());
+    const LABEL = { notion_token:'Notion', figma_token:'Figma', google_client_id:'Google (app OAuth)' };
     const rows = Object.entries(d).map(([k, v]) =>
-      `<div class="skl-item"><span class="skl-name">${esc(k)}</span><span class="skl-desc">${v ? '✅ configurado' : '⚪ sem chave'}</span></div>`).join('');
-    box.innerHTML = rows || '<p class="hint">Nenhum conector reportado.</p>';
+      `<div class="skl-item"><span class="skl-name">${esc(LABEL[k] || k)}</span><span class="skl-desc">${v ? '✅ configurado' : '⚪ sem chave'}</span></div>`);
+    // Google: além de "configurado", mostra se o OAuth foi de fato concluído (conectado)
+    if (d.google_client_id){
+      try{
+        const g = await fetch(backendUrl() + '/api/connectors/google/status', { headers: backendHeaders() }).then(r => r.json());
+        rows.push(`<div class="skl-item"><span class="skl-name">Google (login)</span><span class="skl-desc">${g.connected ? '✅ conectado' : '⚠️ configurado, falta clicar em "Conectar Google"'}</span></div>`);
+      }catch(_){}
+    }
+    box.innerHTML = rows.join('') || '<p class="hint">Nenhum conector reportado.</p>';
   }catch(e){ box.innerHTML = '<p class="hint">Falha: ' + esc(e.message) + '</p>'; }
 }
 /* Salva as chaves dos conectores no backend (não voltam por segurança). */
@@ -4250,9 +4273,66 @@ async function connectGoogle(){
     const d = await r.json();
     if (!r.ok || !d.url) throw new Error(d.detail || 'Configure o Client ID/Secret e salve antes.');
     window.open(d.url, '_blank');
-    toast('Abrindo login do Google…');
+    toast('Abrindo login do Google… depois de autorizar, volte e clique em "Ver status".');
   }catch(e){ toast('Falha: ' + e.message, 'err'); }
 }
+/* ---------- Busca/uso dos conectores (Notion/Gmail/Drive) ---------- */
+async function searchConnector(){
+  const box = document.getElementById('conn-results');
+  const source = document.getElementById('conn-source').value;
+  const query = document.getElementById('conn-query').value.trim();
+  if (!backendUrl()){ await autoDetectBackend(); }
+  if (!backendUrl()){ box.innerHTML = '<p class="hint">Backend não encontrado. Ligue o backend primeiro.</p>'; return; }
+  box.innerHTML = '<p class="hint">Buscando…</p>';
+  try{
+    let items = [];
+    if (source === 'notion'){
+      const d = await fetch(backendUrl() + '/api/connectors/notion/search', {
+        method:'POST', headers: backendHeaders({ 'Content-Type':'application/json' }), body: JSON.stringify({ query }),
+      }).then(okJson);
+      items = (d.results || []).map(r => ({ title: r.title, sub: r.type + (r.edited ? ' · editado ' + r.edited.slice(0,10) : ''), url: r.url,
+        ctx: `Página do Notion "${r.title}"${r.url ? ' (' + r.url + ')' : ''}` }));
+    } else if (source === 'gmail'){
+      const d = await fetch(backendUrl() + '/api/connectors/google/gmail/messages?' + new URLSearchParams({ q: query, max_results: 10 }), { headers: backendHeaders() }).then(okJson);
+      items = (d.messages || []).map(m => ({ title: m.subject, sub: (m.from || '') + (m.date ? ' · ' + m.date : ''), url: m.link,
+        ctx: `E-mail — Assunto: ${m.subject}\nDe: ${m.from}\nData: ${m.date}\nTrecho: ${m.snippet}` }));
+    } else if (source === 'drive'){
+      const d = await fetch(backendUrl() + '/api/connectors/google/drive/files?' + new URLSearchParams({ q: query ? `name contains '${query}'` : '', page_size: 20 }), { headers: backendHeaders() }).then(okJson);
+      items = (d.files || []).map(f => ({ title: f.name, sub: (f.mimeType || '').replace('application/vnd.google-apps.','') + (f.modifiedTime ? ' · ' + f.modifiedTime.slice(0,10) : ''), url: f.webViewLink,
+        ctx: `Arquivo do Drive "${f.name}"${f.webViewLink ? ' (' + f.webViewLink + ')' : ''}` }));
+    }
+    if (!items.length){ box.innerHTML = '<p class="hint">Nada encontrado (ou o conector não está configurado/conectado).</p>'; return; }
+    box.innerHTML = '';
+    items.forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'source-card';
+      row.style.cssText = 'align-items:flex-start; cursor:default;';
+      row.innerHTML = `<div class="src-body"><div class="src-title">${esc(it.title)}</div><div class="src-host">${esc(it.sub || '')}</div></div>`;
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex; gap:6px; flex-shrink:0;';
+      if (it.url){
+        const open = document.createElement('a');
+        open.href = it.url; open.target = '_blank'; open.rel = 'noopener';
+        open.className = 'secondary'; open.style.cssText = 'font-size:11px; padding:4px 8px; text-decoration:none;';
+        open.textContent = 'Abrir';
+        actions.appendChild(open);
+      }
+      const use = document.createElement('button');
+      use.className = 'primary'; use.style.cssText = 'font-size:11px; padding:4px 8px;';
+      use.textContent = 'Usar no chat';
+      use.onclick = () => {
+        const input = document.getElementById('chat-input');
+        input.value = (input.value ? input.value + '\n\n' : '') + '[Contexto do conector]\n' + it.ctx;
+        switchView('chat'); input.focus();
+        toast('Contexto adicionado ao chat.');
+      };
+      actions.appendChild(use);
+      row.appendChild(actions);
+      box.appendChild(row);
+    });
+  }catch(e){ box.innerHTML = '<p class="hint">Falha: ' + esc(e.message) + '</p>'; }
+}
+function okJson(r){ return r.ok ? r.json() : r.json().then(d => { throw new Error(d.detail || ('HTTP ' + r.status)); }, () => { throw new Error('HTTP ' + r.status); }); }
 /* Lista ferramentas de um servidor MCP (via backend). */
 async function mcpListTools(){
   const out = document.getElementById('mcp-out');
