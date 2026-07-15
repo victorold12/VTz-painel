@@ -233,6 +233,7 @@
     display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:15px;
   }
   .round-btn.plus{background:var(--surface-2); color:var(--text-dim);}
+  .round-btn.openfile{background:var(--surface-2); color:var(--text-dim);}
   .round-btn.mic{background:var(--surface-2); color:var(--text-dim);}
   .round-btn.mic.recording{background:var(--danger); color:#fff;}
   .round-btn.send{background:var(--violet); color:#fff; box-shadow:0 4px 16px rgba(139,92,246,.4);}
@@ -784,6 +785,7 @@
         <span class="ctx-meter" id="ctx-meter" title="Estimativa de tokens e custo do próximo envio"></span>
         <span id="tools-status"></span>
         <button id="deep-btn" style="margin-left:auto; display:flex; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;" title="Pesquisa profunda: quebra o tema, busca na web e sintetiza um relatório com fontes"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg> pesquisa profunda</button>
+        <button id="agent-btn" style="display:none; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;" title="Agente autônomo: planeja e usa ferramentas (busca, leitura, Notion) em várias rodadas até resolver a tarefa. Precisa do Backend VTz OS ligado."><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><rect x="4" y="7" width="16" height="12" rx="2"/><path d="M9 7V4h6v3"/><line x1="9" y1="12" x2="9" y2="12.5"/><line x1="15" y1="12" x2="15" y2="12.5"/></svg> agente</button>
         <button id="compare-btn" style="display:flex; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><rect x="3" y="4" width="8" height="16" rx="2"/><rect x="13" y="4" width="8" height="16" rx="2"/></svg> comparar</button>
         <button id="view-system-btn" style="display:flex; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg> system prompt</button>
       </div>
@@ -793,6 +795,7 @@
         <div class="composer">
           <button class="round-btn plus" id="plus-btn" title="Anexar arquivos">+</button>
           <input type="file" id="attach-input" multiple accept="image/*,application/pdf,audio/*,video/*,text/*,.md,.csv,.json" style="display:none;">
+          <button class="round-btn openfile" id="openfile-btn" title="Abrir arquivo do computador (dá pra editar e salvar de volta)" style="display:none;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
           <textarea id="chat-input" rows="1" placeholder="Escreva algo..."></textarea>
           <button class="round-btn mic" id="mic-btn" title="Ditar"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
           <button class="round-btn send" id="send-btn"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></button>
@@ -954,6 +957,19 @@
         </div>
         <div id="connectors-status" style="margin-top:10px;"></div>
         <p class="hint" style="margin-top:10px;">As chaves não voltam do backend por segurança — os campos ficam vazios; o status abaixo mostra o que já está salvo. Deixe um campo em branco pra manter, ou apague uma chave salva enviando um espaço.</p>
+
+        <h3 style="margin-top:22px;">Buscar nos conectores</h3>
+        <p class="hint" style="margin-bottom:10px;">Depois de configurar (e conectar o Google), busque aqui suas páginas do Notion, e-mails ou arquivos do Drive — e mande o resultado direto pro chat como contexto.</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <select id="conn-source" style="flex:0 0 auto; width:auto;">
+            <option value="notion">Notion</option>
+            <option value="gmail">Gmail</option>
+            <option value="drive">Google Drive</option>
+          </select>
+          <input type="text" id="conn-query" placeholder="Buscar… (ex.: reunião, projeto X)" style="flex:1; min-width:160px;">
+          <button class="primary" id="conn-search-btn" style="flex:0 0 auto;">Buscar</button>
+        </div>
+        <div id="conn-results" style="margin-top:10px; display:flex; flex-direction:column; gap:6px;"></div>
       </div>
       <div class="cfg-group" data-cat="mcps">
         <h3>MCPs</h3>
@@ -1052,6 +1068,23 @@
     <div class="row-btns">
       <button class="secondary" id="skill-cancel-btn">Cancelar</button>
       <button id="skill-save-btn">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Project modal -->
+<div class="modal-overlay" id="project-modal" style="display:none;">
+  <div class="modal wide">
+    <h2 id="project-modal-title">Novo Projeto</h2>
+    <p>Agrupa conversas com uma instrução própria e conhecimento de referência (specs, dados, contexto) injetados em toda conversa dele.</p>
+    <input type="text" id="project-name-input" placeholder="Nome do projeto" maxlength="40">
+    <label class="hint" style="display:block; margin:10px 0 4px;">Instrução própria (opcional)</label>
+    <textarea id="project-prompt-input" placeholder="Ex.: responda sempre em tom técnico e direto..."></textarea>
+    <label class="hint" style="display:block; margin:10px 0 4px;">Conhecimento do projeto (opcional)</label>
+    <textarea id="project-knowledge-input" placeholder="Cole textos, specs, dados de referência..."></textarea>
+    <div class="row-btns">
+      <button class="secondary" id="project-cancel-btn">Cancelar</button>
+      <button id="project-save-btn">Salvar</button>
     </div>
   </div>
 </div>
@@ -1303,6 +1336,67 @@ function sanitizeForApi(messages){
   });
 }
 /* Chips de anexo no composer */
+/* ---------- Acesso a arquivos locais (File System Access API) ----------
+   Abre arquivos DO DISCO (com permissão do usuário), lê como contexto pra IA e —
+   o diferencial sobre o <input file> — permite SALVAR de volta no mesmo arquivo
+   ou em qualquer pasta. Só Chrome/Edge têm a API; nos demais, cai no <input file>
+   (leitura) e no download pra pasta Downloads (escrita). Nada é acessado sem o
+   usuário escolher e autorizar no seletor do navegador. */
+const FS_CAN_SAVE = typeof window.showSaveFilePicker === 'function';
+const FS_CAN_OPEN = typeof window.showOpenFilePicker === 'function';
+let lastFileHandle = null;   // último arquivo de texto aberto (pra "salvar por cima")
+let lastFileName = '';
+const TEXT_EXT = /\.(txt|md|markdown|json|csv|tsv|js|mjs|ts|jsx|tsx|py|rb|go|rs|java|c|h|cpp|cs|php|html?|css|scss|xml|yaml|yml|toml|ini|cfg|sh|bat|sql|log)$/i;
+function isTextLike(file){ return (file.type && file.type.startsWith('text/')) || TEXT_EXT.test(file.name); }
+
+async function openLocalFiles(){
+  if (!FS_CAN_OPEN){ document.getElementById('attach-input').click(); return; }  // fallback universal
+  let handles;
+  try{ handles = await window.showOpenFilePicker({ multiple:true }); }
+  catch(e){ if (e.name !== 'AbortError') toast('Não consegui abrir: ' + e.message, 'err'); return; }
+  const MAX_TOTAL = 20 * 1024 * 1024;
+  let total = state.pendingAttachments.reduce((n,f) => n + f.size, 0);
+  for (const h of handles){
+    let file; try{ file = await h.getFile(); }catch(_){ continue; }
+    if (total + file.size > MAX_TOTAL){ toast(`Limite de 20MB — "${file.name}" não foi adicionado.`, 'err'); continue; }
+    if (isTextLike(file)){ lastFileHandle = h; lastFileName = file.name; }  // guarda p/ salvar de volta
+    state.pendingAttachments.push(file);
+    total += file.size;
+  }
+  renderAttachChips();
+  toast(lastFileHandle ? `Aberto "${lastFileName}" — dá pra editar e salvar de volta.` : 'Arquivo(s) aberto(s) do computador.');
+}
+
+/* Salva um texto num arquivo REAL no disco (o usuário escolhe pasta e nome). */
+async function saveToDisk(text, suggestedName){
+  if (!FS_CAN_SAVE){ downloadTextFile(suggestedName, text); toast('Salvo em Downloads (navegador sem acesso a pastas).'); return; }
+  let handle;
+  try{
+    handle = await window.showSaveFilePicker({
+      suggestedName,
+      types: [{ description:'Texto', accept:{ 'text/plain':['.txt','.md'], 'text/markdown':['.md'] } }],
+    });
+  }catch(e){ if (e.name !== 'AbortError') toast('Não consegui salvar: ' + e.message, 'err'); return; }
+  try{
+    const w = await handle.createWritable();
+    await w.write(text); await w.close();
+    lastFileHandle = handle; lastFileName = handle.name || suggestedName;
+    toast(`Salvo no computador ✓ (${lastFileName})`);
+  }catch(e){ toast('Erro ao escrever: ' + e.message, 'err'); }
+}
+
+/* Sobrescreve o último arquivo aberto/salvo, sem novo seletor. */
+async function saveOverLast(text){
+  if (!lastFileHandle){ return saveToDisk(text, lastFileName || 'arquivo.txt'); }
+  try{
+    const perm = await lastFileHandle.requestPermission?.({ mode:'readwrite' });
+    if (perm && perm !== 'granted'){ toast('Permissão de escrita negada.', 'err'); return; }
+    const w = await lastFileHandle.createWritable();
+    await w.write(text); await w.close();
+    toast(`Salvo por cima de "${lastFileName}" ✓`);
+  }catch(e){ if (e.name !== 'AbortError') toast('Erro ao salvar: ' + e.message, 'err'); }
+}
+
 function renderAttachChips(){
   const el = document.getElementById('attach-chips');
   if (!el) return;
@@ -2084,6 +2178,7 @@ async function autoDetectBackend(){
         state.backendUrl = url;
         localStorage.setItem('vtz_backend_url', url);
         const inp = document.getElementById('backend-url-input'); if (inp) inp.value = url;
+        updateAgentBtnVisibility();
         toast('Backend local detectado ✓');
         return true;
       }
@@ -2168,6 +2263,83 @@ async function backendDeepResearch(topic){
     conv.messages[aIdx].content = '**Falha na pesquisa profunda (backend):** ' + e.message + '\n\n(o backend está no ar e com CORS liberado?)';
     persistConversations(); renderChat();
     toast('Backend falhou: ' + e.message, 'err');
+  }
+}
+
+/* ---------- Agente autônomo avançado (backend /api/autonomous, SSE) ---------- */
+/* Mostra o botão só quando há backend — é uma rota server-side, não tem fallback. */
+function updateAgentBtnVisibility(){
+  const btn = document.getElementById('agent-btn');
+  if (btn) btn.style.display = backendUrl() ? 'flex' : 'none';
+}
+const AGENT_TOOL_ICON = { web_search:'🔍', fetch_url:'📄', notion_search:'🗒️', note:'📝', update_plan:'🧭' };
+async function startAutonomousAgent(){
+  if (!backendUrl()){ toast('O agente autônomo precisa do Backend VTz OS ligado (Config → Backend).', 'warn'); return; }
+  const input = document.getElementById('chat-input');
+  const task = input.value.trim();
+  if (!task){ toast('Escreva a tarefa do agente no campo de mensagem primeiro.', 'warn'); input.focus(); return; }
+  if (!state.apiKey){ toast('Configure a chave do OpenRouter primeiro.', 'warn'); switchView('config'); return; }
+  input.value = '';
+  const conv = getCurrentConv(); if (!conv) return;
+  conv.messages.push({ role:'user', content: '🤖 Agente: ' + task });
+  const aIdx = conv.messages.push({ role:'assistant', content: '_Iniciando o agente…_' }) - 1;
+  conv.updatedAt = Date.now(); persistConversations(); renderChat();
+
+  let plan = [], steps = [], usage = null, done = false;
+  const render = (finalMd) => {
+    if (finalMd != null){ conv.messages[aIdx].content = finalMd; renderChat(); return; }
+    let md = '### 🤖 Agente autônomo\n**Tarefa:** ' + task + '\n';
+    if (plan.length) md += '\n**Plano:**\n' + plan.map((s,i) => `${i+1}. ${s}`).join('\n') + '\n';
+    if (steps.length){
+      md += '\n**Progresso:**\n' + steps.map(s => {
+        if (s.type === 'action') return `- ${AGENT_TOOL_ICON[s.tool]||'🔧'} \`${s.tool}\` ${s.arg ? '— ' + s.arg : ''}`;
+        if (s.type === 'obs') return `  ↳ _${s.text}_`;
+        return '- ' + s.text;
+      }).join('\n') + '\n';
+    }
+    if (usage) md += `\n_${usage.total} tokens usados_`;
+    conv.messages[aIdx].content = md; renderChat();
+  };
+  render();
+
+  try{
+    const r = await fetch(backendUrl() + '/api/autonomous', {
+      method:'POST',
+      headers: backendHeaders({ 'Content-Type':'application/json', 'X-OR-Key': state.apiKey }),
+      body: JSON.stringify({ task, model: deepResearchModel(), max_steps: 12 }),
+    });
+    if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
+    const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = '';
+    while (true){
+      const { value, done: rd } = await reader.read(); if (rd) break;
+      buf += dec.decode(value, { stream:true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0){
+        const line = buf.slice(0, idx).trim(); buf = buf.slice(idx + 2);
+        if (!line.startsWith('data:')) continue;
+        let ev; try{ ev = JSON.parse(line.slice(5)); }catch(_){ continue; }
+        if (ev.event === 'plan'){ plan = ev.steps || []; render(); }
+        else if (ev.event === 'action'){ const a = ev.args || {}; const arg = a.query || a.url || a.text || (a.steps ? '('+a.steps.length+' passos)' : ''); steps.push({ type:'action', tool: ev.tool, arg: arg ? String(arg).slice(0,80) : '' }); render(); }
+        else if (ev.event === 'observation'){ steps.push({ type:'obs', text: String(ev.result||'').replace(/\s+/g,' ').slice(0,120) }); render(); }
+        else if (ev.event === 'status'){ steps.push({ type:'status', text: ev.message }); render(); }
+        else if (ev.event === 'usage'){ usage = ev; render(); }
+        else if (ev.event === 'answer'){
+          let md = ev.markdown || '(sem resposta)';
+          const nSteps = steps.filter(s => s.type === 'action').length;
+          md += `\n\n---\n_🤖 Agente autônomo · ${nSteps} ação(ões)${usage ? ' · ' + usage.total + ' tokens' : ''}${ev.note ? ' · ' + ev.note : ''}_`;
+          render(md); done = true;
+        }
+        else if (ev.event === 'error'){ throw new Error(ev.message); }
+      }
+    }
+    if (!done) render(conv.messages[aIdx].content + '\n\n_(fluxo encerrado sem resposta final)_');
+    if (conv.title === 'Nova conversa' || !conv.title) conv.title = task.slice(0, 40);
+    conv.updatedAt = Date.now(); persistConversations(); renderChat(); renderHistoryList();
+    toast('Agente autônomo concluído.');
+  }catch(e){
+    render('**Falha no agente autônomo:** ' + e.message + '\n\n(o backend está no ar e com CORS liberado?)');
+    persistConversations();
+    toast('Agente falhou: ' + e.message, 'err');
   }
 }
 
@@ -2478,6 +2650,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // anexos: + abre o picker; chips com remover
   document.getElementById('plus-btn').onclick = () => document.getElementById('attach-input').click();
+  if (FS_CAN_OPEN){
+    const ofb = document.getElementById('openfile-btn');
+    ofb.style.display = 'flex';
+    ofb.onclick = openLocalFiles;
+  }
   document.getElementById('attach-input').addEventListener('change', (e) => {
     const MAX_TOTAL = 20 * 1024 * 1024; // 20MB total (base64 infla ~33%)
     let total = state.pendingAttachments.reduce((n,f) => n + f.size, 0);
@@ -2543,7 +2720,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ARIA = { 'menu-btn':'Abrir menu', 'theme-btn':'Alternar tema claro/escuro', 'mic-btn':'Ditar por voz',
     'send-btn':'Enviar mensagem', 'plus-btn':'Anexar arquivos', 'model-picker-btn':'Selecionar modelo de IA' };
   Object.entries(ARIA).forEach(([id, label]) => document.getElementById(id)?.setAttribute('aria-label', label));
-  ['picker-overlay','msg-menu-overlay','key-modal','skill-modal','agent-modal','select-text-modal','rename-modal','edit-msg-modal'].forEach(id => {
+  ['picker-overlay','msg-menu-overlay','key-modal','skill-modal','agent-modal','project-modal','select-text-modal','rename-modal','edit-msg-modal'].forEach(id => {
     const el = document.getElementById(id);
     if (el){ el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); }
   });
@@ -2552,7 +2729,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape'){
       closeMsgMenu(); closePicker(); toggleSidebar(false);
-      ['select-text-modal','skill-modal','agent-modal','rename-modal','edit-msg-modal'].forEach(id => {
+      ['select-text-modal','skill-modal','agent-modal','project-modal','rename-modal','edit-msg-modal'].forEach(id => {
         const el = document.getElementById(id);
         if (el && el.style.display !== 'none') el.style.display = 'none';
       });
@@ -2593,6 +2770,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('skill-cancel-btn').onclick = closeSkillModal;
   document.getElementById('skill-save-btn').onclick = saveSkillFromModal;
   document.getElementById('skill-modal').addEventListener('click', (e) => { if (e.target.id === 'skill-modal') closeSkillModal(); });
+
+  // projetos
+  document.getElementById('project-cancel-btn').onclick = closeProjectModal;
+  document.getElementById('project-save-btn').onclick = saveProjectFromModal;
+  document.getElementById('project-modal').addEventListener('click', (e) => { if (e.target.id === 'project-modal') closeProjectModal(); });
 
   // agentes
   document.getElementById('new-agent-btn').onclick = () => openAgentModal(null);
@@ -2643,6 +2825,7 @@ document.addEventListener('DOMContentLoaded', () => {
   beInput.addEventListener('change', () => {
     state.backendUrl = beInput.value.trim().replace(/\/+$/, '');
     localStorage.setItem('vtz_backend_url', state.backendUrl);
+    updateAgentBtnVisibility();
     toast(state.backendUrl ? 'Backend salvo.' : 'Backend removido (volta ao modo local).');
   });
   const beTokenInput = document.getElementById('backend-token-input');
@@ -2662,6 +2845,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('connectors-refresh-btn').onclick = refreshConnectorsStatus;
   document.getElementById('connectors-save-btn').onclick = saveConnectorKeys;
   document.getElementById('google-connect-btn').onclick = connectGoogle;
+  document.getElementById('conn-search-btn').onclick = searchConnector;
+  document.getElementById('conn-query').addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); searchConnector(); } });
   document.getElementById('mcp-list-btn').onclick = mcpListTools;
   document.getElementById('agent-modal').addEventListener('click', (e) => { if (e.target.id === 'agent-modal') closeAgentModal(); });
 
@@ -2753,6 +2938,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   document.getElementById('compare-btn').onclick = openCompare;
   document.getElementById('deep-btn').onclick = startDeepResearch;
+  document.getElementById('agent-btn').onclick = startAutonomousAgent;
+  updateAgentBtnVisibility();
 
   // backup / restore
   document.getElementById('export-backup-btn').onclick = exportBackup;
@@ -2882,9 +3069,7 @@ function openProjectPicker(convId){
   addItem('Sem projeto', !conv.projectId, () => set(null));
   state.projects.forEach(p => addItem(p.name, conv.projectId === p.id, () => set(p.id)));
   addItem('＋ Novo projeto…', false, () => {
-    const before = state.projects.length;
-    createProject();
-    if (state.projects.length > before){ conv.projectId = state.projects[state.projects.length-1].id; persistConversations(); renderHistoryList(); }
+    createProject((proj) => { conv.projectId = proj.id; persistConversations(); renderHistoryList(); });
   });
   document.getElementById('msg-menu-overlay').classList.add('open');
 }
@@ -3194,27 +3379,44 @@ function dateBucket(ts){
 /* ---------- Projetos / Pastas de conversa ---------- */
 const PROJECT_COLORS = ['#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6','#a855f7'];
 function persistProjects(){ localStorage.setItem('vtz_projects', JSON.stringify(state.projects)); scheduleCloudSync?.(); }
-function createProject(){
-  const name = (prompt('Nome do projeto (ex.: Treino, Incubadora, Jogos):') || '').trim();
-  if (!name) return;
-  const sp = (prompt('Instrução própria deste projeto (opcional — injetada em toda conversa dele). Deixe vazio se não quiser:') || '').trim();
-  const proj = { id: uid(), name: name.slice(0,40), color: PROJECT_COLORS[state.projects.length % PROJECT_COLORS.length], systemPrompt: sp };
-  state.projects.push(proj);
-  persistProjects();
-  state.projectFilter = proj.id; localStorage.setItem('vtz_project_filter', proj.id);
-  renderProjectsBar(); renderHistoryList();
-  toast(`Projeto "${proj.name}" criado.`);
+let projectModalOnSave = null;
+function openProjectModal(existing, onSave){
+  document.getElementById('project-modal-title').textContent = existing ? 'Editar Projeto' : 'Novo Projeto';
+  document.getElementById('project-name-input').value = existing?.name || '';
+  document.getElementById('project-prompt-input').value = existing?.systemPrompt || '';
+  document.getElementById('project-knowledge-input').value = existing?.knowledge || '';
+  document.getElementById('project-modal').dataset.editId = existing?.id || '';
+  projectModalOnSave = onSave || null;
+  document.getElementById('project-modal').style.display = 'flex';
+  document.getElementById('project-name-input').focus();
 }
+function closeProjectModal(){ document.getElementById('project-modal').style.display = 'none'; projectModalOnSave = null; }
+function saveProjectFromModal(){
+  const name = document.getElementById('project-name-input').value.trim();
+  if (!name) return;
+  const sp = document.getElementById('project-prompt-input').value.trim();
+  const kn = document.getElementById('project-knowledge-input').value.trim();
+  const editId = document.getElementById('project-modal').dataset.editId;
+  let proj;
+  if (editId){
+    proj = state.projects.find(x => x.id === editId);
+    if (!proj) return;
+    proj.name = name.slice(0,40); proj.systemPrompt = sp; proj.knowledge = kn;
+  } else {
+    proj = { id: uid(), name: name.slice(0,40), color: PROJECT_COLORS[state.projects.length % PROJECT_COLORS.length], systemPrompt: sp, knowledge: kn };
+    state.projects.push(proj);
+  }
+  persistProjects();
+  renderProjectsBar(); renderHistoryList();
+  toast(editId ? 'Projeto atualizado.' : `Projeto "${proj.name}" criado.`);
+  const cb = projectModalOnSave;
+  closeProjectModal();
+  if (cb) cb(proj);
+}
+function createProject(onSave){ openProjectModal(null, onSave); }
 function editProject(id){
   const p = state.projects.find(x => x.id === id); if (!p) return;
-  const name = (prompt('Nome do projeto:', p.name) || '').trim();
-  if (!name) return;
-  const sp = (prompt('Instrução própria do projeto (system prompt) — injetada em toda conversa dele:', p.systemPrompt || '') ?? p.systemPrompt) || '';
-  const kn = (prompt('Conhecimento do projeto (fatos/contexto de referência — cole textos, specs, dados):', p.knowledge || '') ?? p.knowledge) || '';
-  p.name = name.slice(0,40); p.systemPrompt = sp.trim(); p.knowledge = kn.trim();
-  persistProjects();
-  renderProjectsBar(); renderHistoryList();
-  toast('Projeto atualizado.');
+  openProjectModal(p);
 }
 function deleteProject(id){
   const p = state.projects.find(x => x.id === id); if (!p) return;
@@ -3247,7 +3449,10 @@ function renderProjectsBar(){
   const add = document.createElement('span');
   add.className = 'proj-chip add';
   add.textContent = '+ Projeto';
-  add.onclick = createProject;
+  add.onclick = () => createProject((proj) => {
+    state.projectFilter = proj.id; localStorage.setItem('vtz_project_filter', proj.id);
+    renderProjectsBar(); renderHistoryList();
+  });
   bar.appendChild(add);
   // botão de editar o projeto atualmente filtrado (nome, prompt e conhecimento)
   if (state.projectFilter){
@@ -4024,9 +4229,17 @@ async function refreshConnectorsStatus(){
   box.innerHTML = '<p class="hint">Consultando…</p>';
   try{
     const d = await fetch(backendUrl() + '/api/connectors/status', { headers: backendHeaders() }).then(r => r.json());
+    const LABEL = { notion_token:'Notion', figma_token:'Figma', google_client_id:'Google (app OAuth)' };
     const rows = Object.entries(d).map(([k, v]) =>
-      `<div class="skl-item"><span class="skl-name">${esc(k)}</span><span class="skl-desc">${v ? '✅ configurado' : '⚪ sem chave'}</span></div>`).join('');
-    box.innerHTML = rows || '<p class="hint">Nenhum conector reportado.</p>';
+      `<div class="skl-item"><span class="skl-name">${esc(LABEL[k] || k)}</span><span class="skl-desc">${v ? '✅ configurado' : '⚪ sem chave'}</span></div>`);
+    // Google: além de "configurado", mostra se o OAuth foi de fato concluído (conectado)
+    if (d.google_client_id){
+      try{
+        const g = await fetch(backendUrl() + '/api/connectors/google/status', { headers: backendHeaders() }).then(r => r.json());
+        rows.push(`<div class="skl-item"><span class="skl-name">Google (login)</span><span class="skl-desc">${g.connected ? '✅ conectado' : '⚠️ configurado, falta clicar em "Conectar Google"'}</span></div>`);
+      }catch(_){}
+    }
+    box.innerHTML = rows.join('') || '<p class="hint">Nenhum conector reportado.</p>';
   }catch(e){ box.innerHTML = '<p class="hint">Falha: ' + esc(e.message) + '</p>'; }
 }
 /* Salva as chaves dos conectores no backend (não voltam por segurança). */
@@ -4060,9 +4273,66 @@ async function connectGoogle(){
     const d = await r.json();
     if (!r.ok || !d.url) throw new Error(d.detail || 'Configure o Client ID/Secret e salve antes.');
     window.open(d.url, '_blank');
-    toast('Abrindo login do Google…');
+    toast('Abrindo login do Google… depois de autorizar, volte e clique em "Ver status".');
   }catch(e){ toast('Falha: ' + e.message, 'err'); }
 }
+/* ---------- Busca/uso dos conectores (Notion/Gmail/Drive) ---------- */
+async function searchConnector(){
+  const box = document.getElementById('conn-results');
+  const source = document.getElementById('conn-source').value;
+  const query = document.getElementById('conn-query').value.trim();
+  if (!backendUrl()){ await autoDetectBackend(); }
+  if (!backendUrl()){ box.innerHTML = '<p class="hint">Backend não encontrado. Ligue o backend primeiro.</p>'; return; }
+  box.innerHTML = '<p class="hint">Buscando…</p>';
+  try{
+    let items = [];
+    if (source === 'notion'){
+      const d = await fetch(backendUrl() + '/api/connectors/notion/search', {
+        method:'POST', headers: backendHeaders({ 'Content-Type':'application/json' }), body: JSON.stringify({ query }),
+      }).then(okJson);
+      items = (d.results || []).map(r => ({ title: r.title, sub: r.type + (r.edited ? ' · editado ' + r.edited.slice(0,10) : ''), url: r.url,
+        ctx: `Página do Notion "${r.title}"${r.url ? ' (' + r.url + ')' : ''}` }));
+    } else if (source === 'gmail'){
+      const d = await fetch(backendUrl() + '/api/connectors/google/gmail/messages?' + new URLSearchParams({ q: query, max_results: 10 }), { headers: backendHeaders() }).then(okJson);
+      items = (d.messages || []).map(m => ({ title: m.subject, sub: (m.from || '') + (m.date ? ' · ' + m.date : ''), url: m.link,
+        ctx: `E-mail — Assunto: ${m.subject}\nDe: ${m.from}\nData: ${m.date}\nTrecho: ${m.snippet}` }));
+    } else if (source === 'drive'){
+      const d = await fetch(backendUrl() + '/api/connectors/google/drive/files?' + new URLSearchParams({ q: query ? `name contains '${query}'` : '', page_size: 20 }), { headers: backendHeaders() }).then(okJson);
+      items = (d.files || []).map(f => ({ title: f.name, sub: (f.mimeType || '').replace('application/vnd.google-apps.','') + (f.modifiedTime ? ' · ' + f.modifiedTime.slice(0,10) : ''), url: f.webViewLink,
+        ctx: `Arquivo do Drive "${f.name}"${f.webViewLink ? ' (' + f.webViewLink + ')' : ''}` }));
+    }
+    if (!items.length){ box.innerHTML = '<p class="hint">Nada encontrado (ou o conector não está configurado/conectado).</p>'; return; }
+    box.innerHTML = '';
+    items.forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'source-card';
+      row.style.cssText = 'align-items:flex-start; cursor:default;';
+      row.innerHTML = `<div class="src-body"><div class="src-title">${esc(it.title)}</div><div class="src-host">${esc(it.sub || '')}</div></div>`;
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex; gap:6px; flex-shrink:0;';
+      if (it.url){
+        const open = document.createElement('a');
+        open.href = it.url; open.target = '_blank'; open.rel = 'noopener';
+        open.className = 'secondary'; open.style.cssText = 'font-size:11px; padding:4px 8px; text-decoration:none;';
+        open.textContent = 'Abrir';
+        actions.appendChild(open);
+      }
+      const use = document.createElement('button');
+      use.className = 'primary'; use.style.cssText = 'font-size:11px; padding:4px 8px;';
+      use.textContent = 'Usar no chat';
+      use.onclick = () => {
+        const input = document.getElementById('chat-input');
+        input.value = (input.value ? input.value + '\n\n' : '') + '[Contexto do conector]\n' + it.ctx;
+        switchView('chat'); input.focus();
+        toast('Contexto adicionado ao chat.');
+      };
+      actions.appendChild(use);
+      row.appendChild(actions);
+      box.appendChild(row);
+    });
+  }catch(e){ box.innerHTML = '<p class="hint">Falha: ' + esc(e.message) + '</p>'; }
+}
+function okJson(r){ return r.ok ? r.json() : r.json().then(d => { throw new Error(d.detail || ('HTTP ' + r.status)); }, () => { throw new Error('HTTP ' + r.status); }); }
 /* Lista ferramentas de um servidor MCP (via backend). */
 async function mcpListTools(){
   const out = document.getElementById('mcp-out');
@@ -4334,6 +4604,19 @@ function openMsgMenu(msgIndex){
   items.push({ icon:'download', label:'Baixar mensagem (.md)', run: () => {
     downloadTextFile(`vtz-mensagem-${msgIndex+1}.md`, rawText);
   }});
+  if (isAssistant && FS_CAN_SAVE){
+    items.push({ icon:'download', label:'Salvar no computador…', run: () => {
+      const first = blocks[0];
+      const name = first ? guessFilename(first.code, first.lang, 1) : `vtz-${msgIndex+1}.md`;
+      saveToDisk(first ? first.code : rawText, name);
+    }});
+    if (lastFileHandle){
+      items.push({ icon:'download', label:`Salvar por cima de "${lastFileName}"`, run: () => {
+        const first = blocks[0];
+        saveOverLast(first ? first.code : rawText);
+      }});
+    }
+  }
   items.push({ icon:'file', label:'Baixar PDF (formatado)', run: () => downloadRichPdf(rawText, `vtz-${msgIndex+1}.pdf`) });
   items.push({ icon:'file', label:'Baixar slides (PDF)', run: () => downloadSlidesPdf(rawText, `vtz-slides-${msgIndex+1}.pdf`) });
   items.push({ icon:'file', label:'Baixar como Word (.docx)', run: () => downloadDocx(rawText, `vtz-${msgIndex+1}.docx`) });
