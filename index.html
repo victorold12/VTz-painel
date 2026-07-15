@@ -233,6 +233,7 @@
     display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:15px;
   }
   .round-btn.plus{background:var(--surface-2); color:var(--text-dim);}
+  .round-btn.openfile{background:var(--surface-2); color:var(--text-dim);}
   .round-btn.mic{background:var(--surface-2); color:var(--text-dim);}
   .round-btn.mic.recording{background:var(--danger); color:#fff;}
   .round-btn.send{background:var(--violet); color:#fff; box-shadow:0 4px 16px rgba(139,92,246,.4);}
@@ -794,6 +795,7 @@
         <div class="composer">
           <button class="round-btn plus" id="plus-btn" title="Anexar arquivos">+</button>
           <input type="file" id="attach-input" multiple accept="image/*,application/pdf,audio/*,video/*,text/*,.md,.csv,.json" style="display:none;">
+          <button class="round-btn openfile" id="openfile-btn" title="Abrir arquivo do computador (dá pra editar e salvar de volta)" style="display:none;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
           <textarea id="chat-input" rows="1" placeholder="Escreva algo..."></textarea>
           <button class="round-btn mic" id="mic-btn" title="Ditar"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
           <button class="round-btn send" id="send-btn"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></button>
@@ -1321,6 +1323,67 @@ function sanitizeForApi(messages){
   });
 }
 /* Chips de anexo no composer */
+/* ---------- Acesso a arquivos locais (File System Access API) ----------
+   Abre arquivos DO DISCO (com permissão do usuário), lê como contexto pra IA e —
+   o diferencial sobre o <input file> — permite SALVAR de volta no mesmo arquivo
+   ou em qualquer pasta. Só Chrome/Edge têm a API; nos demais, cai no <input file>
+   (leitura) e no download pra pasta Downloads (escrita). Nada é acessado sem o
+   usuário escolher e autorizar no seletor do navegador. */
+const FS_CAN_SAVE = typeof window.showSaveFilePicker === 'function';
+const FS_CAN_OPEN = typeof window.showOpenFilePicker === 'function';
+let lastFileHandle = null;   // último arquivo de texto aberto (pra "salvar por cima")
+let lastFileName = '';
+const TEXT_EXT = /\.(txt|md|markdown|json|csv|tsv|js|mjs|ts|jsx|tsx|py|rb|go|rs|java|c|h|cpp|cs|php|html?|css|scss|xml|yaml|yml|toml|ini|cfg|sh|bat|sql|log)$/i;
+function isTextLike(file){ return (file.type && file.type.startsWith('text/')) || TEXT_EXT.test(file.name); }
+
+async function openLocalFiles(){
+  if (!FS_CAN_OPEN){ document.getElementById('attach-input').click(); return; }  // fallback universal
+  let handles;
+  try{ handles = await window.showOpenFilePicker({ multiple:true }); }
+  catch(e){ if (e.name !== 'AbortError') toast('Não consegui abrir: ' + e.message, 'err'); return; }
+  const MAX_TOTAL = 20 * 1024 * 1024;
+  let total = state.pendingAttachments.reduce((n,f) => n + f.size, 0);
+  for (const h of handles){
+    let file; try{ file = await h.getFile(); }catch(_){ continue; }
+    if (total + file.size > MAX_TOTAL){ toast(`Limite de 20MB — "${file.name}" não foi adicionado.`, 'err'); continue; }
+    if (isTextLike(file)){ lastFileHandle = h; lastFileName = file.name; }  // guarda p/ salvar de volta
+    state.pendingAttachments.push(file);
+    total += file.size;
+  }
+  renderAttachChips();
+  toast(lastFileHandle ? `Aberto "${lastFileName}" — dá pra editar e salvar de volta.` : 'Arquivo(s) aberto(s) do computador.');
+}
+
+/* Salva um texto num arquivo REAL no disco (o usuário escolhe pasta e nome). */
+async function saveToDisk(text, suggestedName){
+  if (!FS_CAN_SAVE){ downloadTextFile(suggestedName, text); toast('Salvo em Downloads (navegador sem acesso a pastas).'); return; }
+  let handle;
+  try{
+    handle = await window.showSaveFilePicker({
+      suggestedName,
+      types: [{ description:'Texto', accept:{ 'text/plain':['.txt','.md'], 'text/markdown':['.md'] } }],
+    });
+  }catch(e){ if (e.name !== 'AbortError') toast('Não consegui salvar: ' + e.message, 'err'); return; }
+  try{
+    const w = await handle.createWritable();
+    await w.write(text); await w.close();
+    lastFileHandle = handle; lastFileName = handle.name || suggestedName;
+    toast(`Salvo no computador ✓ (${lastFileName})`);
+  }catch(e){ toast('Erro ao escrever: ' + e.message, 'err'); }
+}
+
+/* Sobrescreve o último arquivo aberto/salvo, sem novo seletor. */
+async function saveOverLast(text){
+  if (!lastFileHandle){ return saveToDisk(text, lastFileName || 'arquivo.txt'); }
+  try{
+    const perm = await lastFileHandle.requestPermission?.({ mode:'readwrite' });
+    if (perm && perm !== 'granted'){ toast('Permissão de escrita negada.', 'err'); return; }
+    const w = await lastFileHandle.createWritable();
+    await w.write(text); await w.close();
+    toast(`Salvo por cima de "${lastFileName}" ✓`);
+  }catch(e){ if (e.name !== 'AbortError') toast('Erro ao salvar: ' + e.message, 'err'); }
+}
+
 function renderAttachChips(){
   const el = document.getElementById('attach-chips');
   if (!el) return;
@@ -2574,6 +2637,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // anexos: + abre o picker; chips com remover
   document.getElementById('plus-btn').onclick = () => document.getElementById('attach-input').click();
+  if (FS_CAN_OPEN){
+    const ofb = document.getElementById('openfile-btn');
+    ofb.style.display = 'flex';
+    ofb.onclick = openLocalFiles;
+  }
   document.getElementById('attach-input').addEventListener('change', (e) => {
     const MAX_TOTAL = 20 * 1024 * 1024; // 20MB total (base64 infla ~33%)
     let total = state.pendingAttachments.reduce((n,f) => n + f.size, 0);
@@ -4456,6 +4524,19 @@ function openMsgMenu(msgIndex){
   items.push({ icon:'download', label:'Baixar mensagem (.md)', run: () => {
     downloadTextFile(`vtz-mensagem-${msgIndex+1}.md`, rawText);
   }});
+  if (isAssistant && FS_CAN_SAVE){
+    items.push({ icon:'download', label:'Salvar no computador…', run: () => {
+      const first = blocks[0];
+      const name = first ? guessFilename(first.code, first.lang, 1) : `vtz-${msgIndex+1}.md`;
+      saveToDisk(first ? first.code : rawText, name);
+    }});
+    if (lastFileHandle){
+      items.push({ icon:'download', label:`Salvar por cima de "${lastFileName}"`, run: () => {
+        const first = blocks[0];
+        saveOverLast(first ? first.code : rawText);
+      }});
+    }
+  }
   items.push({ icon:'file', label:'Baixar PDF (formatado)', run: () => downloadRichPdf(rawText, `vtz-${msgIndex+1}.pdf`) });
   items.push({ icon:'file', label:'Baixar slides (PDF)', run: () => downloadSlidesPdf(rawText, `vtz-slides-${msgIndex+1}.pdf`) });
   items.push({ icon:'file', label:'Baixar como Word (.docx)', run: () => downloadDocx(rawText, `vtz-${msgIndex+1}.docx`) });
