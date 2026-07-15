@@ -1056,6 +1056,23 @@
   </div>
 </div>
 
+<!-- Project modal -->
+<div class="modal-overlay" id="project-modal" style="display:none;">
+  <div class="modal wide">
+    <h2 id="project-modal-title">Novo Projeto</h2>
+    <p>Agrupa conversas com uma instrução própria e conhecimento de referência (specs, dados, contexto) injetados em toda conversa dele.</p>
+    <input type="text" id="project-name-input" placeholder="Nome do projeto" maxlength="40">
+    <label class="hint" style="display:block; margin:10px 0 4px;">Instrução própria (opcional)</label>
+    <textarea id="project-prompt-input" placeholder="Ex.: responda sempre em tom técnico e direto..."></textarea>
+    <label class="hint" style="display:block; margin:10px 0 4px;">Conhecimento do projeto (opcional)</label>
+    <textarea id="project-knowledge-input" placeholder="Cole textos, specs, dados de referência..."></textarea>
+    <div class="row-btns">
+      <button class="secondary" id="project-cancel-btn">Cancelar</button>
+      <button id="project-save-btn">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toasts -->
 <div id="toasts" aria-live="polite"></div>
 
@@ -2543,7 +2560,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ARIA = { 'menu-btn':'Abrir menu', 'theme-btn':'Alternar tema claro/escuro', 'mic-btn':'Ditar por voz',
     'send-btn':'Enviar mensagem', 'plus-btn':'Anexar arquivos', 'model-picker-btn':'Selecionar modelo de IA' };
   Object.entries(ARIA).forEach(([id, label]) => document.getElementById(id)?.setAttribute('aria-label', label));
-  ['picker-overlay','msg-menu-overlay','key-modal','skill-modal','agent-modal','select-text-modal','rename-modal','edit-msg-modal'].forEach(id => {
+  ['picker-overlay','msg-menu-overlay','key-modal','skill-modal','agent-modal','project-modal','select-text-modal','rename-modal','edit-msg-modal'].forEach(id => {
     const el = document.getElementById(id);
     if (el){ el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); }
   });
@@ -2552,7 +2569,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape'){
       closeMsgMenu(); closePicker(); toggleSidebar(false);
-      ['select-text-modal','skill-modal','agent-modal','rename-modal','edit-msg-modal'].forEach(id => {
+      ['select-text-modal','skill-modal','agent-modal','project-modal','rename-modal','edit-msg-modal'].forEach(id => {
         const el = document.getElementById(id);
         if (el && el.style.display !== 'none') el.style.display = 'none';
       });
@@ -2593,6 +2610,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('skill-cancel-btn').onclick = closeSkillModal;
   document.getElementById('skill-save-btn').onclick = saveSkillFromModal;
   document.getElementById('skill-modal').addEventListener('click', (e) => { if (e.target.id === 'skill-modal') closeSkillModal(); });
+
+  // projetos
+  document.getElementById('project-cancel-btn').onclick = closeProjectModal;
+  document.getElementById('project-save-btn').onclick = saveProjectFromModal;
+  document.getElementById('project-modal').addEventListener('click', (e) => { if (e.target.id === 'project-modal') closeProjectModal(); });
 
   // agentes
   document.getElementById('new-agent-btn').onclick = () => openAgentModal(null);
@@ -2882,9 +2904,7 @@ function openProjectPicker(convId){
   addItem('Sem projeto', !conv.projectId, () => set(null));
   state.projects.forEach(p => addItem(p.name, conv.projectId === p.id, () => set(p.id)));
   addItem('＋ Novo projeto…', false, () => {
-    const before = state.projects.length;
-    createProject();
-    if (state.projects.length > before){ conv.projectId = state.projects[state.projects.length-1].id; persistConversations(); renderHistoryList(); }
+    createProject((proj) => { conv.projectId = proj.id; persistConversations(); renderHistoryList(); });
   });
   document.getElementById('msg-menu-overlay').classList.add('open');
 }
@@ -3194,27 +3214,44 @@ function dateBucket(ts){
 /* ---------- Projetos / Pastas de conversa ---------- */
 const PROJECT_COLORS = ['#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6','#a855f7'];
 function persistProjects(){ localStorage.setItem('vtz_projects', JSON.stringify(state.projects)); scheduleCloudSync?.(); }
-function createProject(){
-  const name = (prompt('Nome do projeto (ex.: Treino, Incubadora, Jogos):') || '').trim();
-  if (!name) return;
-  const sp = (prompt('Instrução própria deste projeto (opcional — injetada em toda conversa dele). Deixe vazio se não quiser:') || '').trim();
-  const proj = { id: uid(), name: name.slice(0,40), color: PROJECT_COLORS[state.projects.length % PROJECT_COLORS.length], systemPrompt: sp };
-  state.projects.push(proj);
-  persistProjects();
-  state.projectFilter = proj.id; localStorage.setItem('vtz_project_filter', proj.id);
-  renderProjectsBar(); renderHistoryList();
-  toast(`Projeto "${proj.name}" criado.`);
+let projectModalOnSave = null;
+function openProjectModal(existing, onSave){
+  document.getElementById('project-modal-title').textContent = existing ? 'Editar Projeto' : 'Novo Projeto';
+  document.getElementById('project-name-input').value = existing?.name || '';
+  document.getElementById('project-prompt-input').value = existing?.systemPrompt || '';
+  document.getElementById('project-knowledge-input').value = existing?.knowledge || '';
+  document.getElementById('project-modal').dataset.editId = existing?.id || '';
+  projectModalOnSave = onSave || null;
+  document.getElementById('project-modal').style.display = 'flex';
+  document.getElementById('project-name-input').focus();
 }
+function closeProjectModal(){ document.getElementById('project-modal').style.display = 'none'; projectModalOnSave = null; }
+function saveProjectFromModal(){
+  const name = document.getElementById('project-name-input').value.trim();
+  if (!name) return;
+  const sp = document.getElementById('project-prompt-input').value.trim();
+  const kn = document.getElementById('project-knowledge-input').value.trim();
+  const editId = document.getElementById('project-modal').dataset.editId;
+  let proj;
+  if (editId){
+    proj = state.projects.find(x => x.id === editId);
+    if (!proj) return;
+    proj.name = name.slice(0,40); proj.systemPrompt = sp; proj.knowledge = kn;
+  } else {
+    proj = { id: uid(), name: name.slice(0,40), color: PROJECT_COLORS[state.projects.length % PROJECT_COLORS.length], systemPrompt: sp, knowledge: kn };
+    state.projects.push(proj);
+  }
+  persistProjects();
+  renderProjectsBar(); renderHistoryList();
+  toast(editId ? 'Projeto atualizado.' : `Projeto "${proj.name}" criado.`);
+  const cb = projectModalOnSave;
+  closeProjectModal();
+  if (cb) cb(proj);
+}
+function createProject(onSave){ openProjectModal(null, onSave); }
 function editProject(id){
   const p = state.projects.find(x => x.id === id); if (!p) return;
-  const name = (prompt('Nome do projeto:', p.name) || '').trim();
-  if (!name) return;
-  const sp = (prompt('Instrução própria do projeto (system prompt) — injetada em toda conversa dele:', p.systemPrompt || '') ?? p.systemPrompt) || '';
-  const kn = (prompt('Conhecimento do projeto (fatos/contexto de referência — cole textos, specs, dados):', p.knowledge || '') ?? p.knowledge) || '';
-  p.name = name.slice(0,40); p.systemPrompt = sp.trim(); p.knowledge = kn.trim();
-  persistProjects();
-  renderProjectsBar(); renderHistoryList();
-  toast('Projeto atualizado.');
+  openProjectModal(p);
 }
 function deleteProject(id){
   const p = state.projects.find(x => x.id === id); if (!p) return;
@@ -3247,7 +3284,10 @@ function renderProjectsBar(){
   const add = document.createElement('span');
   add.className = 'proj-chip add';
   add.textContent = '+ Projeto';
-  add.onclick = createProject;
+  add.onclick = () => createProject((proj) => {
+    state.projectFilter = proj.id; localStorage.setItem('vtz_project_filter', proj.id);
+    renderProjectsBar(); renderHistoryList();
+  });
   bar.appendChild(add);
   // botão de editar o projeto atualmente filtrado (nome, prompt e conhecimento)
   if (state.projectFilter){
