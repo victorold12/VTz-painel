@@ -872,7 +872,7 @@
       </div>
       <div class="cfg-group" data-cat="backend">
         <h3>Backend VTz OS (opcional)</h3>
-        <p class="hint" style="margin-bottom:10px;">URL do servidor (repo <b>servidor</b>). Com ele ligado: busca com imagem da fonte, pesquisa profunda no servidor e conectores. Sem ele, tudo funciona local. Ex.: <code>http://localhost:8000</code></p>
+        <p class="hint" style="margin-bottom:10px;">URL do servidor (repo <b>servidor</b>). Se você rodar o backend na sua máquina, o site <b>detecta sozinho</b> em <code>localhost:8000</code> — só preencha aqui se usar outra URL (ex.: backend publicado na nuvem). Com ele ligado: busca com imagem da fonte, pesquisa profunda no servidor e conectores.</p>
         <input type="text" id="backend-url-input" placeholder="https://seu-backend.exemplo.com" style="font-family:var(--mono);">
         <button class="primary" id="backend-test-btn" style="margin-top:8px;">Testar backend</button>
         <pre id="backend-status" style="display:none; margin-top:10px; background:var(--input-bg); border:1px solid var(--line); border-radius:10px; padding:11px; font-size:11px; line-height:1.6; white-space:pre-wrap; word-break:break-word;"></pre>
@@ -2043,6 +2043,29 @@ async function deepResearch(topic){
 }
 
 /* ---------- Integração com o backend VTz OS (opcional) ---------- */
+/* Auto-detecção: se nenhuma URL foi configurada, procura o backend local
+   (localhost:8000) e se conecta sozinho. Navegadores permitem HTTPS→localhost. */
+let _autoDetectDone = false;
+async function autoDetectBackend(){
+  if (state.backendUrl || _autoDetectDone) return !!state.backendUrl;
+  _autoDetectDone = true;
+  for (const url of ['http://localhost:8000', 'http://127.0.0.1:8000']){
+    try{
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 1500);
+      const r = await fetch(url + '/api/health', { signal: ctrl.signal });
+      clearTimeout(t);
+      if (r.ok){
+        state.backendUrl = url;
+        localStorage.setItem('vtz_backend_url', url);
+        const inp = document.getElementById('backend-url-input'); if (inp) inp.value = url;
+        toast('Backend local detectado ✓');
+        return true;
+      }
+    }catch(_){}
+  }
+  return false;
+}
 /* Busca imagens sobre o tema (via backend) e anexa à mensagem. */
 async function attachTopicImages(msgObj, query, conv){
   if (!backendUrl() || !query || !msgObj) return;
@@ -2596,6 +2619,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('backend-test-btn').onclick = testBackend;
   setupConfigNav();
   setupAccountMenu();
+  autoDetectBackend();  // procura o backend local em segundo plano
   document.getElementById('goto-skills-btn').onclick = () => { switchView('skills'); toggleSidebar(false); };
   document.getElementById('skillsh-load-btn').onclick = loadSkillsLibrary;
   document.getElementById('skill-url-install-btn').onclick = installSkillFromUrl;
@@ -3899,8 +3923,9 @@ function setupConfigNav(){
 /* ---------- Biblioteca skills.sh + instalação por URL ---------- */
 async function loadSkillsLibrary(){
   const box = document.getElementById('skillsh-list');
+  if (!backendUrl()){ box.innerHTML = '<p class="hint">Procurando o backend local…</p>'; await autoDetectBackend(); }
   if (!backendUrl()){
-    box.innerHTML = '<p class="hint">Precisa do Backend VTz OS ligado (aba Backend). Sem ele, use a instalação por URL abaixo.</p>';
+    box.innerHTML = '<p class="hint">Backend não encontrado. Rode o backend (run.bat) ou configure a URL na aba Backend. Sem ele, use a instalação por URL abaixo.</p>';
     return;
   }
   box.innerHTML = '<p class="hint">Carregando catálogo…</p>';
@@ -3956,7 +3981,8 @@ async function installSkillFromUrl(){
 /* Status dos conectores (via backend). */
 async function refreshConnectorsStatus(){
   const box = document.getElementById('connectors-status');
-  if (!backendUrl()){ box.innerHTML = '<p class="hint">Precisa do Backend VTz OS ligado (aba Backend).</p>'; return; }
+  if (!backendUrl()){ box.innerHTML = '<p class="hint">Procurando o backend local…</p>'; await autoDetectBackend(); }
+  if (!backendUrl()){ box.innerHTML = '<p class="hint">Backend não encontrado. Rode o backend (run.bat) ou configure a URL na aba Backend.</p>'; return; }
   box.innerHTML = '<p class="hint">Consultando…</p>';
   try{
     const d = await fetch(backendUrl() + '/api/connectors/status').then(r => r.json());
@@ -3970,7 +3996,8 @@ async function mcpListTools(){
   const out = document.getElementById('mcp-out');
   const url = document.getElementById('mcp-url-input').value.trim();
   out.style.display = 'block';
-  if (!backendUrl()){ out.textContent = 'Precisa do Backend VTz OS ligado (aba Backend).'; return; }
+  if (!backendUrl()){ out.textContent = 'Procurando o backend local…'; await autoDetectBackend(); }
+  if (!backendUrl()){ out.textContent = 'Backend não encontrado. Rode o backend (run.bat) ou configure a URL na aba Backend.'; return; }
   if (!url){ out.textContent = 'Cole a URL do servidor MCP acima.'; return; }
   out.textContent = 'Conectando ao MCP…';
   try{
