@@ -933,9 +933,25 @@
       </div>
       <div class="cfg-group" data-cat="conectores">
         <h3>Conectores</h3>
-        <p class="hint" style="margin-bottom:10px;">Notion, Figma e Google (Gmail/Drive) rodam no Backend VTz OS com as SUAS chaves (todas gratuitas — instruções no README do repo servidor). Aqui você vê o status.</p>
-        <button class="primary" id="connectors-refresh-btn">Ver status</button>
+        <p class="hint" style="margin-bottom:12px;">Cole aqui suas chaves (todas gratuitas) — elas vão pro Backend VTz OS, você não precisa mexer em arquivo nenhum. Precisa do backend ligado.</p>
+
+        <label class="hint" style="display:block; margin:0 0 4px;">Notion — token da integração (<a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener" style="color:var(--violet);">criar</a>)</label>
+        <input type="password" id="conn-notion" placeholder="secret_..." style="font-family:var(--mono);">
+
+        <label class="hint" style="display:block; margin:12px 0 4px;">Figma — Personal Access Token (<a href="https://www.figma.com/developers/api#access-tokens" target="_blank" rel="noopener" style="color:var(--violet);">criar</a>)</label>
+        <input type="password" id="conn-figma" placeholder="figd_..." style="font-family:var(--mono);">
+
+        <label class="hint" style="display:block; margin:12px 0 4px;">Google — Client ID e Secret (<a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="color:var(--violet);">criar app OAuth</a>)</label>
+        <input type="text" id="conn-gid" placeholder="Client ID (...apps.googleusercontent.com)" style="font-family:var(--mono); margin-bottom:6px;">
+        <input type="password" id="conn-gsecret" placeholder="Client Secret" style="font-family:var(--mono);">
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+          <button class="primary" id="connectors-save-btn">Salvar chaves</button>
+          <button id="connectors-refresh-btn">Ver status</button>
+          <button id="google-connect-btn">Conectar Google</button>
+        </div>
         <div id="connectors-status" style="margin-top:10px;"></div>
+        <p class="hint" style="margin-top:10px;">As chaves não voltam do backend por segurança — os campos ficam vazios; o status abaixo mostra o que já está salvo. Deixe um campo em branco pra manter, ou apague uma chave salva enviando um espaço.</p>
       </div>
       <div class="cfg-group" data-cat="mcps">
         <h3>MCPs</h3>
@@ -2624,6 +2640,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('skillsh-load-btn').onclick = loadSkillsLibrary;
   document.getElementById('skill-url-install-btn').onclick = installSkillFromUrl;
   document.getElementById('connectors-refresh-btn').onclick = refreshConnectorsStatus;
+  document.getElementById('connectors-save-btn').onclick = saveConnectorKeys;
+  document.getElementById('google-connect-btn').onclick = connectGoogle;
   document.getElementById('mcp-list-btn').onclick = mcpListTools;
   document.getElementById('agent-modal').addEventListener('click', (e) => { if (e.target.id === 'agent-modal') closeAgentModal(); });
 
@@ -3987,9 +4005,43 @@ async function refreshConnectorsStatus(){
   try{
     const d = await fetch(backendUrl() + '/api/connectors/status').then(r => r.json());
     const rows = Object.entries(d).map(([k, v]) =>
-      `<div class="skl-item"><span class="skl-name">${esc(k)}</span><span class="skl-desc">${v ? '✅ configurado' : '⚪ sem chave (ver README do servidor)'}</span></div>`).join('');
+      `<div class="skl-item"><span class="skl-name">${esc(k)}</span><span class="skl-desc">${v ? '✅ configurado' : '⚪ sem chave'}</span></div>`).join('');
     box.innerHTML = rows || '<p class="hint">Nenhum conector reportado.</p>';
   }catch(e){ box.innerHTML = '<p class="hint">Falha: ' + esc(e.message) + '</p>'; }
+}
+/* Salva as chaves dos conectores no backend (não voltam por segurança). */
+async function saveConnectorKeys(){
+  const box = document.getElementById('connectors-status');
+  if (!backendUrl()){ await autoDetectBackend(); }
+  if (!backendUrl()){ box.innerHTML = '<p class="hint">Backend não encontrado. Ligue o backend primeiro (run.bat).</p>'; box.style.display='block'; return; }
+  const payload = {};
+  const g = (id) => document.getElementById(id).value;
+  if (g('conn-notion') !== '') payload.notion_token = g('conn-notion').trim();
+  if (g('conn-figma') !== '') payload.figma_token = g('conn-figma').trim();
+  if (g('conn-gid') !== '') payload.google_client_id = g('conn-gid').trim();
+  if (g('conn-gsecret') !== '') payload.google_client_secret = g('conn-gsecret').trim();
+  if (!Object.keys(payload).length){ toast('Nada pra salvar — preencha ao menos um campo.', 'warn'); return; }
+  try{
+    const r = await fetch(backendUrl() + '/api/connectors/config', {
+      method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    ['conn-notion','conn-figma','conn-gid','conn-gsecret'].forEach(id => document.getElementById(id).value = '');
+    toast('Chaves salvas no backend ✓');
+    refreshConnectorsStatus();
+  }catch(e){ toast('Falha ao salvar: ' + e.message, 'err'); }
+}
+/* Inicia o login OAuth do Google (abre a página de consentimento). */
+async function connectGoogle(){
+  if (!backendUrl()){ await autoDetectBackend(); }
+  if (!backendUrl()){ toast('Ligue o backend primeiro (run.bat).', 'warn'); return; }
+  try{
+    const r = await fetch(backendUrl() + '/api/connectors/google/authorize');
+    const d = await r.json();
+    if (!r.ok || !d.url) throw new Error(d.detail || 'Configure o Client ID/Secret e salve antes.');
+    window.open(d.url, '_blank');
+    toast('Abrindo login do Google…');
+  }catch(e){ toast('Falha: ' + e.message, 'err'); }
 }
 /* Lista ferramentas de um servidor MCP (via backend). */
 async function mcpListTools(){
