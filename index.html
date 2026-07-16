@@ -836,6 +836,16 @@
     border-radius:10px; padding:8px 10px; font-size:12px; margin-top:4px;
   }
   .tools-pop-divider{height:1px; background:var(--line); margin:6px 4px;}
+  .tp-cmd{
+    display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+    background:transparent; border:none; color:var(--text); padding:8px 12px; border-radius:10px; cursor:pointer; transition:.14s;
+  }
+  .tp-cmd:hover{background:var(--w06);}
+  .tp-cmd code{
+    font-family:var(--mono); font-size:11.5px; color:var(--violet); background:var(--violet-dim);
+    padding:3px 7px; border-radius:6px; white-space:nowrap; flex-shrink:0;
+  }
+  .tp-cmd .tp-cmd-desc{font-size:11.5px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
   /* ---- Sidebar colapsável (desktop) com animação ---- */
   .sidebar-collapse-btn{
@@ -1061,6 +1071,10 @@
             <span class="tp-ico"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg></span>
             <span class="tp-body"><span class="tp-title">System prompt</span><span class="tp-sub">Ver e editar as instruções do modelo</span></span>
           </button>
+
+          <div class="tools-pop-divider"></div>
+          <div class="tools-pop-head">Comandos (digite no chat)</div>
+          <div id="tp-commands"></div>
         </div>
       </div>
       <div class="quick-actions" id="quick-actions"></div>
@@ -1778,6 +1792,9 @@ function toast(msg, type){
 }
 /* Chamada única à API de chat — todas as features passam por aqui */
 function orFetch(payload, opts = {}){
+  // Roteamento por throughput: mesma qualidade (modelo idêntico), mas o OpenRouter
+  // escolhe o provedor mais rápido no momento. Não sobrescreve preferências já postas.
+  const body = payload.provider ? payload : { ...payload, provider: { sort: 'throughput' } };
   return fetch(OR_BASE + '/chat/completions', {
     method:'POST',
     headers:{
@@ -1786,7 +1803,7 @@ function orFetch(payload, opts = {}){
       'HTTP-Referer': location.origin || 'https://vtz-llm.local',
       'X-Title': SITE_TITLE,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
     signal: opts.signal,
   });
 }
@@ -3365,7 +3382,41 @@ function setupToolsPopover(){
   document.addEventListener('click', (e) => {
     if (!pop.contains(e.target) && e.target !== trigger && !trigger.contains(e.target)) close();
   });
+  renderCommandList(close);
   updateToolsTrigger();
+}
+/* Lista de todos os comandos do painel (digitáveis no chat). Clicar cola o
+   template no campo de mensagem, pronto pra completar/enviar. */
+const CHAT_COMMANDS = [
+  { cmd:'/status', tpl:'/status', desc:'Status da sessão (modelo, custo, msgs)' },
+  { cmd:'npx skills add', tpl:'npx skills add <repo> --skill <nome>', desc:'Instala uma skill do GitHub' },
+  { cmd:'/skill list', tpl:'/skill list', desc:'Lista as skills instaladas' },
+  { cmd:'/skill on', tpl:'/skill on <nome>', desc:'Ativa uma skill' },
+  { cmd:'/skill off', tpl:'/skill off <nome>', desc:'Desativa uma skill' },
+  { cmd:'/skill remove', tpl:'/skill remove <nome>', desc:'Remove uma skill' },
+];
+function renderCommandList(close){
+  const box = document.getElementById('tp-commands');
+  if (!box) return;
+  box.innerHTML = '';
+  CHAT_COMMANDS.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'tp-cmd'; b.type = 'button';
+    b.innerHTML = `<code>${esc(c.cmd)}</code><span class="tp-cmd-desc">${esc(c.desc)}</span>`;
+    b.onclick = () => {
+      const input = document.getElementById('chat-input');
+      if (input){
+        input.value = c.tpl;
+        input.dispatchEvent(new Event('input'));
+        input.focus();
+        // posiciona o cursor no primeiro <...> pra facilitar completar
+        const i = c.tpl.indexOf('<');
+        if (i >= 0) input.setSelectionRange(i, c.tpl.indexOf('>', i) + 1);
+      }
+      if (typeof close === 'function') close();
+    };
+    box.appendChild(b);
+  });
 }
 
 /* ---------- Sidebar colapsável (desktop) ---------- */
@@ -4711,14 +4762,21 @@ async function loadSkillsLibrary(){
 /* Instala uma skill de um SKILL.md raw do GitHub (CORS liberado no raw). */
 /* núcleo compartilhado: baixa um SKILL.md cru, parseia e adiciona às skills.
    Usado tanto pela aba Config (instalar por URL) quanto pelos comandos do chat. */
-async function installSkillFromRawUrl(rawUrl){
-  // converte URL de blob do GitHub pra raw automaticamente
+/* baixa 1 SKILL.md cru (rápido: aborta em 6s). Retorna {url, text} ou lança. */
+async function fetchSkillMarkdown(rawUrl){
   const url = rawUrl.replace(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\//, 'https://raw.githubusercontent.com/$1/$2/');
-  const r = await fetch(url);
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  const text = await r.text();
-  if (text.length > 60000) throw new Error('arquivo grande demais pra uma skill');
-  // frontmatter YAML: name + description
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 6000);
+  try{
+    const r = await fetch(url, { signal: ctrl.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const text = await r.text();
+    if (text.length > 60000) throw new Error('arquivo grande demais pra uma skill');
+    return { url, text };
+  } finally { clearTimeout(t); }
+}
+/* parseia o markdown de uma skill e adiciona ao estado (sem rede). */
+function addSkillFromMarkdown(text, url){
   let name = '', desc = '';
   const fm = text.match(/^---\s*\n([\s\S]*?)\n---/);
   if (fm){
@@ -4735,6 +4793,19 @@ async function installSkillFromRawUrl(rawUrl){
   persistSkills();
   if (typeof renderSkills === 'function') renderSkills();
   return skill;
+}
+async function installSkillFromRawUrl(rawUrl){
+  const { url, text } = await fetchSkillMarkdown(rawUrl);
+  return addSkillFromMarkdown(text, url);
+}
+/* Testa TODAS as URLs candidatas em paralelo e instala a 1ª que responder um
+   SKILL.md válido — muito mais rápido que tentar uma de cada vez. */
+async function installSkillFromCandidates(candidates){
+  const attempts = candidates.map(u => fetchSkillMarkdown(u));
+  let hit;
+  try{ hit = await Promise.any(attempts); }
+  catch(_){ return null; }  // nenhuma respondeu
+  return addSkillFromMarkdown(hit.text, hit.url);
 }
 /* Gera palavras-chave (trigger) automaticamente ao instalar uma skill.
    1º: campos explícitos no frontmatter (keywords/triggers/tags), inline ou lista YAML.
@@ -4841,10 +4912,7 @@ async function handleSkillCommand(raw, conv){
     const candidates = resolveSkillCandidates(src, skillName);
     if (!candidates.length) return reply('Não entendi a fonte. Passe um repo do GitHub (`owner/repo` ou URL) com `--skill <nome>`, ou a URL crua de um `SKILL.md`.');
     reply(`⏳ Instalando skill de \`${esc(src)}\`${skillName ? ' (`'+esc(skillName)+'`)' : ''}…`);
-    let installed = null;
-    for (const url of candidates){
-      try{ installed = await installSkillFromRawUrl(url); break; }catch(_){}
-    }
+    const installed = await installSkillFromCandidates(candidates);
     // remove a mensagem "instalando" antes de dar o resultado final
     conv.messages.pop();
     if (installed){
