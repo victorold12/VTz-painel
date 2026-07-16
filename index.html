@@ -4709,34 +4709,136 @@ async function loadSkillsLibrary(){
   }catch(e){ box.innerHTML = '<p class="hint">Falha ao carregar: ' + esc(e.message) + '</p>'; }
 }
 /* Instala uma skill de um SKILL.md raw do GitHub (CORS liberado no raw). */
+/* núcleo compartilhado: baixa um SKILL.md cru, parseia e adiciona às skills.
+   Usado tanto pela aba Config (instalar por URL) quanto pelos comandos do chat. */
+async function installSkillFromRawUrl(rawUrl){
+  // converte URL de blob do GitHub pra raw automaticamente
+  const url = rawUrl.replace(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\//, 'https://raw.githubusercontent.com/$1/$2/');
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const text = await r.text();
+  if (text.length > 60000) throw new Error('arquivo grande demais pra uma skill');
+  // frontmatter YAML: name + description
+  let name = '', desc = '';
+  const fm = text.match(/^---\s*\n([\s\S]*?)\n---/);
+  if (fm){
+    name = (fm[1].match(/^name:\s*(.+)$/m) || [])[1]?.trim().replace(/^["']|["']$/g, '') || '';
+    desc = (fm[1].match(/^description:\s*(.+)$/m) || [])[1]?.trim().replace(/^["']|["']$/g, '') || '';
+  }
+  if (!name){
+    const h1 = text.match(/^#\s+(.+)$/m);
+    name = h1 ? h1[1].trim() : (url.split('/').slice(-2, -1)[0] || 'Skill importada');
+  }
+  const skill = { id: uid(), name: name.slice(0, 60), trigger:'', instructions: text, active:false, _sourceUrl: url, _desc: desc.slice(0, 200) };
+  state.skills.push(skill);
+  persistSkills();
+  if (typeof renderSkills === 'function') renderSkills();
+  return skill;
+}
 async function installSkillFromUrl(){
   const input = document.getElementById('skill-url-input');
-  let url = input.value.trim();
+  const url = input.value.trim();
   if (!url){ toast('Cole a URL do SKILL.md primeiro.', 'warn'); return; }
-  // converte URL de blob do GitHub pra raw automaticamente
-  url = url.replace(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\//, 'https://raw.githubusercontent.com/$1/$2/');
   try{
-    const r = await fetch(url);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const text = await r.text();
-    if (text.length > 60000) throw new Error('arquivo grande demais pra uma skill');
-    // frontmatter YAML: name + description
-    let name = '', desc = '';
-    const fm = text.match(/^---\s*\n([\s\S]*?)\n---/);
-    if (fm){
-      name = (fm[1].match(/^name:\s*(.+)$/m) || [])[1]?.trim().replace(/^["']|["']$/g, '') || '';
-      desc = (fm[1].match(/^description:\s*(.+)$/m) || [])[1]?.trim().replace(/^["']|["']$/g, '') || '';
-    }
-    if (!name){
-      const h1 = text.match(/^#\s+(.+)$/m);
-      name = h1 ? h1[1].trim() : (url.split('/').slice(-2, -1)[0] || 'Skill importada');
-    }
-    state.skills.push({ id: uid(), name: name.slice(0, 60), trigger:'', instructions: text, active:false, _sourceUrl: url, _desc: desc.slice(0, 200) });
-    persistSkills();
-    if (typeof renderSkills === 'function') renderSkills();
+    const s = await installSkillFromRawUrl(url);
     input.value = '';
-    toast(`Skill "${name}" instalada. Ative na aba Skills (switch) ou defina palavras-chave.`);
+    toast(`Skill "${s.name}" instalada. Ative na aba Skills (switch) ou defina palavras-chave.`);
   }catch(e){ toast('Falha ao instalar: ' + e.message, 'err'); }
+}
+
+/* Resolve a "fonte" de uma skill (repo do GitHub + nome, ou URL crua) numa
+   lista de URLs candidatas de SKILL.md pra tentar em ordem. */
+function resolveSkillCandidates(src, skillName){
+  const out = [];
+  // já é um SKILL.md cru ou um blob do GitHub → usa direto
+  if (/SKILL\.md(\?|#|$)/i.test(src) || /\/blob\//.test(src) || /raw\.githubusercontent\.com/.test(src)){
+    out.push(src);
+    if (!skillName) return out;
+  }
+  // repo do GitHub (URL completa) ou "owner/repo"
+  const m = src.match(/github\.com\/([^/]+)\/([^/#?]+)/i) || src.match(/^([\w.-]+)\/([\w.-]+)$/);
+  if (m){
+    const owner = m[1], repo = m[2].replace(/\.git$/, '');
+    for (const br of ['main', 'master']){
+      if (skillName){
+        out.push(`https://raw.githubusercontent.com/${owner}/${repo}/${br}/${skillName}/SKILL.md`);
+        out.push(`https://raw.githubusercontent.com/${owner}/${repo}/${br}/skills/${skillName}/SKILL.md`);
+        out.push(`https://raw.githubusercontent.com/${owner}/${repo}/${br}/.claude/skills/${skillName}/SKILL.md`);
+      } else {
+        out.push(`https://raw.githubusercontent.com/${owner}/${repo}/${br}/SKILL.md`);
+      }
+    }
+  }
+  return [...new Set(out)];
+}
+
+/* Comandos de skill no chat: `npx skills add <repo> --skill <nome>`, `/skill list`, etc.
+   Não roda npx de verdade (o navegador não tem Node) — o site reconhece a sintaxe e
+   faz o equivalente: resolve o SKILL.md, baixa e instala. */
+function parseSkillCommand(raw){
+  const rest = raw.trim().replace(/^npx\s+skills\b/i, '').replace(/^\/skills?\b/i, '').trim();
+  const tokens = rest.split(/\s+/).filter(Boolean);
+  const sub = (tokens.shift() || 'help').toLowerCase();
+  let skillName = '';
+  const args = [];
+  for (let i = 0; i < tokens.length; i++){
+    if (tokens[i] === '--skill' || tokens[i] === '-s') skillName = tokens[++i] || '';
+    else args.push(tokens[i]);
+  }
+  return { sub, args, skillName };
+}
+async function handleSkillCommand(raw, conv){
+  conv.messages.push({ role:'user', content: raw, _local:true, ts: Date.now() });
+  const reply = (md) => {
+    conv.messages.push({ role:'assistant', content: md, _local:true, ts: Date.now() });
+    conv.updatedAt = Date.now();
+    renderChat(); persistConversations(); renderHistoryList();
+  };
+  const findSkill = (q) => {
+    q = (q || '').toLowerCase();
+    return state.skills.find(x => x.name.toLowerCase() === q) || state.skills.find(x => x.name.toLowerCase().includes(q));
+  };
+  const { sub, args, skillName } = parseSkillCommand(raw);
+
+  if (sub === 'add' || sub === 'install'){
+    const src = args[0];
+    if (!src) return reply('**Uso:** `npx skills add <repo-ou-url> --skill <nome>`\n\nEx.: `npx skills add https://github.com/microsoft/azure-skills --skill azure-quotas`');
+    const candidates = resolveSkillCandidates(src, skillName);
+    if (!candidates.length) return reply('Não entendi a fonte. Passe um repo do GitHub (`owner/repo` ou URL) com `--skill <nome>`, ou a URL crua de um `SKILL.md`.');
+    reply(`⏳ Instalando skill de \`${esc(src)}\`${skillName ? ' (`'+esc(skillName)+'`)' : ''}…`);
+    let installed = null;
+    for (const url of candidates){
+      try{ installed = await installSkillFromRawUrl(url); break; }catch(_){}
+    }
+    // remove a mensagem "instalando" antes de dar o resultado final
+    conv.messages.pop();
+    if (installed){
+      reply(`✅ Skill **${esc(installed.name)}** instalada.${installed._desc ? '\n\n_'+esc(installed._desc)+'_' : ''}\n\nAtive com \`/skill on ${esc(installed.name)}\` (ou defina palavras-chave na aba **Skills** pra ela disparar sozinha).`);
+    } else {
+      reply(`❌ Não achei o \`SKILL.md\`. Tentei:\n\n${candidates.map(c => '- `' + c + '`').join('\n')}\n\nConfira o nome em \`--skill\`, ou cole a URL crua do \`SKILL.md\` direto no \`add\`.`);
+    }
+    return;
+  }
+  if (sub === 'list' || sub === 'ls'){
+    if (!state.skills.length) return reply('Nenhuma skill instalada ainda.\n\nInstale com `npx skills add <repo> --skill <nome>`.');
+    const rows = state.skills.map(s => `- ${s.active ? '🟢' : '⚪'} **${esc(s.name)}**${s._desc ? ' — ' + esc(s._desc) : ''}`).join('\n');
+    return reply(`**Skills instaladas (${state.skills.length}):**\n\n${rows}\n\n_🟢 ativa · ⚪ inativa. Use \`/skill on <nome>\` pra ativar._`);
+  }
+  if (sub === 'remove' || sub === 'rm' || sub === 'uninstall'){
+    const s = findSkill(skillName || args.join(' '));
+    if (!s) return reply(`Não achei essa skill. Veja \`/skill list\`.`);
+    state.skills = state.skills.filter(x => x.id !== s.id);
+    persistSkills(); if (typeof renderSkills === 'function') renderSkills();
+    return reply(`🗑️ Skill **${esc(s.name)}** removida.`);
+  }
+  if (sub === 'on' || sub === 'enable' || sub === 'off' || sub === 'disable'){
+    const s = findSkill(skillName || args.join(' '));
+    if (!s) return reply(`Não achei essa skill. Veja \`/skill list\`.`);
+    s.active = (sub === 'on' || sub === 'enable');
+    persistSkills(); if (typeof renderSkills === 'function') renderSkills();
+    return reply(`${s.active ? '🟢' : '⚪'} Skill **${esc(s.name)}** ${s.active ? 'ativada' : 'desativada'}.`);
+  }
+  return reply(`**Comandos de skills** (digite no chat):\n\n- \`npx skills add <repo> --skill <nome>\` — instala do GitHub\n- \`/skill list\` — lista as instaladas\n- \`/skill on <nome>\` · \`/skill off <nome>\` — ativa/desativa\n- \`/skill remove <nome>\` — remove\n\nTambém aceita a URL crua de um \`SKILL.md\` direto no \`add\`.\n\n_Obs: não roda \`npx\` de verdade (o navegador não tem Node) — o site reconhece a sintaxe e baixa o \`SKILL.md\` do repo._`);
 }
 /* Status dos conectores (via backend). */
 async function refreshConnectorsStatus(){
@@ -5349,6 +5451,12 @@ async function sendMessage(){
     conv.messages.push({ role:'assistant', content:status, _local:true, ts:Date.now() });
     conv.updatedAt = Date.now();
     renderChat(); persistConversations();
+    return;
+  }
+  // comandos de skill: `npx skills add ...`, `/skill list`, `/skills`, etc. (não chama a API)
+  if (!hasAtt && /^(npx\s+skills|\/skills?)\b/i.test(text)){
+    if (conv.title === 'Nova conversa') conv.title = 'Comandos de skill';
+    await handleSkillCommand(text, conv);
     return;
   }
   let userMsg;
