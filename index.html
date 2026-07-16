@@ -659,10 +659,9 @@
   @media(max-width:640px){ .cmp-cols{grid-template-columns:1fr; grid-auto-rows:minmax(200px,auto);} .cmp-col{border-right:none; border-bottom:1px solid var(--line);} }
   /* ---------- Polimento mobile ---------- */
   @media(max-width:760px){
-    /* barras que passariam de uma linha rolam na horizontal em vez de empilhar */
-    .toolbar-row{flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; gap:8px;}
-    .toolbar-row::-webkit-scrollbar{display:none;}
-    .toolbar-row > *{flex:none;}
+    /* agora as ferramentas ficam num popover; a barra tem poucos itens e não precisa rolar
+       (overflow visível é essencial pro popover não ser clipado) */
+    .toolbar-row{flex-wrap:wrap; overflow:visible; gap:8px;}
     #deep-btn{margin-left:0 !important;}
     .projects-bar{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;}
     .projects-bar::-webkit-scrollbar{display:none;}
@@ -755,6 +754,212 @@
   .sidebar, .picker-sheet, .msg-menu, .modal{will-change:transform;}
 
   ::-webkit-scrollbar{width:0px;}
+
+  /* ============================================================
+     REDESIGN 2026 — borda animada, menu de tools, sidebar colapsável,
+     painel de sessão minimalista, tabs de mídia, tarefas rodando
+     ============================================================ */
+
+  /* ---- Borda "roxo rodando" (snake) no composer ao focar ---- */
+  @property --vtz-angle{ syntax:'<angle>'; initial-value:0deg; inherits:false; }
+  .composer{position:relative; transition:border-color .25s ease, box-shadow .3s ease;}
+  .composer::before{
+    content:''; position:absolute; inset:-1.5px; border-radius:27px; padding:1.5px;
+    background:conic-gradient(from var(--vtz-angle),
+      transparent 0deg, transparent 200deg,
+      rgba(139,92,246,.35) 260deg, var(--violet) 300deg, #c4a6ff 330deg, var(--violet) 360deg);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite:exclude;
+    opacity:0; transition:opacity .35s ease; pointer-events:none;
+  }
+  .composer:focus-within{border-color:transparent;}
+  .composer:focus-within::before{opacity:1; animation:vtz-rotate 3.2s linear infinite;}
+  @keyframes vtz-rotate{ to{ --vtz-angle:360deg; } }
+  @media (prefers-reduced-motion: reduce){
+    .composer:focus-within::before{animation:none; background:var(--violet); opacity:.5;}
+  }
+
+  /* ---- Menu de ferramentas colapsável (popover acima do composer) ---- */
+  .tools-trigger{
+    display:flex; align-items:center; gap:6px; background:var(--w05);
+    border:1px solid var(--line); color:var(--text-dim);
+    padding:6px 12px; border-radius:20px; font-size:11.5px; cursor:pointer;
+    transition:.18s; font-weight:600; white-space:nowrap;
+  }
+  .tools-trigger:hover{border-color:var(--violet); color:var(--text);}
+  .tools-trigger.has-active{border-color:var(--violet); color:var(--violet); background:var(--violet-dim);}
+  .tools-trigger .dot{width:6px; height:6px; border-radius:50%; background:var(--violet); box-shadow:0 0 6px var(--violet);}
+  .tools-trigger svg.icon{width:14px; height:14px;}
+  .toolbar-row{position:relative;}
+  .tools-pop{
+    position:absolute; bottom:calc(100% + 8px); left:16px; z-index:30;
+    min-width:270px; max-width:340px;
+    background:var(--glass-modal); backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%);
+    border:1px solid var(--w10); border-radius:18px; padding:10px;
+    box-shadow:0 16px 50px rgba(0,0,0,.5), 0 0 0 1px rgba(139,92,246,.08);
+    display:flex; flex-direction:column; gap:2px;
+    opacity:0; transform:translateY(8px) scale(.97); pointer-events:none;
+    transition:opacity .2s ease, transform .2s cubic-bezier(.2,.9,.3,1);
+  }
+  .tools-pop.open{opacity:1; transform:translateY(0) scale(1); pointer-events:auto;}
+  .tools-pop-head{font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--text-faint); padding:6px 12px 8px;}
+  .tp-item{
+    display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:12px;
+    cursor:pointer; transition:.14s; color:var(--text); font-size:13.5px; border:none; background:transparent; text-align:left; width:100%;
+  }
+  .tp-item:hover{background:var(--w06);}
+  .tp-item .tp-ico{width:30px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center; background:var(--w06); color:var(--text-dim); flex-shrink:0; transition:.14s;}
+  .tp-item .tp-ico svg.icon{width:15px; height:15px;}
+  .tp-item.active .tp-ico{background:var(--violet); color:#fff; box-shadow:0 0 14px rgba(139,92,246,.45);}
+  .tp-item.active{color:var(--violet);}
+  .tp-body{flex:1; min-width:0;}
+  .tp-title{display:block; font-weight:600; line-height:1.2;}
+  .tp-sub{display:block; font-size:11px; color:var(--text-faint); margin-top:2px; line-height:1.3;}
+  .tp-check{width:16px; height:16px; flex-shrink:0; color:var(--violet); opacity:0; transition:.14s;}
+  .tp-item.active .tp-check{opacity:1;}
+  .tools-pop select{
+    width:100%; background:var(--input-bg); border:1px solid var(--line); color:var(--text-dim);
+    border-radius:10px; padding:8px 10px; font-size:12px; margin-top:4px;
+  }
+  .tools-pop-divider{height:1px; background:var(--line); margin:6px 4px;}
+
+  /* ---- Sidebar colapsável (desktop) com animação ---- */
+  .sidebar-collapse-btn{
+    display:none; position:absolute; top:16px; right:12px;
+    width:26px; height:26px; border-radius:8px; background:var(--w06); border:1px solid var(--w06);
+    color:var(--text-dim); cursor:pointer; align-items:center; justify-content:center; z-index:2;
+    transition:.18s;
+  }
+  .sidebar-collapse-btn:hover{color:var(--violet); border-color:var(--violet);}
+  .sidebar-collapse-btn svg.icon{width:15px; height:15px; transition:transform .3s cubic-bezier(.3,.9,.3,1);}
+  @media (min-width:1024px){
+    .sidebar{
+      transition:width .28s cubic-bezier(.3,.9,.3,1);
+      overflow:hidden;
+    }
+    .sidebar-collapse-btn{display:flex;}
+    .sidebar-header, .new-chat-btn, .side-nav-item, .sidebar-search input,
+    .acc-name, .acc-chev, .projects-bar, .history-list, .panel-title-side{
+      transition:opacity .18s ease;
+    }
+    /* estado colapsado */
+    body.sb-collapsed .sidebar{width:66px; max-width:66px;}
+    body.sb-collapsed .sidebar-header span{display:none;}
+    body.sb-collapsed .sidebar-header{font-size:0; padding:18px 0 8px; text-align:center;}
+    body.sb-collapsed .sidebar-header::before{content:'V'; font-size:18px; color:var(--violet);}
+    body.sb-collapsed .new-chat-btn{
+      font-size:0; padding:11px 0; margin:8px 12px 14px; text-align:center;
+    }
+    body.sb-collapsed .new-chat-btn::before{content:'+'; font-size:20px; font-weight:400;}
+    body.sb-collapsed .side-nav{padding:0 10px;}
+    body.sb-collapsed .side-nav-item{justify-content:center; padding:11px 0; gap:0; position:relative;}
+    body.sb-collapsed .side-nav-item{font-size:0;}
+    body.sb-collapsed .side-nav-item svg.icon{width:19px; height:19px;}
+    body.sb-collapsed .sidebar-search, body.sb-collapsed .projects-bar,
+    body.sb-collapsed .history-list{opacity:0; pointer-events:none; height:0; margin:0; padding:0; overflow:hidden;}
+    body.sb-collapsed .acc-name, body.sb-collapsed .acc-chev{opacity:0; width:0; overflow:hidden;}
+    body.sb-collapsed .sidebar-footer{justify-content:center;}
+    body.sb-collapsed .sidebar-collapse-btn svg.icon{transform:rotate(180deg);}
+    /* tooltip no modo colapsado */
+    body.sb-collapsed .side-nav-item::after{
+      content:attr(data-label); position:absolute; left:calc(100% + 8px); top:50%; transform:translateY(-50%) scale(.9);
+      background:var(--glass-modal); backdrop-filter:blur(12px); border:1px solid var(--w10);
+      padding:5px 10px; border-radius:8px; font-size:12px; font-weight:600; color:var(--text); white-space:nowrap;
+      opacity:0; pointer-events:none; transition:.15s; z-index:50; box-shadow:0 6px 20px rgba(0,0,0,.4);
+    }
+    body.sb-collapsed .side-nav-item:hover::after{opacity:1; transform:translateY(-50%) scale(1);}
+  }
+
+  /* ---- Painel de sessão minimalista ---- */
+  .session-panel{width:210px; padding:14px 12px; gap:10px;}
+  .sp-head{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .sp-collapse{
+    background:var(--w06); border:1px solid var(--w06); color:var(--text-dim);
+    width:24px; height:24px; border-radius:7px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.16s;
+  }
+  .sp-collapse:hover{color:var(--violet); border-color:var(--violet);}
+  .sp-collapse svg.icon{width:13px; height:13px; transition:transform .3s ease;}
+  .stat-card{transition:transform .2s ease, box-shadow .2s ease; position:relative; overflow:hidden;}
+  .stat-card::after{
+    content:''; position:absolute; top:0; left:0; width:100%; height:1px;
+    background:linear-gradient(90deg, transparent, rgba(139,92,246,.5), transparent);
+  }
+  .stat-card:hover{transform:translateY(-1px); box-shadow:0 6px 20px rgba(0,0,0,.25);}
+  .stat-value.violet{text-shadow:0 0 12px rgba(139,92,246,.3);}
+  body.sp-collapsed .session-panel .stat-card, body.sp-collapsed .session-panel .panel-title{display:none;}
+  body.sp-collapsed .session-panel{width:52px; padding:14px 8px; align-items:center;}
+  body.sp-collapsed .sp-collapse svg.icon{transform:rotate(180deg);}
+  .sp-mini{display:none; flex-direction:column; gap:12px; align-items:center; margin-top:6px;}
+  body.sp-collapsed .sp-mini{display:flex;}
+  .sp-mini-item{display:flex; flex-direction:column; align-items:center; gap:2px; color:var(--text-dim);}
+  .sp-mini-item svg.icon{width:16px; height:16px; color:var(--violet);}
+  .sp-mini-item span{font-size:10px; font-weight:700;}
+
+  /* ---- Tabs de mídia (Imagem / Vídeo / Fala) no topo das views studio ---- */
+  .media-tabs{display:flex; gap:6px; padding:4px; background:var(--w05); border:1px solid var(--line); border-radius:14px; margin-bottom:14px; width:fit-content; position:relative;}
+  .media-tab{
+    display:flex; align-items:center; gap:7px; padding:8px 16px; border-radius:11px; cursor:pointer;
+    background:transparent; border:none; color:var(--text-dim); font-size:13px; font-weight:600; transition:.2s; position:relative; z-index:1;
+  }
+  .media-tab svg.icon{width:15px; height:15px;}
+  .media-tab.active{color:#fff;}
+  .media-tab-glider{
+    position:absolute; top:4px; left:4px; height:calc(100% - 8px); border-radius:11px;
+    background:linear-gradient(135deg,var(--violet),#6d3fd4); box-shadow:0 4px 14px rgba(139,92,246,.4);
+    transition:transform .32s cubic-bezier(.3,.9,.3,1), width .32s cubic-bezier(.3,.9,.3,1); z-index:0;
+  }
+
+  /* ---- Contador "Tarefas rodando" no header ---- */
+  .tasks-chip{
+    display:none; align-items:center; gap:7px; background:var(--w05); border:1px solid var(--line);
+    color:var(--text-dim); padding:6px 12px; border-radius:20px; font-size:11.5px; cursor:pointer; flex-shrink:0;
+    font-weight:600; white-space:nowrap; transition:.18s;
+  }
+  .tasks-chip.active{display:flex; border-color:rgba(139,92,246,.4); color:var(--violet); background:var(--violet-dim);}
+  .tasks-chip .task-spinner{
+    width:12px; height:12px; border-radius:50%; border:2px solid rgba(139,92,246,.25); border-top-color:var(--violet);
+    animation:vid-spin .7s linear infinite;
+  }
+  .tasks-pop{
+    position:absolute; top:calc(100% + 8px); right:16px; z-index:40; min-width:240px; max-width:320px;
+    background:var(--glass-modal); backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%);
+    border:1px solid var(--w10); border-radius:16px; padding:8px;
+    box-shadow:0 16px 50px rgba(0,0,0,.5); display:flex; flex-direction:column; gap:4px;
+    opacity:0; transform:translateY(8px); pointer-events:none; transition:.2s;
+  }
+  .tasks-pop.open{opacity:1; transform:translateY(0); pointer-events:auto;}
+  .tasks-pop-empty{padding:16px; text-align:center; font-size:12px; color:var(--text-faint);}
+  .task-item{display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:11px; background:var(--w05); font-size:12.5px;}
+  .task-item .task-spinner{flex-shrink:0;}
+  .task-item .task-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text);}
+  .task-item .task-time{font-size:10.5px; color:var(--text-faint); font-family:var(--mono);}
+
+  /* ---- Painel de parâmetros de vídeo aprimorado ---- */
+  .vid-params{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:2px;}
+  .vid-chip{
+    display:flex; align-items:center; gap:6px; background:var(--w05); border:1px solid var(--line);
+    color:var(--text-dim); padding:7px 12px; border-radius:20px; font-size:12px; cursor:pointer; transition:.16s; position:relative;
+  }
+  .vid-chip:hover{border-color:var(--violet); color:var(--text);}
+  .vid-chip.on{border-color:var(--violet); color:var(--violet); background:var(--violet-dim);}
+  .vid-chip svg.icon{width:14px; height:14px;}
+  .vid-chip select, .vid-chip input{
+    background:transparent; border:none; color:inherit; font-size:12px; outline:none; cursor:pointer; font-family:inherit;
+  }
+  .vid-chip input[type=number]{width:44px;}
+  .vid-cost{margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--amber); background:rgba(255,180,84,.1); border:1px solid rgba(255,180,84,.2); padding:7px 12px; border-radius:20px; white-space:nowrap;}
+
+  /* ---- Realce roxo consistente em elementos-chave ---- */
+  .empty-logo{animation:vtz-logo-pulse 4s ease-in-out infinite;}
+  @keyframes vtz-logo-pulse{0%,100%{box-shadow:0 8px 30px rgba(139,92,246,.35);} 50%{box-shadow:0 8px 40px rgba(139,92,246,.6);}}
+  .side-nav-item{transition:background .18s ease, color .18s ease, transform .12s ease;}
+  .side-nav-item:hover:not(.active){background:var(--w05); color:var(--text);}
+  .side-nav-item.active{position:relative;}
+  .media-tab, .tasks-chip, .tools-trigger, .vid-chip{transition:all .18s ease;}
+  @media (prefers-reduced-motion: reduce){
+    .empty-logo{animation:none;}
+  }
 </style>
 </head>
 <body>
@@ -768,8 +973,16 @@
       <span class="name" id="current-model-label">Selecionar modelo</span>
       <span class="chev"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
     </button>
+    <button class="tasks-chip" id="tasks-chip" title="Tarefas em andamento">
+      <span class="task-spinner"></span>
+      <span id="tasks-chip-label">Tarefas (0)</span>
+    </button>
     <button class="icon-btn" id="theme-btn" title="Alternar tema"><span id="theme-icon"></span></button>
     <div class="cost-badge" id="cost-badge">$0.0000</div>
+    <div class="tasks-pop" id="tasks-pop">
+      <div class="tasks-pop-empty" id="tasks-pop-empty">Nenhuma tarefa em andamento.</div>
+      <div id="tasks-pop-list"></div>
+    </div>
   </header>
 
   <main>
@@ -787,22 +1000,55 @@
       </div>
       <div id="chat-log" style="display:none;"></div>
       <div class="toolbar-row">
-        <label class="toggle"><input type="checkbox" id="tools-toggle"> Ativar tools</label>
-        <label class="toggle" id="web-label"><input type="checkbox" id="web-toggle"> <span id="web-globe"></span> Web</label>
-        <select id="search-focus" style="display:none; background:var(--input-bg); border:1px solid var(--line); color:var(--text-dim); border-radius:8px; padding:3px 6px; font-size:11px;">
-          <option value="">Foco: tudo</option>
-          <option value="reddit">Reddit</option>
-          <option value="youtube">YouTube</option>
-          <option value="academic">Acadêmico</option>
-          <option value="news">Notícias</option>
-          <option value="shopping">Compras/preços</option>
-        </select>
+        <button class="tools-trigger" id="tools-trigger" title="Ferramentas do chat">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          Ferramentas
+          <span class="dot" id="tools-trigger-dot" style="display:none;"></span>
+        </button>
         <span class="ctx-meter" id="ctx-meter" title="Estimativa de tokens e custo do próximo envio"></span>
         <span id="tools-status"></span>
-        <button id="deep-btn" style="margin-left:auto; display:flex; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;" title="Pesquisa profunda: quebra o tema, busca na web e sintetiza um relatório com fontes"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg> pesquisa profunda</button>
-        <button id="agent-btn" style="display:none; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;" title="Agente autônomo: planeja e usa ferramentas (busca, leitura, Notion) em várias rodadas até resolver a tarefa. Precisa do Backend VTz OS ligado."><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><rect x="4" y="7" width="16" height="12" rx="2"/><path d="M9 7V4h6v3"/><line x1="9" y1="12" x2="9" y2="12.5"/><line x1="15" y1="12" x2="15" y2="12.5"/></svg> agente</button>
-        <button id="compare-btn" style="display:flex; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><rect x="3" y="4" width="8" height="16" rx="2"/><rect x="13" y="4" width="8" height="16" rx="2"/></svg> comparar</button>
-        <button id="view-system-btn" style="display:flex; align-items:center; gap:5px; background:transparent; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:8px; font-size:11px; cursor:pointer;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg> system prompt</button>
+
+        <div class="tools-pop" id="tools-pop">
+          <div class="tools-pop-head">Ferramentas do chat</div>
+          <label class="tp-item" id="tp-tools">
+            <span class="tp-ico"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-6 6a2 2 0 1 0 2.8 2.8l6-6a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.1-2.1z"/></svg></span>
+            <span class="tp-body"><span class="tp-title">Ativar tools</span><span class="tp-sub">Ferramentas do modelo (function calling)</span></span>
+            <input type="checkbox" id="tools-toggle" style="display:none;">
+            <svg class="tp-check icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </label>
+          <label class="tp-item" id="tp-web">
+            <span class="tp-ico"><span id="web-globe-slot"></span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/></svg></span>
+            <span class="tp-body"><span class="tp-title">Busca na web</span><span class="tp-sub">Deixa o modelo pesquisar na internet</span></span>
+            <input type="checkbox" id="web-toggle" style="display:none;">
+            <svg class="tp-check icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </label>
+          <span id="web-label" style="display:none;"></span>
+          <select id="search-focus" style="display:none;">
+            <option value="">Foco da busca: tudo</option>
+            <option value="reddit">Reddit</option>
+            <option value="youtube">YouTube</option>
+            <option value="academic">Acadêmico</option>
+            <option value="news">Notícias</option>
+            <option value="shopping">Compras/preços</option>
+          </select>
+          <div class="tools-pop-divider"></div>
+          <button class="tp-item" id="deep-btn" title="Pesquisa profunda: quebra o tema, busca na web e sintetiza um relatório com fontes">
+            <span class="tp-ico"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></span>
+            <span class="tp-body"><span class="tp-title">Pesquisa profunda</span><span class="tp-sub">Relatório com fontes via backend</span></span>
+          </button>
+          <button class="tp-item" id="agent-btn" style="display:none;" title="Agente autônomo: planeja e usa ferramentas em várias rodadas. Precisa do Backend VTz OS ligado.">
+            <span class="tp-ico"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="12" rx="2"/><path d="M9 7V4h6v3"/><line x1="9" y1="12" x2="9" y2="12.5"/><line x1="15" y1="12" x2="15" y2="12.5"/></svg></span>
+            <span class="tp-body"><span class="tp-title">Agente autônomo</span><span class="tp-sub">Planeja e executa em várias rodadas</span></span>
+          </button>
+          <button class="tp-item" id="compare-btn" title="Comparar modelos lado a lado">
+            <span class="tp-ico"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="8" height="16" rx="2"/><rect x="13" y="4" width="8" height="16" rx="2"/></svg></span>
+            <span class="tp-body"><span class="tp-title">Comparar modelos</span><span class="tp-sub">Roda a mesma pergunta em vários modelos</span></span>
+          </button>
+          <button class="tp-item" id="view-system-btn" title="Ver/editar o system prompt">
+            <span class="tp-ico"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg></span>
+            <span class="tp-body"><span class="tp-title">System prompt</span><span class="tp-sub">Ver e editar as instruções do modelo</span></span>
+          </button>
+        </div>
       </div>
       <div class="quick-actions" id="quick-actions"></div>
       <div class="attach-chips" id="attach-chips"></div>
@@ -828,6 +1074,11 @@
     </section>
 
     <section id="image-view" class="view">
+      <div class="media-tabs">
+        <div class="media-tab-glider"></div>
+        <button class="media-tab" data-media-view="image"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imagem</button>
+        <button class="media-tab" data-media-view="video"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="15" height="14" rx="2"/><polygon points="17 9 22 6 22 18 17 15" fill="currentColor" stroke="none"/></svg> Vídeo</button>
+      </div>
       <div class="img-controls">
         <select id="image-model-select"></select>
         <textarea id="image-prompt" placeholder="Descreva a imagem..."></textarea>
@@ -837,13 +1088,34 @@
     </section>
 
     <section id="video-view" class="view">
+      <div class="media-tabs">
+        <div class="media-tab-glider"></div>
+        <button class="media-tab" data-media-view="image"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imagem</button>
+        <button class="media-tab" data-media-view="video"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="15" height="14" rx="2"/><polygon points="17 9 22 6 22 18 17 15" fill="currentColor" stroke="none"/></svg> Vídeo</button>
+      </div>
       <p class="hint" id="video-hint" style="margin-bottom:10px;">Geração de vídeo via Replicate — precisa do Backend VTz OS ligado e de uma chave do Replicate (Config → Geral → Replicate API Key).</p>
       <div class="img-controls">
         <select id="video-model-select"></select>
-        <input type="number" id="video-duration" placeholder="Duração (s)" min="1" style="max-width:120px;">
         <textarea id="video-prompt" placeholder="Descreva o vídeo..."></textarea>
         <input type="text" id="video-image-url" placeholder="URL da imagem base (só p/ modelos imagem→vídeo)" style="flex:1 1 100%; display:none;">
         <button class="gen-btn" id="gen-video-btn">Gerar</button>
+      </div>
+      <div class="vid-params">
+        <span class="vid-chip"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+          <input type="number" id="video-duration" placeholder="5" min="1" value="5"> s</span>
+        <label class="vid-chip"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+          <select id="video-aspect">
+            <option value="16:9">16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="1:1">1:1</option>
+            <option value="4:3">4:3</option>
+            <option value="21:9">21:9</option>
+          </select></label>
+        <button class="vid-chip" id="video-audio-chip" type="button" title="Gerar com áudio (se o modelo suportar)">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg> Áudio</button>
+        <button class="vid-chip" id="video-revise-chip" type="button" title="Deixa a IA melhorar seu prompt antes de gerar (usa o OpenRouter)">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.9 5.8L20 10l-6.1 2.2L12 18l-1.9-5.8L4 10l6.1-2.2z"/></svg> Revisar prompt</button>
+        <span class="vid-cost" id="video-cost">~— créditos</span>
       </div>
       <div class="img-grid video-grid" id="video-grid"></div>
     </section>
@@ -1024,7 +1296,12 @@
 
 <!-- Painel de sessão (só desktop) — dados reais, atualizados a cada mensagem -->
 <aside class="session-panel" id="session-panel">
-  <div class="panel-title">Sessão atual</div>
+  <div class="sp-head">
+    <div class="panel-title">Sessão atual</div>
+    <button class="sp-collapse" id="sp-collapse-btn" title="Recolher painel">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+  </div>
   <div class="stat-card">
     <div class="stat-row"><span class="stat-label">Modelo</span><span class="stat-value violet" id="sp-model">—</span></div>
     <div class="stat-row"><span class="stat-label">Custo total</span><span class="stat-value amber" id="sp-cost">$0.0000</span></div>
@@ -1037,12 +1314,24 @@
     <div class="stat-row"><span class="stat-label">Skills ativas</span><span class="stat-value violet" id="sp-skills">0</span></div>
     <div class="stat-row"><span class="stat-label">Tools disponíveis</span><span class="stat-value" id="sp-tools">0</span></div>
   </div>
+  <!-- versão mini (quando recolhido) -->
+  <div class="sp-mini">
+    <button class="sp-collapse" id="sp-expand-btn" title="Expandir painel">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="sp-mini-item" title="Custo total"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span id="sp-mini-cost">$0</span></div>
+    <div class="sp-mini-item" title="Mensagens"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span id="sp-mini-msgs">0</span></div>
+    <div class="sp-mini-item" title="Conversas"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span id="sp-mini-convs">0</span></div>
+  </div>
 </aside>
 
 <!-- Sidebar drawer -->
 <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">VTZ<span>·</span>PANEL</div>
+  <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Recolher menu">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
   <button class="new-chat-btn" id="new-chat-btn">+ Nova conversa</button>
   <nav class="side-nav">
     <button class="side-nav-item active" data-view="chat"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="4"/><polygon points="8 17 8 21 12 17" fill="currentColor" stroke="none"/></svg> Chat</button>
@@ -2784,7 +3073,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('tools-toggle').addEventListener('change', (e) => {
     state.toolsEnabled = e.target.checked;
     document.getElementById('tools-status').textContent = state.toolsEnabled ? `${Object.keys(TOOLS).length} tools ativas` : '';
+    document.getElementById('tp-tools').classList.toggle('active', state.toolsEnabled);
+    updateToolsTrigger();
   });
+  setupToolsPopover();
 
   // mic (best-effort, Web Speech API)
   setupMic();
@@ -2821,6 +3113,19 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('gen-image-btn').onclick = generateImage;
   document.getElementById('gen-video-btn').onclick = generateVideo;
   document.getElementById('video-model-select').onchange = updateVideoModelFields;
+  document.getElementById('video-duration')?.addEventListener('input', updateVideoCost);
+  document.getElementById('video-aspect')?.addEventListener('change', updateVideoCost);
+  document.getElementById('video-audio-chip')?.addEventListener('click', (e) => {
+    e.currentTarget.classList.toggle('on'); updateVideoCost();
+  });
+  document.getElementById('video-revise-chip')?.addEventListener('click', (e) => {
+    e.currentTarget.classList.toggle('on');
+  });
+  // redesign 2026: menus, sidebar colapsável, painel de sessão, tabs de mídia, tarefas
+  initSidebarCollapse();
+  initSessionPanel();
+  initMediaTabs();
+  setupTasksChip();
 
   // skills
   document.getElementById('new-skill-btn').onclick = () => openSkillModal(null);
@@ -2924,12 +3229,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // diagnóstico + toggle de streaming
-  document.getElementById('web-globe').innerHTML = iconHTML('globe');
   const focusSel = document.getElementById('search-focus');
   focusSel.value = state.searchFocus || '';
   document.getElementById('web-toggle').addEventListener('change', (e) => {
     state.webSearch = e.target.checked;
-    focusSel.style.display = state.webSearch ? 'inline-block' : 'none';
+    focusSel.style.display = state.webSearch ? 'block' : 'none';
+    document.getElementById('tp-web').classList.toggle('active', state.webSearch);
+    updateToolsTrigger();
     if (state.webSearch) toast('Busca web ativada — o modelo pesquisa a internet antes de responder (~US$0,02/msg, fora do contador de tokens).');
     else toast('Busca web desativada.');
   });
@@ -3015,10 +3321,136 @@ function switchView(name){
   if (name === 'analytics') renderAnalytics();
   if (name === 'config') updateStorageMeter();
   if (name === 'video' && !state.videoModels) loadVideoModels();
+  syncMediaTabs(name);
 }
 function toggleSidebar(open){
   document.getElementById('sidebar').classList.toggle('open', open);
   document.getElementById('sidebar-backdrop').classList.toggle('open', open);
+}
+
+/* ---------- Menu de ferramentas colapsável ---------- */
+function updateToolsTrigger(){
+  const active = !!(state.toolsEnabled || state.webSearch);
+  const trg = document.getElementById('tools-trigger');
+  const dot = document.getElementById('tools-trigger-dot');
+  if (trg) trg.classList.toggle('has-active', active);
+  if (dot) dot.style.display = active ? 'block' : 'none';
+}
+function setupToolsPopover(){
+  const trigger = document.getElementById('tools-trigger');
+  const pop = document.getElementById('tools-pop');
+  if (!trigger || !pop) return;
+  const close = () => pop.classList.remove('open');
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pop.classList.toggle('open');
+  });
+  // fecha ao clicar numa ação (mas não ao mexer nos toggles/select)
+  ['deep-btn','agent-btn','compare-btn','view-system-btn'].forEach(id => {
+    document.getElementById(id)?.addEventListener('click', () => setTimeout(close, 60));
+  });
+  document.addEventListener('click', (e) => {
+    if (!pop.contains(e.target) && e.target !== trigger && !trigger.contains(e.target)) close();
+  });
+  updateToolsTrigger();
+}
+
+/* ---------- Sidebar colapsável (desktop) ---------- */
+function toggleSidebarCollapse(){
+  const collapsed = document.body.classList.toggle('sb-collapsed');
+  localStorage.setItem('vtz_sb_collapsed', collapsed ? '1' : '0');
+}
+function initSidebarCollapse(){
+  if (localStorage.getItem('vtz_sb_collapsed') === '1') document.body.classList.add('sb-collapsed');
+  // rótulos pra tooltip no modo colapsado
+  document.querySelectorAll('.side-nav-item').forEach(b => {
+    const txt = b.textContent.trim();
+    if (txt) b.setAttribute('data-label', txt);
+  });
+  document.getElementById('sidebar-collapse-btn')?.addEventListener('click', toggleSidebarCollapse);
+}
+
+/* ---------- Painel de sessão minimalista ---------- */
+function toggleSessionPanel(){
+  const collapsed = document.body.classList.toggle('sp-collapsed');
+  localStorage.setItem('vtz_sp_collapsed', collapsed ? '1' : '0');
+}
+function initSessionPanel(){
+  if (localStorage.getItem('vtz_sp_collapsed') === '1') document.body.classList.add('sp-collapsed');
+  document.getElementById('sp-collapse-btn')?.addEventListener('click', toggleSessionPanel);
+  document.getElementById('sp-expand-btn')?.addEventListener('click', toggleSessionPanel);
+}
+
+/* ---------- Tabs de mídia (Imagem / Vídeo) ---------- */
+function initMediaTabs(){
+  document.querySelectorAll('.media-tabs').forEach(group => {
+    const tabs = [...group.querySelectorAll('.media-tab')];
+    const glider = group.querySelector('.media-tab-glider');
+    const moveGlider = (el) => {
+      if (!glider || !el) return;
+      glider.style.width = el.offsetWidth + 'px';
+      glider.style.transform = `translateX(${el.offsetLeft - 4}px)`;
+    };
+    tabs.forEach(t => {
+      t.addEventListener('click', () => {
+        const view = t.dataset.mediaView;
+        if (view) switchView(view);
+      });
+    });
+    // reposiciona o glider quando a aba fica visível
+    group._moveGlider = moveGlider;
+  });
+}
+function syncMediaTabs(name){
+  document.querySelectorAll('.media-tabs').forEach(group => {
+    const tabs = [...group.querySelectorAll('.media-tab')];
+    const active = tabs.find(t => t.dataset.mediaView === name);
+    tabs.forEach(t => t.classList.toggle('active', t === active));
+    if (active && group._moveGlider) requestAnimationFrame(() => group._moveGlider(active));
+  });
+}
+
+/* ---------- Contador de tarefas rodando (gerações ativas) ---------- */
+const runningTasks = new Map(); // id -> { name, startedAt }
+function addRunningTask(id, name){
+  runningTasks.set(id, { name, startedAt: Date.now() });
+  renderTasksChip();
+}
+function removeRunningTask(id){
+  runningTasks.delete(id);
+  renderTasksChip();
+}
+function renderTasksChip(){
+  const chip = document.getElementById('tasks-chip');
+  const label = document.getElementById('tasks-chip-label');
+  const n = runningTasks.size;
+  if (chip) chip.classList.toggle('active', n > 0);
+  if (label) label.textContent = `Tarefas (${n})`;
+  const list = document.getElementById('tasks-pop-list');
+  const empty = document.getElementById('tasks-pop-empty');
+  if (empty) empty.style.display = n ? 'none' : 'block';
+  if (list){
+    list.innerHTML = [...runningTasks.entries()].map(([id, t]) => {
+      const secs = Math.round((Date.now() - t.startedAt) / 1000);
+      return `<div class="task-item"><span class="task-spinner"></span>`
+        + `<span class="task-name">${esc(t.name)}</span><span class="task-time">${secs}s</span></div>`;
+    }).join('');
+  }
+}
+function setupTasksChip(){
+  const chip = document.getElementById('tasks-chip');
+  const pop = document.getElementById('tasks-pop');
+  if (!chip || !pop) return;
+  chip.addEventListener('click', (e) => {
+    e.stopPropagation();
+    renderTasksChip();
+    pop.classList.toggle('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (!pop.contains(e.target) && !chip.contains(e.target)) pop.classList.remove('open');
+  });
+  // atualiza os cronômetros a cada 1s enquanto houver tarefa
+  setInterval(() => { if (runningTasks.size) renderTasksChip(); }, 1000);
 }
 function saveApiKey(key){
   if (!key) return;
@@ -5303,6 +5735,10 @@ function updateSessionPanel(){
   set('sp-agents', state.agents.length);
   set('sp-skills', state.skills.filter(s => s.active).length + '/' + state.skills.length);
   set('sp-tools', Object.keys(TOOLS).length);
+  // versão mini (painel recolhido)
+  set('sp-mini-cost', '$' + (state.totalCost < 1 ? state.totalCost.toFixed(2) : state.totalCost.toFixed(1)));
+  set('sp-mini-msgs', conv ? conv.messages.filter(x => x.role==='user'||x.role==='assistant').length : 0);
+  set('sp-mini-convs', state.conversations.length);
 }
 function renderAnalytics(){
   const grid = document.getElementById('metrics-grid');
@@ -5412,6 +5848,20 @@ async function loadVideoModels(){
   });
   updateVideoModelFields();
 }
+/* créditos aproximados por segundo de vídeo, por modelo (estimativa p/ UI) */
+const VIDEO_CREDIT_RATES = {
+  'kling-v3':1.4, 'kling-v2':1.1, 'kling-v1':0.8, 'runway-gen3':2.0,
+  'luma-dream':1.2, 'veo-2':2.5, 'seedance':1.0, 'hailuo':1.3,
+};
+function updateVideoCost(){
+  const sel = document.getElementById('video-model-select');
+  const dur = parseInt(document.getElementById('video-duration')?.value, 10) || 5;
+  const rate = VIDEO_CREDIT_RATES[sel?.value] ?? 1.2;
+  let credits = rate * dur;
+  if (document.getElementById('video-audio-chip')?.classList.contains('on')) credits *= 1.2;
+  const el = document.getElementById('video-cost');
+  if (el) el.textContent = `~${credits.toFixed(1)} créditos`;
+}
 function updateVideoModelFields(){
   const sel = document.getElementById('video-model-select');
   const opt = sel.options[sel.selectedIndex];
@@ -5421,17 +5871,40 @@ function updateVideoModelFields(){
   const model = state.videoModels?.find(m => m.id === sel.value);
   if (model?.max_duration){
     durationInput.max = model.max_duration;
-    durationInput.placeholder = `Duração (até ${model.max_duration}s)`;
+    durationInput.title = `Até ${model.max_duration}s`;
+    if (parseInt(durationInput.value,10) > model.max_duration) durationInput.value = model.max_duration;
   } else {
     durationInput.removeAttribute('max');
-    durationInput.placeholder = 'Duração (s)';
+    durationInput.title = 'Duração em segundos';
   }
+  updateVideoCost();
+}
+/* revisão de prompt: usa o OpenRouter pra reescrever o prompt de forma mais rica p/ vídeo */
+async function revisePrompt(raw){
+  if (!state.apiKey) throw new Error('Precisa da chave do OpenRouter (Config → Geral) pra revisar o prompt.');
+  const body = {
+    model: state.model && !state.model.startsWith('__') ? state.model : 'openai/gpt-4.1-mini',
+    messages: [
+      { role:'system', content:'Você melhora prompts de geração de vídeo. Reescreva o pedido do usuário num prompt visual, cinematográfico e detalhado (câmera, luz, movimento, estilo), em UMA frase densa. Responda SÓ com o prompt, sem aspas nem explicação.' },
+      { role:'user', content: raw },
+    ],
+    max_tokens: 220,
+  };
+  const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + state.apiKey },
+    body: JSON.stringify(body),
+  }).then(okJson);
+  return (r.choices?.[0]?.message?.content || raw).trim();
 }
 async function generateVideo(){
-  const prompt = document.getElementById('video-prompt').value.trim();
+  let prompt = document.getElementById('video-prompt').value.trim();
   const model = document.getElementById('video-model-select').value;
   const durationRaw = document.getElementById('video-duration').value.trim();
   const imageUrl = document.getElementById('video-image-url').value.trim();
+  const aspect = document.getElementById('video-aspect')?.value || '';
+  const withAudio = document.getElementById('video-audio-chip')?.classList.contains('on');
+  const doRevise = document.getElementById('video-revise-chip')?.classList.contains('on');
   if (!prompt || !model) return;
   if (!backendUrl()){ await autoDetectBackend(); }
   if (!backendUrl()){ appendVideoNote('Backend não encontrado. Ligue o Backend VTz OS primeiro (run.bat).'); return; }
@@ -5439,9 +5912,17 @@ async function generateVideo(){
   const btn = document.getElementById('gen-video-btn');
   btn.disabled = true; btn.textContent = 'Enviando...';
   try{
+    if (doRevise){
+      btn.textContent = 'Revisando...';
+      try{ prompt = await revisePrompt(prompt); document.getElementById('video-prompt').value = prompt; toast('Prompt revisado pela IA.'); }
+      catch(e){ toast('Não deu pra revisar: ' + e.message, 'warn'); }
+      btn.textContent = 'Enviando...';
+    }
     const payload = { model, prompt };
     if (durationRaw) payload.duration = parseInt(durationRaw, 10);
     if (imageUrl) payload.image_url = imageUrl;
+    if (aspect) payload.aspect_ratio = aspect;
+    if (withAudio) payload.audio = true;
     const d = await fetch(backendUrl() + '/api/video/generate', {
       method:'POST', headers: videoHeaders({ 'Content-Type':'application/json' }), body: JSON.stringify(payload),
     }).then(okJson);
@@ -5458,6 +5939,7 @@ async function generateVideo(){
       + `</div>`;
     grid.prepend(card);
     card.querySelector('.vid-cancel-btn').onclick = () => cancelVideoPrediction(d.id, card);
+    addRunningTask(d.id, 'Vídeo: ' + (d.model_name || model));
     pollVideoPrediction(d.id, card);
   }catch(e){ appendVideoNote('Erro: ' + e.message); }
   finally{ btn.disabled = false; btn.textContent = 'Gerar'; }
@@ -5470,18 +5952,20 @@ async function pollVideoPrediction(id, card, attempt = 0){
     const secs = Math.round((Date.now() - Number(card.dataset.startedAt || Date.now())) / 1000);
     elapsedEl.textContent = secs + 's';
   }
-  if (attempt > 150){ if (statusEl) statusEl.textContent = 'Tempo esgotado — confira o resultado direto no replicate.com.'; return; }
+  if (attempt > 150){ if (statusEl) statusEl.textContent = 'Tempo esgotado — confira o resultado direto no replicate.com.'; removeRunningTask(id); return; }
   try{
     const d = await fetch(backendUrl() + '/api/video/prediction/' + encodeURIComponent(id), { headers: videoHeaders() }).then(okJson);
     if (d.status === 'succeeded'){
       const out = Array.isArray(d.output) ? d.output[0] : d.output;
       if (out) card.innerHTML = `<video src="${out}" controls></video><a href="${out}" download="vtz-video.mp4">Baixar</a>`;
       else { card.className = 'img-card vid-progress'; card.innerHTML = `<div class="vid-status">Concluído, mas sem output reconhecível.</div>`; }
+      removeRunningTask(id);
       return;
     }
     if (d.status === 'failed' || d.status === 'canceled'){
       card.className = 'img-card vid-progress';
       card.innerHTML = `<div class="vid-status">${d.status === 'canceled' ? 'Cancelado.' : 'Falhou: ' + esc(d.error || d.status)}</div>`;
+      removeRunningTask(id);
       return;
     }
     if (statusEl) statusEl.textContent = `Gerando… (${d.status || 'processing'})`;
@@ -5500,6 +5984,7 @@ async function cancelVideoPrediction(id, card){
     const statusEl = card.querySelector('.vid-status');
     if (statusEl) statusEl.textContent = 'Cancelado.';
     card.dataset.canceled = '1';
+    removeRunningTask(id);
   }catch(e){
     if (btn){ btn.disabled = false; btn.textContent = 'Cancelar'; }
   }
