@@ -359,10 +359,11 @@
   .fav-btn.faved{color:var(--amber);}
   .picker-empty{padding:30px 16px; text-align:center; color:var(--text-dim); font-size:13px;}
 
-  /* ---------- Image tab ---------- */
+  /* ---------- Image tab (também usado pela aba Vídeo) ---------- */
   #image-view{padding:16px; overflow-y:auto; gap:14px;}
+  #video-view{padding:16px; overflow-y:auto; gap:14px;}
   .img-controls{display:flex; gap:8px; flex-wrap:wrap;}
-  .img-controls select, .img-controls textarea{
+  .img-controls select, .img-controls textarea, .img-controls input[type=text], .img-controls input[type=number]{
     background:var(--w05); border:1px solid var(--line); color:var(--text);
     border-radius:12px; padding:10px 12px; font-size:13.5px;
   }
@@ -371,7 +372,7 @@
   .gen-btn{background:var(--violet); color:#fff; border:none; border-radius:12px; padding:11px 20px; font-weight:700; cursor:pointer;}
   .img-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-top:14px;}
   .img-card{background:var(--glass-card); backdrop-filter:blur(12px); border:1px solid var(--w06); border-radius:14px; overflow:hidden;}
-  .img-card img{width:100%; display:block;}
+  .img-card img, .img-card video{width:100%; display:block;}
   .img-card a{display:block; text-align:center; padding:8px; font-size:12px; color:var(--violet); text-decoration:none;}
 
   /* ---------- Agent view ---------- */
@@ -821,6 +822,18 @@
       <div class="img-grid" id="img-grid"></div>
     </section>
 
+    <section id="video-view" class="view">
+      <p class="hint" id="video-hint" style="margin-bottom:10px;">Geração de vídeo via Replicate — precisa do Backend VTz OS ligado e de uma chave do Replicate (Config → Geral → Replicate API Key).</p>
+      <div class="img-controls">
+        <select id="video-model-select"></select>
+        <input type="number" id="video-duration" placeholder="Duração (s)" min="1" style="max-width:120px;">
+        <textarea id="video-prompt" placeholder="Descreva o vídeo..."></textarea>
+        <input type="text" id="video-image-url" placeholder="URL da imagem base (só p/ modelos imagem→vídeo)" style="flex:1 1 100%; display:none;">
+        <button class="gen-btn" id="gen-video-btn">Gerar</button>
+      </div>
+      <div class="img-grid" id="video-grid"></div>
+    </section>
+
     <section id="skills-view" class="view">
       <div class="new-item-btn" id="new-skill-btn">+ Nova Skill</div>
       <div id="skills-list"></div>
@@ -836,6 +849,13 @@
         <button class="primary" id="save-key-btn">Salvar</button>
         <button class="danger" id="clear-key-btn">Remover</button>
         <p class="hint">A key fica só no localStorage deste navegador.</p>
+      </div>
+      <div class="cfg-group" data-cat="conexao">
+        <h3>Replicate API Key (vídeo)</h3>
+        <input type="password" id="replicate-key-input" placeholder="r8_...">
+        <button class="primary" id="save-replicate-key-btn">Salvar</button>
+        <button class="danger" id="clear-replicate-key-btn">Remover</button>
+        <p class="hint">Usada na aba Vídeo pra gerar com Kling, Runway, Luma, Veo, Seedance e Hailuo (via Replicate) — precisa também do Backend VTz OS ligado. Crie grátis em <a href="https://replicate.com" target="_blank" rel="noopener" style="color:var(--violet);">replicate.com</a>. A key fica só no localStorage deste navegador.</p>
       </div>
       <div class="cfg-group" data-cat="conexao">
         <h3>RouteLLM (automático)</h3>
@@ -1014,6 +1034,7 @@
     <button class="side-nav-item active" data-view="chat"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="4"/><polygon points="8 17 8 21 12 17" fill="currentColor" stroke="none"/></svg> Chat</button>
     <button class="side-nav-item" data-view="agent"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><circle cx="9" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.2" fill="currentColor" stroke="none"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1" fill="currentColor" stroke="none"/></svg> Agente</button>
     <button class="side-nav-item" data-view="image"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imagem</button>
+    <button class="side-nav-item" data-view="video"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="15" height="14" rx="2"/><polygon points="17 9 22 6 22 18 17 15" fill="currentColor" stroke="none"/></svg> Vídeo</button>
     <button class="side-nav-item" data-view="skills"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Skills</button>
     <button class="side-nav-item" data-view="analytics"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="19" y1="20" x2="19" y2="9"/></svg> Analytics</button>
   </nav>
@@ -1265,12 +1286,19 @@ const state = {
   searchFocus: localStorage.getItem('vtz_search_focus') || '',          // foco da busca web
   backendUrl: (localStorage.getItem('vtz_backend_url') || '').replace(/\/+$/, ''), // VTz OS backend (opcional)
   backendToken: localStorage.getItem('vtz_backend_token') || '', // token de acesso, se o backend exigir
+  replicateKey: localStorage.getItem('vtz_replicate_key') || '', // chave do Replicate (geração de vídeo)
 };
 function backendUrl(){ return state.backendUrl || ''; }
 /* Monta headers pra chamadas ao backend, incluindo o token de acesso quando configurado. */
 function backendHeaders(extra){
   const h = Object.assign({}, extra || {});
   if (state.backendToken) h['X-Backend-Token'] = state.backendToken;
+  return h;
+}
+/* Mesma coisa, mas também injeta a chave do Replicate (usada só na aba Vídeo). */
+function videoHeaders(extra){
+  const h = backendHeaders(extra);
+  if (state.replicateKey) h['X-Replicate-Key'] = state.replicateKey;
   return h;
 }
 /* Foco de busca: direciona o modelo pra priorizar certas fontes (viés, não filtro rígido). */
@@ -2750,6 +2778,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // config
   document.getElementById('save-key-btn').onclick = () => saveApiKey(document.getElementById('api-key-input').value.trim());
   document.getElementById('clear-key-btn').onclick = () => { localStorage.removeItem('vtz_or_key'); state.apiKey=''; document.getElementById('key-modal').style.display='flex'; };
+  document.getElementById('save-replicate-key-btn').onclick = () => {
+    const key = document.getElementById('replicate-key-input').value.trim();
+    if (!key) return;
+    state.replicateKey = key;
+    localStorage.setItem('vtz_replicate_key', key);
+    document.getElementById('replicate-key-input').value = '';
+    toast('Chave do Replicate salva ✓');
+  };
+  document.getElementById('clear-replicate-key-btn').onclick = () => {
+    localStorage.removeItem('vtz_replicate_key');
+    state.replicateKey = '';
+    toast('Chave do Replicate removida.');
+  };
   document.getElementById('reset-cost-btn').onclick = () => { state.totalCost = 0; localStorage.setItem('vtz_or_cost','0'); updateCostBadge(); };
   const brlInput = document.getElementById('usd-brl-input');
   brlInput.value = String(state.usdToBrl).replace('.', ',');
@@ -2764,6 +2805,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   document.getElementById('gen-image-btn').onclick = generateImage;
+  document.getElementById('gen-video-btn').onclick = generateVideo;
+  document.getElementById('video-model-select').onchange = updateVideoModelFields;
 
   // skills
   document.getElementById('new-skill-btn').onclick = () => openSkillModal(null);
@@ -2957,6 +3000,7 @@ function switchView(name){
   document.querySelector(`.side-nav-item[data-view="${name}"]`)?.classList.add('active');
   if (name === 'analytics') renderAnalytics();
   if (name === 'config') updateStorageMeter();
+  if (name === 'video' && !state.videoModels) loadVideoModels();
 }
 function toggleSidebar(open){
   document.getElementById('sidebar').classList.toggle('open', open);
@@ -5316,6 +5360,102 @@ async function generateImage(){
 }
 function appendImageNote(text){
   const grid = document.getElementById('img-grid');
+  const note = document.createElement('div');
+  note.className = 'img-card';
+  note.style.padding = '14px'; note.style.fontSize = '12px'; note.style.color = 'var(--text-dim)';
+  note.textContent = text;
+  grid.prepend(note);
+}
+
+/* ---------- Vídeo (Replicate, via Backend VTz OS) ---------- */
+const FALLBACK_VIDEO_MODELS = [
+  { id:'kling-v3',     name:'Kling AI v3.0 (recomendado)',  type:'text-to-video',  max_duration:10 },
+  { id:'kling-v2',     name:'Kling AI v2.0',                type:'text-to-video',  max_duration:10 },
+  { id:'kling-v1',     name:'Kling AI v1.0',                type:'text-to-video',  max_duration:10 },
+  { id:'runway-gen3',  name:'Runway Gen-3.5 Motion',         type:'text-to-video',  max_duration:25 },
+  { id:'luma-dream',   name:'Luma Dream Machine',            type:'text-to-video',  max_duration:5  },
+  { id:'veo-2',        name:'Google Veo 2.0',                type:'text-to-video',  max_duration:6  },
+  { id:'seedance',     name:'Seedance (Imagem → Vídeo)',     type:'image-to-video', max_duration:5  },
+  { id:'hailuo',       name:'Hailuo Video Generation',       type:'text-to-video',  max_duration:10 },
+];
+async function loadVideoModels(){
+  const sel = document.getElementById('video-model-select');
+  let models = FALLBACK_VIDEO_MODELS;
+  if (backendUrl()){
+    try{
+      const d = await fetch(backendUrl() + '/api/video/models', { headers: backendHeaders() }).then(okJson);
+      if (d.models && d.models.length) models = d.models;
+    }catch(_){ /* sem backend/erro — usa a lista fixa mesmo assim (só pra visualizar) */ }
+  }
+  state.videoModels = models;
+  sel.innerHTML = '';
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.name + (m.max_duration ? ` (até ${m.max_duration}s)` : '');
+    opt.dataset.type = m.type || 'text-to-video';
+    sel.appendChild(opt);
+  });
+  updateVideoModelFields();
+}
+function updateVideoModelFields(){
+  const sel = document.getElementById('video-model-select');
+  const opt = sel.options[sel.selectedIndex];
+  const isImg2Vid = opt?.dataset.type === 'image-to-video';
+  document.getElementById('video-image-url').style.display = isImg2Vid ? 'block' : 'none';
+}
+async function generateVideo(){
+  const prompt = document.getElementById('video-prompt').value.trim();
+  const model = document.getElementById('video-model-select').value;
+  const durationRaw = document.getElementById('video-duration').value.trim();
+  const imageUrl = document.getElementById('video-image-url').value.trim();
+  if (!prompt || !model) return;
+  if (!backendUrl()){ await autoDetectBackend(); }
+  if (!backendUrl()){ appendVideoNote('Backend não encontrado. Ligue o Backend VTz OS primeiro (run.bat).'); return; }
+  if (!state.replicateKey){ appendVideoNote('Cole sua chave do Replicate em Config → Geral → Replicate API Key.'); return; }
+  const btn = document.getElementById('gen-video-btn');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try{
+    const payload = { model, prompt };
+    if (durationRaw) payload.duration = parseInt(durationRaw, 10);
+    if (imageUrl) payload.image_url = imageUrl;
+    const d = await fetch(backendUrl() + '/api/video/generate', {
+      method:'POST', headers: videoHeaders({ 'Content-Type':'application/json' }), body: JSON.stringify(payload),
+    }).then(okJson);
+    const grid = document.getElementById('video-grid');
+    const card = document.createElement('div');
+    card.className = 'img-card';
+    card.style.padding = '10px';
+    card.innerHTML = `<div class="hint" style="font-size:11px; margin-bottom:6px;">${esc(d.model_name || model)}</div>`
+      + `<div class="vid-status" style="font-size:12px; color:var(--text-dim);">Gerando… (${esc(d.status || 'starting')})</div>`;
+    grid.prepend(card);
+    pollVideoPrediction(d.id, card);
+  }catch(e){ appendVideoNote('Erro: ' + e.message); }
+  finally{ btn.disabled = false; btn.textContent = 'Gerar'; }
+}
+async function pollVideoPrediction(id, card, attempt = 0){
+  const statusEl = card.querySelector('.vid-status');
+  if (attempt > 150){ if (statusEl) statusEl.textContent = 'Tempo esgotado — confira o resultado direto no replicate.com.'; return; }
+  try{
+    const d = await fetch(backendUrl() + '/api/video/prediction/' + encodeURIComponent(id), { headers: videoHeaders() }).then(okJson);
+    if (d.status === 'succeeded'){
+      const out = Array.isArray(d.output) ? d.output[0] : d.output;
+      if (out) card.innerHTML = `<video src="${out}" controls></video><a href="${out}" download="vtz-video.mp4">Baixar</a>`;
+      else if (statusEl) statusEl.textContent = 'Concluído, mas sem output reconhecível.';
+      return;
+    }
+    if (d.status === 'failed' || d.status === 'canceled'){
+      if (statusEl) statusEl.textContent = 'Falhou: ' + (d.error || d.status);
+      return;
+    }
+    if (statusEl) statusEl.textContent = `Gerando… (${d.status || 'processing'})`;
+    setTimeout(() => pollVideoPrediction(id, card, attempt + 1), 3000);
+  }catch(e){
+    if (statusEl) statusEl.textContent = 'Erro ao consultar: ' + e.message;
+  }
+}
+function appendVideoNote(text){
+  const grid = document.getElementById('video-grid');
   const note = document.createElement('div');
   note.className = 'img-card';
   note.style.padding = '14px'; note.style.fontSize = '12px'; note.style.color = 'var(--text-dim)';
