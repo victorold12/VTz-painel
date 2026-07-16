@@ -775,6 +775,8 @@
   }
   .composer:focus-within{border-color:transparent;}
   .composer:focus-within::before{opacity:1; animation:vtz-rotate 3.2s linear infinite;}
+  /* a borda animada já sinaliza o foco — sem outline roxo interno no campo */
+  .composer textarea:focus, .composer textarea:focus-visible{outline:none;}
   @keyframes vtz-rotate{ to{ --vtz-angle:360deg; } }
   @media (prefers-reduced-motion: reduce){
     .composer:focus-within::before{animation:none; background:var(--violet); opacity:.5;}
