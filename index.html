@@ -1234,14 +1234,14 @@
       </div>
       <div class="cfg-group" data-cat="respostas">
         <h3>Memória (o que a IA lembra de você)</h3>
-        <p class="hint" style="margin-bottom:10px;">Fatos seus injetados em TODA conversa — nome, objetivos, preferências, contexto. Um por linha. Corta repetição (estilo ChatGPT/Copilot).</p>
+        <p class="hint" style="margin-bottom:10px;">Um <b>grafo de conhecimento</b> sobre você (entidades + relações), injetado de forma resumida em TODA conversa — nome, objetivos, preferências, contexto. Evita duplicar e contradizer fatos antigos (ex.: mudou de cidade, ele corrige em vez de acumular).</p>
         <textarea id="memory-input" placeholder="Ex.:&#10;Me chamo Victor Hugo, moro em Maricá-RJ.&#10;Treino à noite, foco em físico atlético.&#10;Jogo Fortnite, Valorant e EA FC.&#10;Prefiro respostas diretas em pt-BR." style="width:100%; min-height:120px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:12.5px; line-height:1.6; resize:vertical;"></textarea>
         <p class="hint" id="memory-count" style="margin-top:6px;">—</p>
         <label class="toggle" style="display:flex; align-items:center; gap:8px; margin:10px 0 4px; font-size:12.5px; cursor:pointer;">
           <input type="checkbox" id="auto-memory-toggle"> Memória automática — a IA aprende fatos duráveis sozinha ao longo das conversas (estilo Claude/ChatGPT)
         </label>
         <button id="update-memory-btn" style="margin-top:6px;">Atualizar memória agora</button>
-        <p class="hint" style="margin-top:8px;">A memória automática usa um modelo barato pra destilar fatos (fração de centavo por atualização) e roda em 2º plano a cada poucas mensagens. Você pode editar/apagar qualquer linha acima.</p>
+        <p class="hint" style="margin-top:8px;">A memória automática usa um modelo barato pra destilar entidades e relações (fração de centavo por atualização) e roda em 2º plano a cada poucas mensagens. Você pode editar/apagar qualquer linha acima — ao salvar à mão elas viram fatos simples, e a memória automática reconstrói as relações depois.</p>
       </div>
       <div class="cfg-group" data-cat="backend">
         <h3>Backend VTz OS (opcional)</h3>
@@ -1619,6 +1619,74 @@ function iconHTML(name){ return ICONS[name] || ICONS.bot; }
 /* migra ícones antigos em emoji (versões anteriores do painel) pros novos ícones SVG */
 const LEGACY_EMOJI_TO_ICON = {'🏛️':'bank','🧠':'cpu','🎮':'gamepad','💪':'dumbbell','🧩':'zap','🤖':'bot'};
 
+/* ---------- Memória em GRAFO (evolução da lista plana) ----------
+   Em vez de guardar frases soltas, guardamos um pequeno grafo de conhecimento:
+     nós  = entidades/conceitos sobre o usuário (pessoa, lugar, projeto, preferência, decisão, fato)
+     arestas = relações entre eles (mora em, prefere, trabalha com, decidiu, etc.)
+   Vantagem: sem duplicar/contradizer fatos, e ao montar o prompt resumimos só o
+   subgrafo relevante — mais estruturado e mais barato que despejar 60 frases toda vez. */
+const MEM_NODE_TYPES = ['pessoa','lugar','projeto','preferencia','objetivo','decisao','ferramenta','fato'];
+/* id determinístico e estável a partir do rótulo — mesmo rótulo => mesmo id (dedup natural) */
+function memSlug(label){
+  return String(label).toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')   // tira acento
+    .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0, 48) || 'no';
+}
+/* Migra a lista plana antiga (vtz_memories) pro formato de grafo, uma única vez.
+   Se o grafo já tem nós, devolve ele intacto. Caso contrário, transforma cada
+   frase antiga num nó "fato" ligado a um nó raiz "Você" — sem perder nada. */
+function migrateMemoriesToGraph(stored){
+  const g = stored && Array.isArray(stored.nodes) ? stored : { nodes:[], edges:[] };
+  if (g.nodes.length) return g;
+  const legacy = JSON.parse(localStorage.getItem('vtz_memories') || '[]');
+  if (!legacy.length) return g;
+  g.nodes.push({ id:'voce', label:'Você', type:'pessoa' });
+  for (const fact of legacy){
+    const id = 'fato_' + memSlug(fact);
+    if (g.nodes.some(n => n.id === id)) continue;
+    g.nodes.push({ id, label: String(fact), type:'fato' });
+    g.edges.push({ source:'voce', target:id, relation:'sabe-se que', confidence:0.85 });
+  }
+  localStorage.setItem('vtz_memory_graph', JSON.stringify(g));
+  return g;
+}
+function saveMemoryGraph(){
+  localStorage.setItem('vtz_memory_graph', JSON.stringify(state.memoryGraph));
+}
+/* Resume o grafo (ou um subgrafo relevante) em texto natural pro system prompt.
+   Barato: agrupa por nó de origem e lista as relações numa linha por entidade.
+   `focusText` (opcional) prioriza os nós cujo rótulo casa com a conversa atual. */
+function memoryGraphToText(g, { focusText = '', maxNodes = 40 } = {}){
+  if (!g || !g.nodes.length) return '';
+  const byId = new Map(g.nodes.map(n => [n.id, n]));
+  // relevância: se há foco, pontua nós cujo rótulo aparece no texto da conversa
+  let nodes = g.nodes;
+  if (focusText){
+    const hay = focusText.toLowerCase();
+    const scored = g.nodes.map(n => {
+      const words = n.label.toLowerCase().split(/[^a-z0-9à-ú]+/).filter(w => w.length > 3);
+      const hits = words.filter(w => hay.includes(w)).length;
+      return { n, hits };
+    });
+    // mantém sempre a pessoa raiz + os mais relevantes; se ninguém casar, usa todos
+    const anyHit = scored.some(s => s.hits > 0);
+    if (anyHit){
+      nodes = scored.filter(s => s.hits > 0 || s.n.type === 'pessoa')
+        .sort((a,b) => b.hits - a.hits).map(s => s.n);
+    }
+  }
+  nodes = nodes.slice(0, maxNodes);
+  const keep = new Set(nodes.map(n => n.id));
+  const lines = [];
+  for (const n of nodes){
+    const rels = g.edges.filter(e => e.source === n.id && keep.has(e.target))
+      .map(e => `${e.relation} ${byId.get(e.target)?.label || e.target}`);
+    if (rels.length) lines.push(`- ${n.label}: ${rels.join('; ')}.`);
+    else if (n.type === 'fato' || !g.edges.some(e => e.target === n.id)) lines.push(`- ${n.label}.`);
+  }
+  return lines.join('\n');
+}
+
 
 const state = {
   apiKey: localStorage.getItem('vtz_or_key') || '',
@@ -1647,7 +1715,8 @@ const state = {
   costByModel: JSON.parse(localStorage.getItem('vtz_cost_by_model') || '{}'),
   tagFilter: '',
   soundOn: localStorage.getItem('vtz_sound') === '1',
-  memories: JSON.parse(localStorage.getItem('vtz_memories') || '[]'), // fatos sobre o Victor, injetados em toda conversa
+  memories: JSON.parse(localStorage.getItem('vtz_memories') || '[]'), // backward compat: flat facts (deprecated, migrated to memoryGraph)
+  memoryGraph: migrateMemoriesToGraph(JSON.parse(localStorage.getItem('vtz_memory_graph') || '{"nodes":[],"edges":[]}')),
   autoMemory: localStorage.getItem('vtz_auto_memory') !== '0',          // extrai fatos duráveis sozinha (padrão: ligado)
   projects: JSON.parse(localStorage.getItem('vtz_projects') || '[]'), // pastas de conversa
   projectFilter: localStorage.getItem('vtz_project_filter') || '',      // '' = todos
@@ -1923,11 +1992,43 @@ async function autoTitleConversation(conv){
     if (title){ conv.title = title; persistConversations(); renderHistoryList(); }
   }catch(_){ /* título automático é best-effort */ }
 }
-/* ---------- Auto-memória (fatos duráveis entre chats, estilo Claude/ChatGPT) ----------
-   Destila a conversa num punhado de fatos duráveis e junta a state.memories, que já é
-   injetada em TODA conversa. Usa um modelo barato/confiável (não o do chat) pra extrair
-   JSON limpo — custo por rodada é fração de centavo. */
+/* ---------- Auto-memória em GRAFO (evolução da lista plana, estilo Claude/ChatGPT) ----------
+   Destila a conversa em ENTIDADES + RELAÇÕES (não frases soltas) e funde no
+   state.memoryGraph, que é resumido e injetado em TODA conversa. Usa um modelo
+   barato/confiável (não o do chat) pra extrair JSON limpo — custo por rodada é
+   fração de centavo. O grafo evita duplicar e contradizer fatos antigos. */
 const MEMORY_MODEL = 'openai/gpt-4.1-mini';
+const MEM_MAX_NODES = 120; // teto de segurança do grafo
+
+/* Funde um nó no grafo (dedup por id determinístico). Devolve o id. */
+function memUpsertNode(g, label, type){
+  const id = memSlug(label);
+  const existing = g.nodes.find(n => n.id === id);
+  if (existing){
+    if (type && existing.type === 'fato' && type !== 'fato') existing.type = type; // promove tipo
+    return id;
+  }
+  g.nodes.push({ id, label: String(label).slice(0, 80), type: MEM_NODE_TYPES.includes(type) ? type : 'fato' });
+  return id;
+}
+/* Funde uma aresta. Relações "funcionais" (uma cidade, uma profissão) SUBSTITUEM
+   o alvo antigo em vez de acumular — é assim que o grafo corrige contradições. */
+const MEM_FUNCTIONAL_RELATIONS = new Set(['mora em','nasceu em','trabalha como','se chama','tem idade','estuda em','usa como principal']);
+function memUpsertEdge(g, srcId, relation, tgtId){
+  relation = String(relation).toLowerCase().trim().slice(0, 40);
+  if (srcId === tgtId) return;
+  if (MEM_FUNCTIONAL_RELATIONS.has(relation)){
+    // remove alvos antigos da mesma relação funcional (correção de fato) + limpa nós órfãos
+    const stale = g.edges.filter(e => e.source === srcId && e.relation === relation && e.target !== tgtId);
+    g.edges = g.edges.filter(e => !(e.source === srcId && e.relation === relation && e.target !== tgtId));
+    for (const e of stale){
+      if (!g.edges.some(x => x.source === e.target || x.target === e.target))
+        g.nodes = g.nodes.filter(n => n.id !== e.target);
+    }
+  }
+  if (g.edges.some(e => e.source === srcId && e.relation === relation && e.target === tgtId)) return;
+  g.edges.push({ source: srcId, target: tgtId, relation, confidence: 0.9 });
+}
 async function extractMemories(conv, { silent = true } = {}){
   if (!state.apiKey || !conv) return [];
   const recent = conv.messages
@@ -1936,38 +2037,81 @@ async function extractMemories(conv, { silent = true } = {}){
   if (recent.length < 2) return [];
   const transcript = recent.map(m =>
     `${m.role === 'user' ? 'Usuário' : 'IA'}: ${contentToText(m.content).slice(0, 700)}`).join('\n');
-  const existing = state.memories.length ? state.memories.map(m => '- ' + m).join('\n') : '(nenhuma ainda)';
-  const sys = 'Você mantém a memória de longo prazo de um usuário entre conversas. Extraia só FATOS DURÁVEIS que valem lembrar sempre: nome, localização, profissão/contexto, preferências fixas, objetivos e projetos em andamento, decisões técnicas recorrentes. IGNORE o que é efêmero, dúvidas pontuais, ou o que já está na memória atual. Responda APENAS um array JSON de strings curtas em pt-BR (cada fato numa frase). Se não houver nada novo, responda exatamente [].';
-  const usr = `MEMÓRIA ATUAL:\n${existing}\n\nCONVERSA RECENTE:\n${transcript}\n\nRetorne só os fatos NOVOS (ausentes da memória atual) como array JSON.`;
+  const existing = memoryGraphToText(state.memoryGraph) || '(grafo vazio)';
+  const sys = 'Você mantém a MEMÓRIA EM GRAFO de longo prazo de um usuário. A partir da conversa, extraia ENTIDADES e RELAÇÕES duráveis que valem lembrar sempre: nome, localização, profissão/contexto, preferências fixas, objetivos, projetos em andamento, decisões técnicas recorrentes, ferramentas usadas. IGNORE o efêmero, dúvidas pontuais e o que já está no grafo. '
+    + 'Responda APENAS um objeto JSON: {"nodes":[{"label":"...","type":"..."}],"edges":[{"source":"label origem","target":"label destino","relation":"verbo curto pt-BR"}]}. '
+    + 'O usuário é sempre o nó de label "Você" (type "pessoa"). type ∈ [pessoa,lugar,projeto,preferencia,objetivo,decisao,ferramenta,fato]. relation é um verbo curto: "mora em","prefere","trabalha como","joga","usa","quer","decidiu". '
+    + 'Toda aresta referencia labels que existem em nodes ou já no grafo. Se nada novo, responda {"nodes":[],"edges":[]}.';
+  const usr = `GRAFO ATUAL:\n${existing}\n\nCONVERSA RECENTE:\n${transcript}\n\nRetorne só o que é NOVO (ausente do grafo) como JSON {nodes, edges}.`;
   try{
     const res = await orFetch({
       model: MEMORY_MODEL,
       messages: [{ role:'system', content: sys }, { role:'user', content: usr }],
-      max_tokens: 300, temperature: 0,
+      max_tokens: 500, temperature: 0,
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     trackUsage(data.usage, MEMORY_MODEL);
-    const txt = data.choices?.[0]?.message?.content || '[]';
-    const arr = JSON.parse((txt.match(/\[[\s\S]*\]/) || ['[]'])[0]);
-    const clean = arr.map(s => String(s).trim()).filter(Boolean).slice(0, 8);
-    const lower = new Set(state.memories.map(m => m.toLowerCase()));
-    const added = clean.filter(m => !lower.has(m.toLowerCase()));
-    if (added.length){
-      state.memories.push(...added);
-      // teto de segurança: mantém as 60 lembranças mais recentes
-      if (state.memories.length > 60) state.memories = state.memories.slice(-60);
+    const txt = data.choices?.[0]?.message?.content || '{}';
+    const parsed = JSON.parse((txt.match(/\{[\s\S]*\}/) || ['{}'])[0]);
+    const g = state.memoryGraph;
+    const before = { n: g.nodes.length, e: g.edges.length };
+    // garante o nó raiz
+    if (!g.nodes.some(n => n.id === 'voce')) g.nodes.push({ id:'voce', label:'Você', type:'pessoa' });
+    // mapa label->id pros nós novos (aceita "Você"/"voce" como raiz)
+    const labelToId = new Map();
+    for (const n of (parsed.nodes || [])){
+      if (!n || !n.label) continue;
+      const isSelf = memSlug(n.label) === 'voce' || /^voc[eê]$|^eu$|^usu[aá]rio$/i.test(n.label.trim());
+      const id = isSelf ? 'voce' : memUpsertNode(g, n.label, n.type);
+      labelToId.set(n.label.toLowerCase(), id);
+    }
+    const resolveId = (label) => {
+      if (!label) return null;
+      const l = label.toLowerCase();
+      if (labelToId.has(l)) return labelToId.get(l);
+      const slug = /^voc[eê]$|^eu$|^usu[aá]rio$/i.test(label.trim()) ? 'voce' : memSlug(label);
+      if (g.nodes.some(n => n.id === slug)) return slug;
+      return memUpsertNode(g, label, 'fato'); // alvo mencionado só na aresta
+    };
+    for (const e of (parsed.edges || [])){
+      if (!e || !e.source || !e.target || !e.relation) continue;
+      const s = resolveId(e.source), t = resolveId(e.target);
+      if (s && t) memUpsertEdge(g, s, e.relation, t);
+    }
+    // teto: se estourar, remove os nós-fato mais antigos (mantém entidades estruturadas)
+    if (g.nodes.length > MEM_MAX_NODES){
+      const overflow = g.nodes.length - MEM_MAX_NODES;
+      const removable = g.nodes.filter(n => n.type === 'fato' && n.id !== 'voce').slice(0, overflow);
+      const rmIds = new Set(removable.map(n => n.id));
+      g.nodes = g.nodes.filter(n => !rmIds.has(n.id));
+      g.edges = g.edges.filter(e => !rmIds.has(e.source) && !rmIds.has(e.target));
+    }
+    const addedN = g.nodes.length - before.n, addedE = g.edges.length - before.e;
+    if (addedN > 0 || addedE > 0){
+      // sincroniza a lista plana legada (compat + backup/sync antigo)
+      state.memories = memoryGraphToText(g).split('\n').map(s => s.replace(/^- /,'').trim()).filter(Boolean);
       localStorage.setItem('vtz_memories', JSON.stringify(state.memories));
-      const mi = document.getElementById('memory-input'); if (mi) mi.value = state.memories.join('\n');
-      const mc = document.getElementById('memory-count'); if (mc) mc.textContent = state.memories.length + ' lembranças salvas';
-      if (!silent) toast(`Memória atualizada: +${added.length} ${added.length === 1 ? 'fato' : 'fatos'}.`);
-      return added;
+      saveMemoryGraph();
+      renderMemoryUI();
+      if (!silent) toast(`Memória atualizada: +${addedN} entidade${addedN===1?'':'s'}, +${addedE} relaç${addedE===1?'ão':'ões'}.`);
+      return [`+${addedN}n/${addedE}e`];
     }
     if (!silent) toast('Nada novo pra lembrar desta conversa.');
     return [];
   }catch(e){
     if (!silent) toast('Falha ao atualizar memória: ' + e.message, 'err');
     return [];
+  }
+}
+/* Atualiza a UI da memória (textarea + contador) a partir do grafo atual */
+function renderMemoryUI(){
+  const mi = document.getElementById('memory-input');
+  if (mi && document.activeElement !== mi) mi.value = memoryGraphToText(state.memoryGraph);
+  const mc = document.getElementById('memory-count');
+  if (mc){
+    const n = state.memoryGraph.nodes.length, e = state.memoryGraph.edges.length;
+    mc.textContent = n ? `${n} entidade${n>1?'s':''}, ${e} relaç${e===1?'ão':'ões'} — resumo do grafo injetado em toda conversa.` : 'Grafo de memória vazio.';
   }
 }
 /* Estado do composer depende da CONVERSA visível: se ela está gerando, input trava
@@ -3289,19 +3433,23 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('vtz_global_prompt', DEFAULT_GLOBAL_PROMPT);
     toast('Estilo restaurado pro padrão.');
   };
-  // memória
+  // memória em grafo
   const memInput = document.getElementById('memory-input');
-  const memCount = document.getElementById('memory-count');
-  const renderMemCount = () => {
-    const n = state.memories.length;
-    memCount.textContent = n ? `${n} lembrança${n>1?'s':''} ativa${n>1?'s':''} — injetadas em toda conversa.` : 'Nenhuma lembrança ainda.';
-  };
-  memInput.value = state.memories.join('\n');
-  renderMemCount();
+  renderMemoryUI();
+  // editar à mão: reconstrói o grafo como fatos simples (preserva "apagar linha = esquecer").
+  // A memória automática volta a criar as relações estruturadas depois.
   memInput.addEventListener('change', () => {
-    state.memories = memInput.value.split('\n').map(s => s.trim()).filter(Boolean);
+    const lines = memInput.value.split('\n').map(s => s.replace(/^-\s*/,'').trim()).filter(Boolean);
+    const g = { nodes:[{ id:'voce', label:'Você', type:'pessoa' }], edges:[] };
+    for (const line of lines){
+      const id = memUpsertNode(g, line, 'fato');
+      if (id !== 'voce') memUpsertEdge(g, 'voce', 'sabe-se que', id);
+    }
+    state.memoryGraph = g;
+    state.memories = lines;
     localStorage.setItem('vtz_memories', JSON.stringify(state.memories));
-    renderMemCount();
+    saveMemoryGraph();
+    renderMemoryUI();
     toast('Memória salva.');
   });
   const autoMemToggle = document.getElementById('auto-memory-toggle');
@@ -3320,7 +3468,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     e.target.disabled = true; e.target.textContent = 'Atualizando…';
     await extractMemories(conv, { silent: false });
-    renderMemCount();
+    renderMemoryUI();
     e.target.disabled = false; e.target.textContent = 'Atualizar memória agora';
   });
   // backend VTz OS
@@ -3875,6 +4023,7 @@ async function pushToCloud(){
       globalPrompt: localStorage.getItem('vtz_global_prompt') || '',
       favorites: state.favorites,
       memories: state.memories,
+      memoryGraph: state.memoryGraph,
       projects: state.projects,
       updatedAt: Date.now(),
     };
@@ -3895,6 +4044,13 @@ async function pullFromCloud(uid){
     if (typeof d.globalPrompt === 'string') localStorage.setItem('vtz_global_prompt', d.globalPrompt);
     if (Array.isArray(d.favorites)){ state.favorites = d.favorites; localStorage.setItem('vtz_favorites', JSON.stringify(d.favorites)); }
     if (Array.isArray(d.memories)){ state.memories = d.memories; localStorage.setItem('vtz_memories', JSON.stringify(d.memories)); }
+    if (d.memoryGraph && Array.isArray(d.memoryGraph.nodes)){
+      state.memoryGraph = d.memoryGraph; localStorage.setItem('vtz_memory_graph', JSON.stringify(d.memoryGraph));
+    } else if (Array.isArray(d.memories)){
+      // nuvem antiga (só lista plana): reconstrói o grafo a partir dela
+      localStorage.removeItem('vtz_memory_graph');
+      state.memoryGraph = migrateMemoriesToGraph({ nodes:[], edges:[] });
+    }
     if (Array.isArray(d.projects)){ state.projects = d.projects; localStorage.setItem('vtz_projects', JSON.stringify(d.projects)); }
     state.conversations = JSON.parse(localStorage.getItem('vtz_conversations') || '[]');
     renderProjectsBar(); renderHistoryList(); renderChat();
@@ -4538,8 +4694,12 @@ function buildSystemPrompt(conv){
   const parts = [];
   const globalP = (localStorage.getItem('vtz_global_prompt') || '').trim();
   if (globalP) parts.push(globalP);
-  if (state.memories && state.memories.length){
-    parts.push('[Memória sobre o usuário — leve em conta sempre, sem repetir de volta a menos que perguntado]\n' + state.memories.map(m => '- ' + m).join('\n'));
+  // memória em grafo: resume só o subgrafo relevante pra conversa atual (barato + focado)
+  if (state.memoryGraph && state.memoryGraph.nodes.length){
+    const focus = conv.messages.filter(m => m.role === 'user' && !m._local)
+      .slice(-3).map(m => contentToText(m.content)).join(' ');
+    const memText = memoryGraphToText(state.memoryGraph, { focusText: focus, maxNodes: 30 });
+    if (memText) parts.push('[Memória sobre o usuário — leve em conta sempre, sem repetir de volta a menos que perguntado]\n' + memText);
   }
   const proj = conv.projectId && state.projects.find(p => p.id === conv.projectId);
   if (proj){
