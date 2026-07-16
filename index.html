@@ -432,7 +432,7 @@
 
   /* ---------- Config tab ---------- */
   #config-view{padding:20px; overflow-y:auto; align-items:flex-start;}
-  .cfg-shell{display:flex; gap:20px; align-items:flex-start; max-width:920px; margin:0 auto;}
+  .cfg-shell{display:flex; width:100%; gap:20px; align-items:flex-start; max-width:920px; margin:0 auto;}
   .cfg-nav{display:flex; flex-direction:column; gap:2px; min-width:196px; position:sticky; top:0;}
   .cfg-nav-item{display:flex; align-items:center; gap:10px; text-align:left; background:transparent; border:none; color:var(--text-dim); font-size:13.5px; font-weight:600; padding:10px 12px; border-radius:10px; cursor:pointer; transition:.15s; width:100%;}
   .cfg-nav-item:hover{background:var(--w06); color:var(--text);}
@@ -674,11 +674,19 @@
     .qa-btn{flex:none;}
     /* 16px nos campos evita o zoom automático do iOS ao focar */
     #chat-input, .cfg-group input, .cfg-group textarea, #cmp-prompt, #memory-input, #global-prompt-input, .modal input, .modal textarea{font-size:16px;}
-    .cfg-shell{flex-direction:column; gap:12px;}
-    .cfg-nav{flex-direction:row; overflow-x:auto; min-width:0; width:100%; gap:6px; position:static; scrollbar-width:none; padding-bottom:2px;}
+    .cfg-shell{flex-direction:column; gap:12px; position:relative;}
+    .cfg-nav{flex-direction:row; overflow-x:auto; min-width:0; width:100%; gap:6px; position:static; scrollbar-width:none; padding-bottom:2px; -webkit-overflow-scrolling:touch;}
     .cfg-nav::-webkit-scrollbar{display:none;}
     .cfg-nav-item{flex:none; white-space:nowrap; padding:8px 12px;}
     .cfg-nav-label{display:none;}
+    /* dica visual de que a fileira de categorias rola (some quando chega no fim) */
+    .cfg-shell::after{
+      content:''; position:absolute; top:0; right:0; width:28px; height:37px;
+      background:linear-gradient(90deg, transparent, var(--void) 85%);
+      pointer-events:none;
+    }
+    [data-theme="light"] .cfg-shell::after{background:linear-gradient(90deg, transparent, var(--surface) 85%);}
+    .cfg-shell.cfg-nav-end::after{display:none;}
     /* overlays ocupam melhor a tela pequena */
     .hp-panel, .cmp-panel{height:92vh; width:100%; border-radius:14px;}
     .cmp-selectors{flex-direction:column;}
@@ -3324,7 +3332,7 @@ function switchView(name){
   document.getElementById(name + '-view').classList.add('active');
   document.querySelector(`.side-nav-item[data-view="${name}"]`)?.classList.add('active');
   if (name === 'analytics') renderAnalytics();
-  if (name === 'config') updateStorageMeter();
+  if (name === 'config'){ updateStorageMeter(); requestAnimationFrame(updateCfgNavScrollHint); }
   if (name === 'video' && !state.videoModels) loadVideoModels();
   syncMediaTabs(name);
 }
@@ -4656,6 +4664,20 @@ function setupConfigNav(){
     nav.appendChild(b);
   });
   show('conexao');
+
+  // dica de rolagem (mobile): esconde o degradê quando não há mais o que rolar.
+  // a view começa display:none (largura 0), então além de recalcular no
+  // scroll/resize, switchView('config') também chama isso quando a aba abre.
+  nav.addEventListener('scroll', updateCfgNavScrollHint);
+  window.addEventListener('resize', updateCfgNavScrollHint);
+  updateCfgNavScrollHint();
+}
+function updateCfgNavScrollHint(){
+  const nav = document.getElementById('cfg-nav');
+  const shell = nav?.closest('.cfg-shell');
+  if (!nav || !shell) return;
+  const hasMore = nav.scrollWidth - nav.clientWidth - nav.scrollLeft > 4;
+  shell.classList.toggle('cfg-nav-end', !hasMore);
 }
 
 /* ---------- Biblioteca skills.sh + instalação por URL ---------- */
