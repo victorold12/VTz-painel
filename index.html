@@ -1237,6 +1237,11 @@
         <p class="hint" style="margin-bottom:10px;">Fatos seus injetados em TODA conversa — nome, objetivos, preferências, contexto. Um por linha. Corta repetição (estilo ChatGPT/Copilot).</p>
         <textarea id="memory-input" placeholder="Ex.:&#10;Me chamo Victor Hugo, moro em Maricá-RJ.&#10;Treino à noite, foco em físico atlético.&#10;Jogo Fortnite, Valorant e EA FC.&#10;Prefiro respostas diretas em pt-BR." style="width:100%; min-height:120px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:12.5px; line-height:1.6; resize:vertical;"></textarea>
         <p class="hint" id="memory-count" style="margin-top:6px;">—</p>
+        <label class="toggle" style="display:flex; align-items:center; gap:8px; margin:10px 0 4px; font-size:12.5px; cursor:pointer;">
+          <input type="checkbox" id="auto-memory-toggle"> Memória automática — a IA aprende fatos duráveis sozinha ao longo das conversas (estilo Claude/ChatGPT)
+        </label>
+        <button id="update-memory-btn" style="margin-top:6px;">Atualizar memória agora</button>
+        <p class="hint" style="margin-top:8px;">A memória automática usa um modelo barato pra destilar fatos (fração de centavo por atualização) e roda em 2º plano a cada poucas mensagens. Você pode editar/apagar qualquer linha acima.</p>
       </div>
       <div class="cfg-group" data-cat="backend">
         <h3>Backend VTz OS (opcional)</h3>
@@ -1643,6 +1648,7 @@ const state = {
   tagFilter: '',
   soundOn: localStorage.getItem('vtz_sound') === '1',
   memories: JSON.parse(localStorage.getItem('vtz_memories') || '[]'), // fatos sobre o Victor, injetados em toda conversa
+  autoMemory: localStorage.getItem('vtz_auto_memory') !== '0',          // extrai fatos duráveis sozinha (padrão: ligado)
   projects: JSON.parse(localStorage.getItem('vtz_projects') || '[]'), // pastas de conversa
   projectFilter: localStorage.getItem('vtz_project_filter') || '',      // '' = todos
   searchFocus: localStorage.getItem('vtz_search_focus') || '',          // foco da busca web
@@ -1892,6 +1898,14 @@ function afterAssistantDone(conv){
     conv._titled = true;
     autoTitleConversation(conv);
   }
+  // auto-memória: a cada ~6 mensagens do usuário, destila fatos duráveis em 2º plano
+  if (state.autoMemory){
+    const userCount = realMsgs.filter(m => m.role === 'user').length;
+    if (userCount >= 3 && userCount !== conv._lastMemAt && userCount % 3 === 0){
+      conv._lastMemAt = userCount;
+      extractMemories(conv, { silent: true });
+    }
+  }
 }
 async function autoTitleConversation(conv){
   try{
@@ -1908,6 +1922,53 @@ async function autoTitleConversation(conv){
     const title = (data.choices?.[0]?.message?.content || '').trim().replace(/["'.]/g,'').slice(0, 60);
     if (title){ conv.title = title; persistConversations(); renderHistoryList(); }
   }catch(_){ /* título automático é best-effort */ }
+}
+/* ---------- Auto-memória (fatos duráveis entre chats, estilo Claude/ChatGPT) ----------
+   Destila a conversa num punhado de fatos duráveis e junta a state.memories, que já é
+   injetada em TODA conversa. Usa um modelo barato/confiável (não o do chat) pra extrair
+   JSON limpo — custo por rodada é fração de centavo. */
+const MEMORY_MODEL = 'openai/gpt-4.1-mini';
+async function extractMemories(conv, { silent = true } = {}){
+  if (!state.apiKey || !conv) return [];
+  const recent = conv.messages
+    .filter(m => (m.role === 'user' || m.role === 'assistant') && !m._local)
+    .slice(-16);
+  if (recent.length < 2) return [];
+  const transcript = recent.map(m =>
+    `${m.role === 'user' ? 'Usuário' : 'IA'}: ${contentToText(m.content).slice(0, 700)}`).join('\n');
+  const existing = state.memories.length ? state.memories.map(m => '- ' + m).join('\n') : '(nenhuma ainda)';
+  const sys = 'Você mantém a memória de longo prazo de um usuário entre conversas. Extraia só FATOS DURÁVEIS que valem lembrar sempre: nome, localização, profissão/contexto, preferências fixas, objetivos e projetos em andamento, decisões técnicas recorrentes. IGNORE o que é efêmero, dúvidas pontuais, ou o que já está na memória atual. Responda APENAS um array JSON de strings curtas em pt-BR (cada fato numa frase). Se não houver nada novo, responda exatamente [].';
+  const usr = `MEMÓRIA ATUAL:\n${existing}\n\nCONVERSA RECENTE:\n${transcript}\n\nRetorne só os fatos NOVOS (ausentes da memória atual) como array JSON.`;
+  try{
+    const res = await orFetch({
+      model: MEMORY_MODEL,
+      messages: [{ role:'system', content: sys }, { role:'user', content: usr }],
+      max_tokens: 300, temperature: 0,
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    trackUsage(data.usage, MEMORY_MODEL);
+    const txt = data.choices?.[0]?.message?.content || '[]';
+    const arr = JSON.parse((txt.match(/\[[\s\S]*\]/) || ['[]'])[0]);
+    const clean = arr.map(s => String(s).trim()).filter(Boolean).slice(0, 8);
+    const lower = new Set(state.memories.map(m => m.toLowerCase()));
+    const added = clean.filter(m => !lower.has(m.toLowerCase()));
+    if (added.length){
+      state.memories.push(...added);
+      // teto de segurança: mantém as 60 lembranças mais recentes
+      if (state.memories.length > 60) state.memories = state.memories.slice(-60);
+      localStorage.setItem('vtz_memories', JSON.stringify(state.memories));
+      const mi = document.getElementById('memory-input'); if (mi) mi.value = state.memories.join('\n');
+      const mc = document.getElementById('memory-count'); if (mc) mc.textContent = state.memories.length + ' lembranças salvas';
+      if (!silent) toast(`Memória atualizada: +${added.length} ${added.length === 1 ? 'fato' : 'fatos'}.`);
+      return added;
+    }
+    if (!silent) toast('Nada novo pra lembrar desta conversa.');
+    return [];
+  }catch(e){
+    if (!silent) toast('Falha ao atualizar memória: ' + e.message, 'err');
+    return [];
+  }
 }
 /* Estado do composer depende da CONVERSA visível: se ela está gerando, input trava
    e o botão vira "parar" — outras conversas continuam livres pra digitar e enviar */
@@ -3243,6 +3304,25 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMemCount();
     toast('Memória salva.');
   });
+  const autoMemToggle = document.getElementById('auto-memory-toggle');
+  if (autoMemToggle){
+    autoMemToggle.checked = state.autoMemory;
+    autoMemToggle.onchange = () => {
+      state.autoMemory = autoMemToggle.checked;
+      localStorage.setItem('vtz_auto_memory', state.autoMemory ? '1' : '0');
+      toast(state.autoMemory ? 'Memória automática ligada.' : 'Memória automática desligada.');
+    };
+  }
+  document.getElementById('update-memory-btn')?.addEventListener('click', async (e) => {
+    const conv = getCurrentConv();
+    if (!conv || conv.messages.filter(m => !m._local && (m.role==='user'||m.role==='assistant')).length < 2){
+      toast('Abra uma conversa com algumas mensagens primeiro.', 'warn'); return;
+    }
+    e.target.disabled = true; e.target.textContent = 'Atualizando…';
+    await extractMemories(conv, { silent: false });
+    renderMemCount();
+    e.target.disabled = false; e.target.textContent = 'Atualizar memória agora';
+  });
   // backend VTz OS
   const beInput = document.getElementById('backend-url-input');
   beInput.value = state.backendUrl;
@@ -4469,6 +4549,12 @@ function buildSystemPrompt(conv){
   if (conv.systemPrompt) parts.push(conv.systemPrompt);
   if (state.webSearch && state.searchFocus && SEARCH_FOCUS[state.searchFocus]){
     parts.push(`[Foco da busca web] Ao pesquisar, ${SEARCH_FOCUS[state.searchFocus].hint}.`);
+  }
+  // roster leve: o modelo sempre sabe QUAIS skills existem (mesmo sem ativar),
+  // pra responder "quais skills eu tenho?" sem depender do histórico de comandos.
+  if (state.skills.length){
+    parts.push('[Skills instaladas neste painel]\n' + state.skills.map(s =>
+      `- ${s.name}${s.active ? ' (ativa)' : ''}${s._desc ? ' — ' + s._desc : ''}`).join('\n'));
   }
   const lastUser = [...conv.messages].reverse().find(m => m.role === 'user');
   const lastText = contentToText(lastUser?.content || '').toLowerCase();
