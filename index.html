@@ -371,9 +371,23 @@
   .img-controls textarea{flex:1; min-width:200px; resize:vertical; min-height:44px;}
   .gen-btn{background:var(--violet); color:#fff; border:none; border-radius:12px; padding:11px 20px; font-weight:700; cursor:pointer;}
   .img-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-top:14px;}
+  .img-grid.video-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));}
   .img-card{background:var(--glass-card); backdrop-filter:blur(12px); border:1px solid var(--w06); border-radius:14px; overflow:hidden;}
   .img-card img, .img-card video{width:100%; display:block;}
   .img-card a{display:block; text-align:center; padding:8px; font-size:12px; color:var(--violet); text-decoration:none;}
+  .vid-progress{padding:14px;}
+  .vid-progress .spinner{
+    width:22px; height:22px; border-radius:50%; border:2.5px solid var(--w06); border-top-color:var(--violet);
+    animation:vid-spin .8s linear infinite; margin-bottom:10px;
+  }
+  @keyframes vid-spin{to{transform:rotate(360deg);}}
+  .vid-status{font-size:12px; color:var(--text-dim);}
+  .vid-elapsed{font-size:11px; color:var(--text-faint); margin-top:2px;}
+  .vid-cancel-btn{
+    margin-top:10px; background:transparent; border:1px solid var(--line); color:var(--text-dim);
+    border-radius:10px; padding:6px 12px; font-size:11.5px; cursor:pointer;
+  }
+  .vid-cancel-btn:hover{border-color:var(--danger,#e05353); color:var(--danger,#e05353);}
 
   /* ---------- Agent view ---------- */
   #agent-view{padding:16px; overflow-y:auto; gap:12px;}
@@ -831,7 +845,7 @@
         <input type="text" id="video-image-url" placeholder="URL da imagem base (só p/ modelos imagem→vídeo)" style="flex:1 1 100%; display:none;">
         <button class="gen-btn" id="gen-video-btn">Gerar</button>
       </div>
-      <div class="img-grid" id="video-grid"></div>
+      <div class="img-grid video-grid" id="video-grid"></div>
     </section>
 
     <section id="skills-view" class="view">
@@ -5403,6 +5417,15 @@ function updateVideoModelFields(){
   const opt = sel.options[sel.selectedIndex];
   const isImg2Vid = opt?.dataset.type === 'image-to-video';
   document.getElementById('video-image-url').style.display = isImg2Vid ? 'block' : 'none';
+  const durationInput = document.getElementById('video-duration');
+  const model = state.videoModels?.find(m => m.id === sel.value);
+  if (model?.max_duration){
+    durationInput.max = model.max_duration;
+    durationInput.placeholder = `Duração (até ${model.max_duration}s)`;
+  } else {
+    durationInput.removeAttribute('max');
+    durationInput.placeholder = 'Duração (s)';
+  }
 }
 async function generateVideo(){
   const prompt = document.getElementById('video-prompt').value.trim();
@@ -5425,33 +5448,60 @@ async function generateVideo(){
     const grid = document.getElementById('video-grid');
     const card = document.createElement('div');
     card.className = 'img-card';
-    card.style.padding = '10px';
-    card.innerHTML = `<div class="hint" style="font-size:11px; margin-bottom:6px;">${esc(d.model_name || model)}</div>`
-      + `<div class="vid-status" style="font-size:12px; color:var(--text-dim);">Gerando… (${esc(d.status || 'starting')})</div>`;
+    card.dataset.startedAt = String(Date.now());
+    card.innerHTML = `<div class="vid-progress">`
+      + `<div class="hint" style="font-size:11px; margin-bottom:8px;">${esc(d.model_name || model)}</div>`
+      + `<div class="spinner"></div>`
+      + `<div class="vid-status">Gerando… (${esc(d.status || 'starting')})</div>`
+      + `<div class="vid-elapsed">0s</div>`
+      + `<button class="vid-cancel-btn" type="button">Cancelar</button>`
+      + `</div>`;
     grid.prepend(card);
+    card.querySelector('.vid-cancel-btn').onclick = () => cancelVideoPrediction(d.id, card);
     pollVideoPrediction(d.id, card);
   }catch(e){ appendVideoNote('Erro: ' + e.message); }
   finally{ btn.disabled = false; btn.textContent = 'Gerar'; }
 }
 async function pollVideoPrediction(id, card, attempt = 0){
+  if (card.dataset.canceled) return;
   const statusEl = card.querySelector('.vid-status');
+  const elapsedEl = card.querySelector('.vid-elapsed');
+  if (elapsedEl){
+    const secs = Math.round((Date.now() - Number(card.dataset.startedAt || Date.now())) / 1000);
+    elapsedEl.textContent = secs + 's';
+  }
   if (attempt > 150){ if (statusEl) statusEl.textContent = 'Tempo esgotado — confira o resultado direto no replicate.com.'; return; }
   try{
     const d = await fetch(backendUrl() + '/api/video/prediction/' + encodeURIComponent(id), { headers: videoHeaders() }).then(okJson);
     if (d.status === 'succeeded'){
       const out = Array.isArray(d.output) ? d.output[0] : d.output;
       if (out) card.innerHTML = `<video src="${out}" controls></video><a href="${out}" download="vtz-video.mp4">Baixar</a>`;
-      else if (statusEl) statusEl.textContent = 'Concluído, mas sem output reconhecível.';
+      else { card.className = 'img-card vid-progress'; card.innerHTML = `<div class="vid-status">Concluído, mas sem output reconhecível.</div>`; }
       return;
     }
     if (d.status === 'failed' || d.status === 'canceled'){
-      if (statusEl) statusEl.textContent = 'Falhou: ' + (d.error || d.status);
+      card.className = 'img-card vid-progress';
+      card.innerHTML = `<div class="vid-status">${d.status === 'canceled' ? 'Cancelado.' : 'Falhou: ' + esc(d.error || d.status)}</div>`;
       return;
     }
     if (statusEl) statusEl.textContent = `Gerando… (${d.status || 'processing'})`;
     setTimeout(() => pollVideoPrediction(id, card, attempt + 1), 3000);
   }catch(e){
     if (statusEl) statusEl.textContent = 'Erro ao consultar: ' + e.message;
+  }
+}
+async function cancelVideoPrediction(id, card){
+  const btn = card.querySelector('.vid-cancel-btn');
+  if (btn){ btn.disabled = true; btn.textContent = 'Cancelando...'; }
+  try{
+    await fetch(backendUrl() + '/api/video/prediction/' + encodeURIComponent(id) + '/cancel', {
+      method: 'POST', headers: videoHeaders(),
+    }).then(okJson);
+    const statusEl = card.querySelector('.vid-status');
+    if (statusEl) statusEl.textContent = 'Cancelado.';
+    card.dataset.canceled = '1';
+  }catch(e){
+    if (btn){ btn.disabled = false; btn.textContent = 'Cancelar'; }
   }
 }
 function appendVideoNote(text){
