@@ -32,7 +32,33 @@ if errorlevel 1 (
   call firebase login
 )
 
-REM 3) Publica hosting + regras do Firestore
+REM 3) Recompila app.js/style.css a partir de src/ (se o Node estiver instalado).
+REM    Sem Node, publica a versao ja compilada que esta no repo (fallback seguro).
+where node >nul 2>nul
+if errorlevel 1 (
+  echo.
+  echo [AVISO] Node.js nao encontrado - pulando build, publicando app.js/style.css ja existentes.
+  echo Para builds atualizados, instale o Node: https://nodejs.org
+) else (
+  echo.
+  echo Compilando src/ para app.js e style.css...
+  if not exist "node_modules" (
+    call npm install
+    if errorlevel 1 (
+      echo [ERRO] npm install falhou.
+      pause
+      exit /b 1
+    )
+  )
+  call npm run build
+  if errorlevel 1 (
+    echo [ERRO] Build falhou. Veja a mensagem acima.
+    pause
+    exit /b 1
+  )
+)
+
+REM 4) Publica hosting + regras do Firestore
 echo.
 echo Publicando hosting e regras do Firestore...
 call firebase deploy --only hosting,firestore:rules --project vtz-life-47067

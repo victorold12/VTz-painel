@@ -1,0 +1,12 @@
+{
+  "name": "vtz-painel",
+  "private": true,
+  "version": "1.0.0",
+  "description": "VTz LLM Panel — build step: concatena src/js/*.js (ordem preservada) e minifica pra app.js/style.css.",
+  "scripts": {
+    "build": "node scripts/build.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
+}

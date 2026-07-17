@@ -9,7 +9,12 @@
       "**/node_modules/**",
       "**/*.bat",
       "**/*.md",
-      ".gitattributes"
+      ".gitattributes",
+      ".gitignore",
+      "src/**",
+      "scripts/**",
+      "package.json",
+      "package-lock.json"
     ],
     "cleanUrls": true,
     "rewrites": [
