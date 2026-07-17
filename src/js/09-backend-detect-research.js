@@ -179,16 +179,32 @@ async function startAutonomousAgent(){
   }
 }
 
+/* skill "Gerar arquivo → Claude" — definida à parte pra poder ser garantida
+   tanto no seed de 1ª execução quanto numa migração pra instalações que já
+   tinham vtz_skills salvo antes dela existir (ver bloco de migração abaixo). */
+function makeClaudeRedirectSkill(){
+  return { id: uid(), name:'Gerar arquivo → Claude', trigger:'',
+    instructions:'Quando o pedido for de um ARQUIVO DE ESCRITÓRIO formatado (PDF, Word/.docx, PowerPoint/.pptx, dashboard/painel HTML): não tente gerar esse arquivo aqui — este painel não produz PDF/Word/PPTX com qualidade real. Em vez disso, faça só 2 coisas: escreva 1 frase curta explicando que a geração real do arquivo fica melhor direto no Claude; depois coloque um prompt completo e bem estruturado (cobrindo contexto, dados, tom e estrutura esperada do que foi pedido) dentro de um bloco de código cercado com a linguagem claude-redirect — 3 crases, a palavra claude-redirect, o prompt, 3 crases de novo. O app renderiza esse bloco como um botão "Continuar no Claude" e monta o link sozinho; você não precisa escrever URL nenhuma. Não gere o conteúdo do documento na resposta — nem em Python/reportlab, nem em nenhuma outra linguagem: você não tem como executar esse código aqui, então ele não produz arquivo nenhum pro usuário. Quando o pedido for geração de CÓDIGO ou conteúdo grande de texto pra ficar aqui no chat (não um arquivo de escritório): gere normalmente, como sempre — e, só como opção no fim da resposta, pode oferecer o mesmo bloco claude-redirect com um prompt equivalente, caso o usuário prefira continuar no Claude. Nunca obrigatório nesse caso.',
+    active:true };
+}
+
 /* seed de skills na primeira execução */
 if (localStorage.getItem('vtz_skills') === null){
   state.skills = [
     { id: uid(), name:'VTZ Design System', trigger:'design, ui, interface, tema, glass', instructions:'Aplique o design system VTZ: tema Glass (superfícies translúcidas com blur) como padrão, acento violeta, tipografia nativa do sistema, preto como base.', active:false },
     { id: uid(), name:'Automação Windows (.bat)', trigger:'windows, script, automação, .bat, .reg', instructions:'Sempre que gerar scripts de automação Windows, acompanhe o .py (ou .ps1) com um .bat de execução. Para mudanças de registro, inclua backup e restauração reversíveis.', active:false },
     { id: uid(), name:'Incubadora Maricá', trigger:'incubadora, evento, maricá, relatório', instructions:'Contexto: mapeamento de eventos e relatórios para 5 empresas incubadas em Maricá-RJ. Tom objetivo, formatação clara com headers, atenção à sensibilidade política local.', active:false },
-    { id: uid(), name:'Gerar arquivo → Claude', trigger:'',
-      instructions:'Quando o pedido for de um ARQUIVO DE ESCRITÓRIO formatado (PDF, Word/.docx, PowerPoint/.pptx, dashboard/painel HTML): não tente gerar esse arquivo aqui — este painel não produz PDF/Word/PPTX com qualidade real. Em vez disso, faça só 2 coisas: escreva 1 frase curta explicando que a geração real do arquivo fica melhor direto no Claude; depois coloque um prompt completo e bem estruturado (cobrindo contexto, dados, tom e estrutura esperada do que foi pedido) dentro de um bloco de código cercado com a linguagem claude-redirect — 3 crases, a palavra claude-redirect, o prompt, 3 crases de novo. O app renderiza esse bloco como um botão "Continuar no Claude" e monta o link sozinho; você não precisa escrever URL nenhuma. Não gere o conteúdo do documento na resposta. Quando o pedido for geração de CÓDIGO ou conteúdo grande de texto pra ficar aqui no chat (não um arquivo de escritório): gere normalmente, como sempre — e, só como opção no fim da resposta, pode oferecer o mesmo bloco claude-redirect com um prompt equivalente, caso o usuário prefira continuar no Claude. Nunca obrigatório nesse caso.',
-      active:true },
+    makeClaudeRedirectSkill(),
   ];
+  localStorage.setItem('vtz_skills', JSON.stringify(state.skills));
+}
+
+/* migração: garante a skill acima mesmo em instalações que já tinham
+   vtz_skills salvo (o seed acima só roda em localStorage vazio — sem isso,
+   quem já usava o app antes nunca ganha a skill nova). Idempotente: só
+   adiciona se ainda não existir pelo nome. */
+if (!state.skills.some(s => s.name === 'Gerar arquivo → Claude')){
+  state.skills.push(makeClaudeRedirectSkill());
   localStorage.setItem('vtz_skills', JSON.stringify(state.skills));
 }
 
