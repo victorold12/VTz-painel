@@ -33,7 +33,8 @@ if errorlevel 1 (
 )
 
 REM 3) Recompila app.js/style.css a partir de src/ (se o Node estiver instalado).
-REM    Sem Node, publica a versao ja compilada que esta no repo (fallback seguro).
+REM    Qualquer falha aqui (Node ausente, npm com erro, pasta corrompida etc.)
+REM    e so um aviso: publica a versao ja compilada que ja vem pronta no repo.
 where node >nul 2>nul
 if errorlevel 1 (
   echo.
@@ -45,18 +46,19 @@ if errorlevel 1 (
   if not exist "node_modules" (
     call npm install
     if errorlevel 1 (
-      echo [ERRO] npm install falhou.
-      pause
-      exit /b 1
+      echo [AVISO] npm install falhou - publicando app.js/style.css ja existentes, sem recompilar.
+      echo Se a pasta foi extraida de um zip dentro do OneDrive/Google Drive, tente
+      echo extrair de novo numa pasta local simples ^(ex: C:\vtz-painel^) e rodar de novo.
+      goto :deploy
     )
   )
   call npm run build
   if errorlevel 1 (
-    echo [ERRO] Build falhou. Veja a mensagem acima.
-    pause
-    exit /b 1
+    echo [AVISO] Build falhou - publicando app.js/style.css ja existentes, sem recompilar.
   )
 )
+
+:deploy
 
 REM 4) Publica hosting + regras do Firestore
 echo.
