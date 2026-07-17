@@ -24,5 +24,8 @@
   "22-edit-message.js",
   "23-regenerate.js",
   "24-humanize.js",
-  "25-routellm-init-tail.js"
+  "25-routellm-init-tail.js",
+  "26-doc-design-tokens.js",
+  "27-pptx-dashboard-renderer.js",
+  "28-visual-qa-loop.js"
 ]

@@ -258,10 +258,47 @@ function extractCodeBlocks(markdown){
   return blocks;
 }
 
+/* Constrói o link de "conversa nova no Claude com prompt preenchido" —
+   sempre montado em código, nunca deixado pro modelo escrever a URL (evita
+   erro de encoding de acento/espaço). */
+function claudeRedirectUrl(promptText){
+  return 'https://claude.ai/new?q=' + encodeURIComponent(promptText.trim());
+}
+
+/* Blocos ```claude-redirect``` viram um card com botão "Continuar no Claude"
+   em vez do wrap de código padrão — usado pela skill "Gerar arquivo → Claude"
+   (09-backend-detect-research.js) pra redirecionar PDF/Word/PPTX/dashboard
+   pro Claude em vez de tentar gerar esses formatos aqui. */
+function renderClaudeRedirectCard(pre){
+  const promptText = pre.innerText;
+  const card = document.createElement('div');
+  card.className = 'claude-redirect-card';
+  card.innerHTML = `
+    <div class="crc-icon">${iconHTML('sparkle')}</div>
+    <div class="crc-body">
+      <div class="crc-title">Continuar no Claude</div>
+      <div class="crc-sub">Abre uma conversa nova lá já com o prompt preenchido.</div>
+    </div>
+  `;
+  const btn = document.createElement('a');
+  btn.className = 'crc-btn';
+  btn.href = claudeRedirectUrl(promptText);
+  btn.target = '_blank';
+  btn.rel = 'noopener';
+  btn.textContent = 'Abrir →';
+  card.appendChild(btn);
+  pre.replaceWith(card);
+}
+
 /* Botão de copiar em cada bloco de código dentro da mensagem */
 function enhanceCodeBlocks(scope){
   scope.querySelectorAll('pre').forEach(pre => {
     if (pre.parentElement && pre.parentElement.classList.contains('code-wrap')) return;
+    const codeElRedirect = pre.querySelector('code');
+    if (/language-claude-redirect\b/.test(codeElRedirect?.className || '')){
+      renderClaudeRedirectCard(pre);
+      return;
+    }
     const wrap = document.createElement('div');
     wrap.className = 'code-wrap';
     pre.replaceWith(wrap);

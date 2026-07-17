@@ -261,9 +261,14 @@ function openMsgMenu(msgIndex){
       }});
     }
   }
-  items.push({ icon:'file', label:'Baixar PDF (formatado)', run: () => downloadRichPdf(rawText, `vtz-${msgIndex+1}.pdf`) });
-  items.push({ icon:'file', label:'Baixar slides (PDF)', run: () => downloadSlidesPdf(rawText, `vtz-slides-${msgIndex+1}.pdf`) });
-  items.push({ icon:'file', label:'Baixar como Word (.docx)', run: () => downloadDocx(rawText, `vtz-${msgIndex+1}.docx`) });
+  items.push({ icon:'file', label:'Baixar PDF (formatado)', run: () => qaAndDownloadPdf(rawText, `vtz-${msgIndex+1}.pdf`, { conv }) });
+  items.push({ icon:'file', label:'Baixar slides (PDF)', run: () => qaAndDownloadSlidesPdf(rawText, `vtz-slides-${msgIndex+1}.pdf`, { conv }) });
+  items.push({ icon:'file', label:'Baixar como Word (.docx)', run: () => qaAndDownloadDocx(rawText, `vtz-${msgIndex+1}.docx`, { conv }) });
+  items.push({ icon:'file', label:'Baixar como PowerPoint (.pptx)', run: () => qaAndDownloadPptx(rawText, `vtz-${msgIndex+1}.pptx`, { conv }) });
+  items.push({ icon:'file', label:'Baixar como dashboard (.html)', run: () => {
+    const spec = buildDashboardSpecFromMarkdown(rawText, conv?.title || 'Dashboard');
+    qaAndDownloadDashboard(spec, `vtz-dashboard-${msgIndex+1}.html`, { conv });
+  }});
   if (extractMarkdownTables(rawText).length){
     items.push({ icon:'file', label:'Baixar tabela (.xlsx)', run: () => downloadXlsx(rawText, `vtz-${msgIndex+1}.xlsx`) });
   }
