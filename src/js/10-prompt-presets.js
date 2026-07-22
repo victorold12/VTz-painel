@@ -526,6 +526,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('conn-search-btn').onclick = searchConnector;
   document.getElementById('conn-query').addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); searchConnector(); } });
   document.getElementById('mcp-list-btn').onclick = mcpListTools;
+  document.getElementById('pair-confirm-btn').onclick = confirmPairing;
+  document.getElementById('pair-deny-btn').onclick = denyPairing;
+  document.getElementById('pair-code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); confirmPairing(); } });
+  document.getElementById('agents-refresh-btn').onclick = refreshAgentsList;
+  document.getElementById('audit-refresh-btn').onclick = refreshAuditList;
   document.getElementById('agent-modal').addEventListener('click', (e) => { if (e.target.id === 'agent-modal') closeAgentModal(); });
 
   // busca no histórico (debounced)

@@ -449,6 +449,21 @@
   .cfg-group button.danger{color:var(--danger);}
   .hint{font-size:11.5px; color:var(--text-dim); line-height:1.5;}
 
+  /* ---------- Agente Local (pareamento, dispositivos, auditoria) ---------- */
+  .agente-banner{font-size:11.5px; line-height:1.5; padding:9px 11px; border-radius:10px; margin-bottom:4px; background:var(--w05); border:1px solid var(--line); color:var(--text-dim);}
+  .agente-banner.warn{color:var(--amber); border-color:var(--amber);}
+  .agente-banner.ok{color:var(--text);}
+  .agent-row{display:flex; align-items:center; gap:10px; padding:9px 11px; background:var(--w05); border:1px solid var(--line); border-radius:10px; margin-bottom:6px; flex-wrap:wrap;}
+  .agent-row .agent-dot{font-size:10px; flex-shrink:0;}
+  .agent-row .agent-name{font-size:12.5px; font-weight:600; color:var(--text);}
+  .agent-row .agent-meta{font-size:10.5px; color:var(--text-faint);}
+  .agent-row .agent-actions{margin-left:auto; display:flex; gap:6px;}
+  .audit-row{display:flex; align-items:baseline; gap:8px; padding:7px 9px; border-bottom:1px solid var(--line); font-size:11px; flex-wrap:wrap;}
+  .audit-row:last-child{border-bottom:none;}
+  .audit-row .audit-tier{font-family:var(--mono); font-weight:700; flex-shrink:0; width:44px;}
+  .audit-row .audit-target{font-family:var(--mono); color:var(--text-dim); overflow-wrap:anywhere;}
+  .audit-row .audit-when{margin-left:auto; color:var(--text-faint); font-size:10px; flex-shrink:0;}
+
   /* ---------- Modals (glass) ---------- */
   .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,.7); backdrop-filter:blur(3px); z-index:50; display:flex; align-items:center; justify-content:center; padding:20px;}
   .modal{

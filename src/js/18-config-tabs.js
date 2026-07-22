@@ -11,6 +11,7 @@ function setupConfigNav(){
     { cat:'respostas', label:'Respostas',      icon:'sparkle' },
     { cat:'dados',     label:'Dados & Backup', icon:'folder' },
     { cat:'backend',   label:'Backend VTz OS', icon:'cpu' },
+    { cat:'agente',    label:'Agente Local',   icon:'monitor' },
     { section:'Personalizar' },
     { cat:'skills',    label:'Habilidades',    icon:'zap' },
     { cat:'conectores',label:'Conectores',     icon:'globe' },
@@ -21,6 +22,7 @@ function setupConfigNav(){
     groups.forEach(g => { g.hidden = g.dataset.cat !== cat; });
     nav.querySelectorAll('.cfg-nav-item').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
     if (cat === 'dados') updateStorageMeter();
+    if (cat === 'agente'){ refreshAgentsList(); refreshAuditList(); }
   };
   nav.innerHTML = '';
   cats.forEach(c => {

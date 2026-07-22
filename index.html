@@ -270,6 +270,31 @@
         <button class="primary" id="backend-test-btn" style="margin-top:8px;">Testar backend</button>
         <pre id="backend-status" style="display:none; margin-top:10px; background:var(--input-bg); border:1px solid var(--line); border-radius:10px; padding:11px; font-size:11px; line-height:1.6; white-space:pre-wrap; word-break:break-word;"></pre>
       </div>
+      <div class="cfg-group" data-cat="agente">
+        <h3>Agente Local</h3>
+        <p class="hint" style="margin-bottom:12px;">Instale o Agente Local no seu PC pra habilitar ações que precisam da sua máquina: arquivo, comando, organização de pastas. Sem ele, o chat continua funcionando normalmente — só as ações do PC ficam indisponíveis. Ver <code>agente-local/README.md</code> no repositório <b>servidor</b> pra instalar.</p>
+        <div id="agente-capability-banner" class="agente-banner"></div>
+
+        <h4 style="margin:18px 0 8px;">Parear dispositivo</h4>
+        <p class="hint" style="margin-bottom:8px;">Rode <code>npm run pair</code> no Agente Local — ele mostra um código de 8 caracteres. Digite abaixo pra confirmar (expira em 10 minutos).</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <input type="text" id="pair-code-input" placeholder="XXXX-XXXX" maxlength="9" style="font-family:var(--mono); text-transform:uppercase; flex:1; min-width:140px;">
+          <button class="primary" id="pair-confirm-btn" style="flex:0 0 auto;">Confirmar</button>
+          <button id="pair-deny-btn" style="flex:0 0 auto;">Negar</button>
+        </div>
+        <p class="hint" id="pair-result" style="margin-top:8px;"></p>
+
+        <h4 style="margin:22px 0 8px;">Dispositivos pareados</h4>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <button id="agents-refresh-btn">Atualizar lista</button>
+        </div>
+        <div id="pc-agents-list"></div>
+
+        <h4 style="margin:22px 0 8px;">Atividade recente</h4>
+        <p class="hint" style="margin-bottom:8px;">O que o JARVIS fez no seu PC — cada linha mostra a camada de risco (tier), a decisão e o resultado.</p>
+        <button id="audit-refresh-btn">Atualizar atividade</button>
+        <div id="audit-list" style="margin-top:10px;"></div>
+      </div>
       <div class="cfg-group" data-cat="conexao">
         <h3>Diagnóstico</h3>
         <p class="hint" style="margin-bottom:10px;">Roda um teste real contra a API e mostra exatamente o que funciona e o que falha.</p>
