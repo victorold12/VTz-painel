@@ -9,6 +9,7 @@
     --violet-dim:rgba(139,92,246,.15);
     --danger:#ff6b6b;
     --amber:#ffb454;
+    --good:#4fd1c5;
     --input-bg:#000000;
     --tab-active-bg:#f2f2f5;
     --tab-active-text:#000000;
@@ -54,6 +55,7 @@
     --violet-dim:rgba(109,40,217,.12);
     --danger:#d32f2f;
     --amber:#9a5b00;
+    --good:#2db4aa;
     --input-bg:#ffffff;
     --tab-active-bg:#1c1c22;
     --tab-active-text:#ffffff;
@@ -454,7 +456,15 @@
   .agente-banner.warn{color:var(--amber); border-color:var(--amber);}
   .agente-banner.ok{color:var(--text);}
   .agent-row{display:flex; align-items:center; gap:10px; padding:9px 11px; background:var(--w05); border:1px solid var(--line); border-radius:10px; margin-bottom:6px; flex-wrap:wrap;}
-  .agent-row .agent-dot{font-size:10px; flex-shrink:0;}
+  .agent-row .agent-dot{flex-shrink:0; display:inline-flex;}
+  .agent-row .agent-dot svg.icon{width:10px; height:10px;}
+  .agent-row .agent-dot.online{color:var(--good);}
+  .agent-row .agent-dot.offline{color:var(--text-faint);}
+  .agent-row .agent-dot.revoked{color:var(--danger);}
+  .audit-row .audit-status{display:inline-flex; align-items:center;}
+  .audit-row .audit-status svg.icon{width:13px; height:13px;}
+  .audit-row .audit-status.ok{color:var(--good);}
+  .audit-row .audit-status.fail{color:var(--danger);}
   .agent-row .agent-name{font-size:12.5px; font-weight:600; color:var(--text);}
   .agent-row .agent-meta{font-size:10.5px; color:var(--text-faint);}
   .agent-row .agent-actions{margin-left:auto; display:flex; gap:6px;}

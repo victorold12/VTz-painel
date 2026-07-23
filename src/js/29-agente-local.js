@@ -26,7 +26,7 @@ function renderCapabilityBanner(){
     box.textContent = `${_pcAgents.length} dispositivo(s) pareado(s), mas nenhum online agora — ligue o Agente Local (npm start) pra habilitar ações no PC.`;
   } else {
     box.className = 'agente-banner ok';
-    box.textContent = `✅ ${online.length} dispositivo(s) online: ${online.map(a => a.name).join(', ')}. Ações no PC disponíveis.`;
+    box.textContent = `${online.length} dispositivo(s) online: ${online.map(a => a.name).join(', ')}. Ações no PC disponíveis.`;
   }
 }
 
@@ -66,10 +66,10 @@ async function refreshAgentsList(){
 function renderAgentRow(a){
   const row = document.createElement('div');
   row.className = 'agent-row';
-  const dot = a.revoked ? '⚫' : (a.online ? '🟢' : '⚪');
+  const statusClass = a.revoked ? 'revoked' : (a.online ? 'online' : 'offline');
   const status = a.revoked ? 'revogado' : (a.online ? 'online' : 'offline');
   row.innerHTML = `
-    <span class="agent-dot">${dot}</span>
+    <span class="agent-dot ${statusClass}">${iconHTML('dot')}</span>
     <span>
       <div class="agent-name">${esc(a.name)}</div>
       <div class="agent-meta">${esc(a.platform)} · ${status} · visto ${esc(timeAgo(a.last_seen_at))}</div>
@@ -117,7 +117,7 @@ async function confirmPairing(){
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
-    result.textContent = `✅ Pareado com "${d.name}" (${d.platform}). O Agente Local já pode conectar.`;
+    result.textContent = `Pareado com "${d.name}" (${d.platform}). O Agente Local já pode conectar.`;
     input.value = '';
     toast('Pareamento confirmado.');
     refreshAgentsList();
@@ -170,7 +170,8 @@ function renderAuditRow(e){
   const tierColor = e.tier >= 3 ? 'var(--danger)' : (e.tier === 2 ? 'var(--amber)' : 'var(--text-dim)');
   row.innerHTML = `
     <span class="audit-tier" style="color:${tierColor};">${AUDIT_TIER_LABEL[e.tier] ?? '?'}</span>
-    <span>${ok ? '✅' : '⛔'} ${esc(e.decision)}</span>
+    <span class="audit-status ${ok ? 'ok' : 'fail'}">${iconHTML(ok ? 'check' : 'close')}</span>
+    <span>${esc(e.decision)}</span>
     <span class="audit-target">${esc((e.target || '').slice(0, 80))}</span>
     <span class="audit-when">${esc(timeAgo(e.ts))}</span>
   `;
