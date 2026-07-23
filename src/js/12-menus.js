@@ -200,6 +200,8 @@ async function pullFromCloud(uid){
       localStorage.removeItem('vtz_memory_graph');
       state.memoryGraph = migrateMemoriesToGraph({ nodes:[], edges:[] });
     }
+    // restaurar backup também atualiza a fonte única (Seção 7), se há backend
+    if (backendUrl() && typeof pushMemoryToBackend === 'function') pushMemoryToBackend();
     if (Array.isArray(d.projects)){ state.projects = d.projects; localStorage.setItem('vtz_projects', JSON.stringify(d.projects)); }
     state.conversations = JSON.parse(localStorage.getItem('vtz_conversations') || '[]');
     renderProjectsBar(); renderHistoryList(); renderChat();

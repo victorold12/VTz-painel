@@ -606,6 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.backendUrl = beInput.value.trim().replace(/\/+$/, '');
     localStorage.setItem('vtz_backend_url', state.backendUrl);
     updateAgentBtnVisibility();
+    if (state.backendUrl){ _memSynced = false; syncMemoryWithBackend(); } // fonte única: sincroniza a memória (Seção 7)
     toast(state.backendUrl ? 'Backend salvo.' : 'Backend removido (volta ao modo local).');
   });
   const beTokenInput = document.getElementById('backend-token-input');
@@ -613,6 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
   beTokenInput.addEventListener('change', () => {
     state.backendToken = beTokenInput.value.trim();
     localStorage.setItem('vtz_backend_token', state.backendToken);
+    if (state.backendUrl){ _memSynced = false; syncMemoryWithBackend(); } // token novo pode destravar a memória (Seção 7)
     toast(state.backendToken ? 'Token salvo.' : 'Token removido.');
   });
   document.getElementById('backend-test-btn').onclick = testBackend;
@@ -734,6 +736,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('import-backup-file').addEventListener('change', (e) => {
     if (e.target.files[0]) importBackup(e.target.files[0]);
   });
+
+  // Se já havia um backend salvo, sincroniza a memória com ele na abertura
+  // (fonte única — Seção 7). autoDetectBackend só roda quando NÃO há URL salva,
+  // então este é o gatilho pro caso de URL já configurada (ex.: Render).
+  if (state.backendUrl) syncMemoryWithBackend();
 });
 
 /* ---------- View / sidebar switching ---------- */

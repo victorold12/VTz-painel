@@ -16,8 +16,44 @@ function migrateMemoriesToGraph(stored){
   localStorage.setItem('vtz_memory_graph', JSON.stringify(g));
   return g;
 }
+let _memPushTimer = null;
 function saveMemoryGraph(){
   localStorage.setItem('vtz_memory_graph', JSON.stringify(state.memoryGraph));
+  // Backend é a fonte única da memória (Seção 7). Com backend configurado, o
+  // localStorage vira só cache descartável e o grafo é empurrado pra lá.
+  // Debounce: uma extração/edição mexe em vários nós/arestas de uma vez.
+  if (backendUrl()){
+    clearTimeout(_memPushTimer);
+    _memPushTimer = setTimeout(pushMemoryToBackend, 800);
+  }
+}
+async function pushMemoryToBackend(){
+  if (!backendUrl()) return;
+  try{
+    await fetch(backendUrl() + '/api/memory', {
+      method:'PUT', headers: backendHeaders({ 'Content-Type':'application/json' }),
+      body: JSON.stringify({ nodes: state.memoryGraph.nodes, edges: state.memoryGraph.edges }),
+    });
+  }catch(_){ /* offline: o cache local já guardou; sobe na próxima escrita */ }
+}
+/* Puxa o grafo do backend (fonte única). Se o backend já tem grafo, ele VENCE e
+   substitui o cache local. Se o backend está vazio mas há grafo local, migra
+   (empurra o local pra cima) — uma vez, no 1º backend configurado da sessão. */
+let _memSynced = false;
+async function syncMemoryWithBackend(){
+  if (!backendUrl() || _memSynced) return;
+  try{
+    const d = await fetch(backendUrl() + '/api/memory', { headers: backendHeaders() }).then(okJson);
+    const remote = { nodes: d.nodes || [], edges: d.edges || [] };
+    if (remote.nodes.length){
+      state.memoryGraph = remote;
+      localStorage.setItem('vtz_memory_graph', JSON.stringify(remote));
+      renderMemoryUI();
+    } else if (state.memoryGraph.nodes.length){
+      await pushMemoryToBackend(); // migra o que já existia local pro backend
+    }
+    _memSynced = true;
+  }catch(_){ /* backend fora do ar: segue com o cache local, tenta de novo depois */ }
 }
 /* Resume o grafo (ou um subgrafo relevante) em texto natural pro system prompt.
    Barato: agrupa por nó de origem e lista as relações numa linha por entidade.
