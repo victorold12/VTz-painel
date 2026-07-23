@@ -9,7 +9,12 @@
       "**/node_modules/**",
       "**/*.bat",
       "**/*.md",
-      ".gitattributes"
+      ".gitattributes",
+      ".gitignore",
+      "src/**",
+      "scripts/**",
+      "package.json",
+      "package-lock.json"
     ],
     "cleanUrls": true,
     "rewrites": [
@@ -18,6 +23,12 @@
     "headers": [
       {
         "source": "/index.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
+      },
+      {
+        "source": "@(/app.js|/style.css)",
         "headers": [
           { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
         ]

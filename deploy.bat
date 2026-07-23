@@ -32,7 +32,35 @@ if errorlevel 1 (
   call firebase login
 )
 
-REM 3) Publica hosting + regras do Firestore
+REM 3) Recompila app.js/style.css a partir de src/ (se o Node estiver instalado).
+REM    Qualquer falha aqui (Node ausente, npm com erro, pasta corrompida etc.)
+REM    e so um aviso: publica a versao ja compilada que ja vem pronta no repo.
+where node >nul 2>nul
+if errorlevel 1 (
+  echo.
+  echo [AVISO] Node.js nao encontrado - pulando build, publicando app.js/style.css ja existentes.
+  echo Para builds atualizados, instale o Node: https://nodejs.org
+) else (
+  echo.
+  echo Compilando src/ para app.js e style.css...
+  if not exist "node_modules" (
+    call npm install
+    if errorlevel 1 (
+      echo [AVISO] npm install falhou - publicando app.js/style.css ja existentes, sem recompilar.
+      echo Se a pasta foi extraida de um zip dentro do OneDrive/Google Drive, tente
+      echo extrair de novo numa pasta local simples ^(ex: C:\vtz-painel^) e rodar de novo.
+      goto :deploy
+    )
+  )
+  call npm run build
+  if errorlevel 1 (
+    echo [AVISO] Build falhou - publicando app.js/style.css ja existentes, sem recompilar.
+  )
+)
+
+:deploy
+
+REM 4) Publica hosting + regras do Firestore
 echo.
 echo Publicando hosting e regras do Firestore...
 call firebase deploy --only hosting,firestore:rules --project vtz-life-47067
