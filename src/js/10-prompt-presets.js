@@ -633,6 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pair-code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); confirmPairing(); } });
   document.getElementById('agents-refresh-btn').onclick = refreshAgentsList;
   document.getElementById('audit-refresh-btn').onclick = refreshAuditList;
+  document.getElementById('audit-verify-btn').onclick = verifyAuditChain;
   document.getElementById('agent-modal').addEventListener('click', (e) => { if (e.target.id === 'agent-modal') closeAgentModal(); });
 
   // busca no histórico (debounced)

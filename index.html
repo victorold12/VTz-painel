@@ -292,7 +292,11 @@
 
         <h4 style="margin:22px 0 8px;">Atividade recente</h4>
         <p class="hint" style="margin-bottom:8px;">O que o JARVIS fez no seu PC — cada linha mostra a camada de risco (tier), a decisão e o resultado.</p>
-        <button id="audit-refresh-btn">Atualizar atividade</button>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button id="audit-refresh-btn">Atualizar atividade</button>
+          <button id="audit-verify-btn" class="secondary">Verificar integridade</button>
+          <span id="audit-verify-status" class="hint" style="margin:0;"></span>
+        </div>
         <div id="audit-list" style="margin-top:10px;"></div>
       </div>
       <div class="cfg-group" data-cat="conexao">
