@@ -303,6 +303,7 @@ async function runChatLoop(depth=0, convArg, modelOverride){
         if (tool){
           if (conv.id === state.currentConvId) appendMessageDOM(null, `tool: ${toolName}(${JSON.stringify(args)})`, true);
           result = await tool.exec(args);
+          if (toolName === 'pc_action' && conv.id === state.currentConvId) appendMessageDOM(null, formatPcActionResult(result), true);
         }
         conv.messages.push({ role:'tool', tool_call_id: call.id, content: String(result) });
       }

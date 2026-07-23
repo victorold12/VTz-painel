@@ -126,6 +126,63 @@ if (isVtzOS) {
   };
 }
 
+/* pc_action — aciona o Agente Local pareado (servidor/docs/SEGURANCA-AGENTE-LOCAL.md).
+   O backend só encaminha (Seção 0); quem decide o tier e executa é o agente, na
+   máquina do usuário. Hoje só a ação "run" está ligada no agente (comando via
+   allowlist — dir/ls/cat/mkdir/copy/move/ren); ações estruturadas de arquivo
+   chegam depois. Sem agente pareado e online, devolve erro claro pro modelo
+   explicar ao usuário, em vez de travar a chamada. */
+TOOLS.pc_action = {
+  def:{
+    type:'function',
+    function:{
+      name:'pc_action',
+      description:'Executa um comando no PC do usuário através do Agente Local pareado (arquivo, pasta, comando de sistema). O comando passa por uma allowlist de segurança no próprio PC do usuário — comandos fora do padrão pedem confirmação nativa lá, o que pode demorar até o usuário responder. Só funciona se houver um Agente Local pareado e online; se a ferramenta devolver erro dizendo isso, avise o usuário para parear/abrir o Agente Local em Configurações.',
+      parameters:{
+        type:'object',
+        properties:{
+          command:{ type:'string', description:'Comando exato a executar, ex.: "dir C:\\\\Users\\\\nome\\\\Downloads", "mkdir NovaPasta", "cat notas.txt".' },
+        },
+        required:['command'],
+      },
+    },
+  },
+  exec: async (args) => {
+    if (!backendUrl()) return 'Erro: backend não encontrado, não dá pra acionar o Agente Local.';
+    try{
+      const agentsRes = await fetch(backendUrl() + '/api/agents', { headers: backendHeaders() }).then(okJson);
+      const agent = (agentsRes.agents || []).find(a => a.online && !a.revoked);
+      if (!agent) return 'Nenhum Agente Local pareado e online agora. Peça pro usuário parear/abrir o Agente Local em Configurações > Agente Local.';
+      const r = await fetch(backendUrl() + `/api/agents/${encodeURIComponent(agent.agent_id)}/command`, {
+        method:'POST', headers: backendHeaders({ 'Content-Type':'application/json' }),
+        body: JSON.stringify({ action:'run', args:{ command:String(args.command || '') }, timeout:90 }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) return 'Erro ao acionar o Agente Local: ' + (d.detail || ('HTTP ' + r.status));
+      if (!d.ok) return 'Ação recusada/negada pelo Agente Local: ' + (d.data?.error || 'sem detalhe');
+      const stdout = String(d.data?.stdout || '').trim().slice(0, 3000);
+      const stderr = String(d.data?.stderr || '').trim().slice(0, 1000);
+      return JSON.stringify({ agent: agent.name, stdout, stderr });
+    }catch(e){ return 'Erro ao acionar o Agente Local: ' + e.message; }
+  }
+};
+
+/* Formata o resultado cru de pc_action (JSON {agent,stdout,stderr} ou string de
+   erro) como markdown legível, pra mostrar no chat antes da resposta do modelo. */
+function formatPcActionResult(result){
+  try{
+    const d = JSON.parse(result);
+    if (d && typeof d === 'object' && ('stdout' in d || 'stderr' in d)){
+      const parts = [`**Agente Local** (${esc(d.agent || '?')}) executou:`];
+      if (d.stdout) parts.push('```\n' + d.stdout + '\n```');
+      if (d.stderr) parts.push('_stderr:_\n```\n' + d.stderr + '\n```');
+      if (!d.stdout && !d.stderr) parts.push('_(sem saída)_');
+      return parts.join('\n');
+    }
+  }catch(e){ /* não é JSON -> é mensagem de erro/aviso simples, mostra cru */ }
+  return String(result);
+}
+
 /* ---------- Provider badges ---------- */
 const PROVIDER_PALETTE = {
   openai:['OA','#10a37f'], anthropic:['AN','#d97757'], google:['GG','#4285f4'],
