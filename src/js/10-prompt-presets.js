@@ -126,49 +126,89 @@ if (isVtzOS) {
   };
 }
 
-/* pc_action — aciona o Agente Local pareado (servidor/docs/SEGURANCA-AGENTE-LOCAL.md).
-   O backend só encaminha (Seção 0); quem decide o tier e executa é o agente, na
-   máquina do usuário. Hoje só a ação "run" está ligada no agente (comando via
-   allowlist — dir/ls/cat/mkdir/copy/move/ren); ações estruturadas de arquivo
-   chegam depois. Sem agente pareado e online, devolve erro claro pro modelo
-   explicar ao usuário, em vez de travar a chamada. */
+/* Agente Local (servidor/docs/SEGURANCA-AGENTE-LOCAL.md): o backend só encaminha
+   (Seção 0); quem decide o tier e executa é o agente, na máquina do usuário.
+   Duas tools — pc_action (comando de sistema) e pc_file (arquivo estruturado).
+   Ambas passam pelo mesmo gate de 4 camadas no PC: leitura/escrita nas pastas
+   permitidas roda sozinho; fora do padrão pede confirmação nativa lá (pode
+   demorar); destrutivo é bloqueado. */
+
+/* Acha um agente online e manda uma ação; devolve {agent, data} ou uma string
+   de erro/aviso legível pro modelo repassar ao usuário. */
+async function callAgentAction(action, actionArgs){
+  if (!backendUrl()) return 'Erro: backend não encontrado, não dá pra acionar o Agente Local.';
+  try{
+    const agentsRes = await fetch(backendUrl() + '/api/agents', { headers: backendHeaders() }).then(okJson);
+    const agent = (agentsRes.agents || []).find(a => a.online && !a.revoked);
+    if (!agent) return 'Nenhum Agente Local pareado e online agora. Peça pro usuário parear/abrir o Agente Local em Configurações > Agente Local.';
+    const r = await fetch(backendUrl() + `/api/agents/${encodeURIComponent(agent.agent_id)}/command`, {
+      method:'POST', headers: backendHeaders({ 'Content-Type':'application/json' }),
+      body: JSON.stringify({ action, args: actionArgs, timeout:90 }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: 'Erro ao acionar o Agente Local: ' + (d.detail || ('HTTP ' + r.status)) };
+    if (!d.ok) return { error: 'Ação recusada/negada pelo Agente Local: ' + (d.data?.error || 'sem detalhe'), agent: agent.name };
+    return { agent: agent.name, data: d.data || {} };
+  }catch(e){ return 'Erro ao acionar o Agente Local: ' + e.message; }
+}
+
 TOOLS.pc_action = {
   def:{
     type:'function',
     function:{
       name:'pc_action',
-      description:'Executa um comando no PC do usuário através do Agente Local pareado (arquivo, pasta, comando de sistema). O comando passa por uma allowlist de segurança no próprio PC do usuário — comandos fora do padrão pedem confirmação nativa lá, o que pode demorar até o usuário responder. Só funciona se houver um Agente Local pareado e online; se a ferramenta devolver erro dizendo isso, avise o usuário para parear/abrir o Agente Local em Configurações.',
+      description:'Executa um COMANDO DE SISTEMA no PC do usuário via Agente Local pareado (ex.: git, npm, listar processos). Para ler/escrever/criar/apagar arquivo ou pasta, prefira pc_file. O comando passa por allowlist no PC; fora do padrão pede confirmação nativa lá (pode demorar). Só funciona com um Agente Local pareado e online — se der erro dizendo isso, avise o usuário para abrir/parear o Agente Local em Configurações.',
       parameters:{
         type:'object',
         properties:{
-          command:{ type:'string', description:'Comando exato a executar, ex.: "dir C:\\\\Users\\\\nome\\\\Downloads", "mkdir NovaPasta", "cat notas.txt".' },
+          command:{ type:'string', description:'Comando exato, ex.: "git status", "npm run build".' },
         },
         required:['command'],
       },
     },
   },
   exec: async (args) => {
-    if (!backendUrl()) return 'Erro: backend não encontrado, não dá pra acionar o Agente Local.';
-    try{
-      const agentsRes = await fetch(backendUrl() + '/api/agents', { headers: backendHeaders() }).then(okJson);
-      const agent = (agentsRes.agents || []).find(a => a.online && !a.revoked);
-      if (!agent) return 'Nenhum Agente Local pareado e online agora. Peça pro usuário parear/abrir o Agente Local em Configurações > Agente Local.';
-      const r = await fetch(backendUrl() + `/api/agents/${encodeURIComponent(agent.agent_id)}/command`, {
-        method:'POST', headers: backendHeaders({ 'Content-Type':'application/json' }),
-        body: JSON.stringify({ action:'run', args:{ command:String(args.command || '') }, timeout:90 }),
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) return 'Erro ao acionar o Agente Local: ' + (d.detail || ('HTTP ' + r.status));
-      if (!d.ok) return 'Ação recusada/negada pelo Agente Local: ' + (d.data?.error || 'sem detalhe');
-      const stdout = String(d.data?.stdout || '').trim().slice(0, 3000);
-      const stderr = String(d.data?.stderr || '').trim().slice(0, 1000);
-      return JSON.stringify({ agent: agent.name, stdout, stderr });
-    }catch(e){ return 'Erro ao acionar o Agente Local: ' + e.message; }
+    const res = await callAgentAction('run', { command: String(args.command || '') });
+    if (typeof res === 'string') return res;
+    if (res.error) return res.error;
+    const stdout = String(res.data.stdout || '').trim().slice(0, 3000);
+    const stderr = String(res.data.stderr || '').trim().slice(0, 1000);
+    return JSON.stringify({ agent: res.agent, stdout, stderr });
   }
 };
 
-/* Formata o resultado cru de pc_action (JSON {agent,stdout,stderr} ou string de
-   erro) como markdown legível, pra mostrar no chat antes da resposta do modelo. */
+TOOLS.pc_file = {
+  def:{
+    type:'function',
+    function:{
+      name:'pc_file',
+      description:'Lê, escreve, lista, cria ou apaga ARQUIVO/PASTA no PC do usuário via Agente Local pareado. Fica restrito às pastas que o usuário permitiu (ex.: Downloads); fora delas ou em arquivos sensíveis, o PC pede confirmação nativa (pode demorar). Apagar pasta sempre pede confirmação. Só funciona com um Agente Local pareado e online.',
+      parameters:{
+        type:'object',
+        properties:{
+          op:{ type:'string', enum:['read','list','write','mkdir','delete'], description:'read=ler arquivo, list=listar pasta, write=escrever/criar arquivo, mkdir=criar pasta, delete=apagar.' },
+          path:{ type:'string', description:'Caminho do arquivo ou pasta, ex.: "C:\\\\Users\\\\nome\\\\Downloads\\\\nota.txt".' },
+          content:{ type:'string', description:'Conteúdo a escrever (só para op="write").' },
+        },
+        required:['op','path'],
+      },
+    },
+  },
+  exec: async (args) => {
+    const op = String(args.op || '');
+    const actionArgs = { path: String(args.path || '') };
+    if (op === 'write') actionArgs.content = String(args.content ?? '');
+    const res = await callAgentAction('fs_' + op, actionArgs);
+    if (typeof res === 'string') return res;
+    if (res.error) return res.error;
+    const out = String(res.data.stdout || '').slice(0, 3000);
+    const meta = res.data.truncated ? ' (conteúdo truncado)' : '';
+    return JSON.stringify({ agent: res.agent, op, result: out + meta });
+  }
+};
+
+/* Formata o resultado cru de pc_action/pc_file (JSON) como markdown legível,
+   pra mostrar no chat antes da resposta do modelo. */
 function formatPcActionResult(result){
   try{
     const d = JSON.parse(result);
@@ -177,6 +217,11 @@ function formatPcActionResult(result){
       if (d.stdout) parts.push('```\n' + d.stdout + '\n```');
       if (d.stderr) parts.push('_stderr:_\n```\n' + d.stderr + '\n```');
       if (!d.stdout && !d.stderr) parts.push('_(sem saída)_');
+      return parts.join('\n');
+    }
+    if (d && typeof d === 'object' && 'op' in d && 'result' in d){
+      const parts = [`**Agente Local** (${esc(d.agent || '?')}) — \`${esc(d.op)}\`:`];
+      parts.push('```\n' + String(d.result || '(sem saída)') + '\n```');
       return parts.join('\n');
     }
   }catch(e){ /* não é JSON -> é mensagem de erro/aviso simples, mostra cru */ }
