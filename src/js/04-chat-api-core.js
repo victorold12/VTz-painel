@@ -63,6 +63,7 @@ function playDing(){
 /* Hook comum pós-resposta: som + auto-título por IA */
 function afterAssistantDone(conv){
   playDing();
+  maybeAutoSpeak(conv); // Modo Voz: fala a resposta (e reinicia a escuta no mãos-livres)
   const realMsgs = conv.messages.filter(m => (m.role==='user'||m.role==='assistant') && !m._local);
   if (!conv.agentId && !conv._titled && realMsgs.length === 2){
     conv._titled = true;

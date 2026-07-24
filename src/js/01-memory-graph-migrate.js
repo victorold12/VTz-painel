@@ -126,5 +126,10 @@ const state = {
   backendUrl: (localStorage.getItem('vtz_backend_url') || '').replace(/\/+$/, ''), // VTz OS backend (opcional)
   backendToken: localStorage.getItem('vtz_backend_token') || '', // token de acesso, se o backend exigir
   replicateKey: localStorage.getItem('vtz_replicate_key') || '', // chave do Replicate (geração de vídeo)
+  voiceMode: localStorage.getItem('vtz_voice_mode') === '1',            // JARVIS fala/ouve (padrão: off)
+  voiceGreeting: localStorage.getItem('vtz_voice_greeting') !== '0',    // cumprimenta ao abrir
+  voiceAutoSpeak: localStorage.getItem('vtz_voice_autospeak') !== '0',  // fala respostas sozinho
+  voiceHandsfree: localStorage.getItem('vtz_voice_handsfree') !== '0',  // volta a escutar após falar
+  voiceName: localStorage.getItem('vtz_voice_name') || '',             // voz escolhida (nome do SpeechSynthesisVoice)
 };
 function backendUrl(){ return state.backendUrl || ''; }

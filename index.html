@@ -251,6 +251,27 @@
         <button id="global-prompt-reset" style="margin-top:8px;">Restaurar padrão</button>
       </div>
       <div class="cfg-group" data-cat="respostas">
+        <h3>Modo Voz (JARVIS)</h3>
+        <p class="hint" style="margin-bottom:10px;">O JARVIS te cumprimenta ao abrir, fala as respostas em voz alta sozinho, e o botão de microfone vira mãos-livres (você fala, ele escuta, responde e fala de volta). Usa a voz do próprio sistema/navegador — grátis e sem instalar nada. (A voz local mais humana — Kokoro/Chatterbox — é um upgrade planejado que roda pelo Agente Local.)</p>
+        <label class="toggle" style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12.5px; cursor:pointer;">
+          <input type="checkbox" id="voice-mode-toggle"> Ativar Modo Voz
+        </label>
+        <label class="toggle" style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12.5px; cursor:pointer;">
+          <input type="checkbox" id="voice-greeting-toggle" checked> Cumprimentar por voz ao abrir ("Olá senhor")
+        </label>
+        <label class="toggle" style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12.5px; cursor:pointer;">
+          <input type="checkbox" id="voice-autospeak-toggle" checked> Falar as respostas automaticamente
+        </label>
+        <label class="toggle" style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12.5px; cursor:pointer;">
+          <input type="checkbox" id="voice-handsfree-toggle" checked> Mãos-livres: após falar a resposta, voltar a escutar
+        </label>
+        <div style="margin-top:8px;">
+          <label style="font-size:11.5px; color:var(--text-dim);">Voz</label>
+          <select id="voice-picker" style="width:100%; margin-top:4px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:8px 10px; font-size:12.5px;"></select>
+        </div>
+        <button id="voice-test-btn" style="margin-top:8px;">Testar voz</button>
+      </div>
+      <div class="cfg-group" data-cat="respostas">
         <h3>Memória (o que a IA lembra de você)</h3>
         <p class="hint" style="margin-bottom:10px;">Um <b>grafo de conhecimento</b> sobre você (entidades + relações), injetado de forma resumida em TODA conversa — nome, objetivos, preferências, contexto. Evita duplicar e contradizer fatos antigos (ex.: mudou de cidade, ele corrige em vez de acumular).</p>
         <textarea id="memory-input" placeholder="Ex.:&#10;Me chamo Victor Hugo, moro em Maricá-RJ.&#10;Treino à noite, foco em físico atlético.&#10;Jogo Fortnite, Valorant e EA FC.&#10;Prefiro respostas diretas em pt-BR." style="width:100%; min-height:120px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:12.5px; line-height:1.6; resize:vertical;"></textarea>

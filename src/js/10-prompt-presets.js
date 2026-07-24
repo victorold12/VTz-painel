@@ -485,6 +485,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // mic (best-effort, Web Speech API)
   setupMic();
 
+  // Modo Voz (JARVIS fala/ouve) — config + cumprimento ao abrir
+  setupVoiceConfig();
+  if (state.voiceMode) speakGreeting();
+
   // config
   document.getElementById('save-key-btn').onclick = () => saveApiKey(document.getElementById('api-key-input').value.trim());
   document.getElementById('clear-key-btn').onclick = () => { localStorage.removeItem('vtz_or_key'); state.apiKey=''; document.getElementById('key-modal').style.display='flex'; };

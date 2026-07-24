@@ -380,25 +380,67 @@ function renderAnalytics(){
   });
 }
 
-/* ---------- Mic (best-effort ditado) ---------- */
-function setupMic(){
-  const btn = document.getElementById('mic-btn');
+/* ---------- Mic (ditado + mãos-livres do Modo Voz) ----------
+   Um único reconhecedor compartilhado. No modo normal, o botão dita pro campo.
+   No Modo Voz mãos-livres, o resultado é enviado automaticamente (startHandsfree
+   Listen), e o loop recomeça sozinho depois que o JARVIS termina de falar
+   (maybeAutoSpeak -> onEnd -> startHandsfreeListen). */
+let _voiceRec = null;
+let _voiceRecState = { listening: false, handsfree: false };
+
+function ensureRecognizer(){
+  if (_voiceRec) return _voiceRec;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR){ btn.style.opacity = '.3'; btn.title = 'Ditado não suportado neste navegador'; return; }
+  if (!SR) return null;
   const rec = new SR();
   rec.lang = 'pt-BR';
   rec.continuous = false;
   rec.interimResults = false;
-  let listening = false;
   rec.onresult = (e) => {
     const text = e.results[0][0].transcript;
     const input = document.getElementById('chat-input');
     input.value = (input.value ? input.value + ' ' : '') + text;
+    if (_voiceRecState.handsfree){
+      _voiceRecState.handsfree = false;
+      // manda sozinho: fecha o loop "eu falo -> ele responde -> fala de volta"
+      if (input.value.trim()) sendMessage();
+    }
   };
-  rec.onend = () => { listening = false; btn.classList.remove('recording'); };
+  rec.onend = () => {
+    _voiceRecState.listening = false;
+    document.getElementById('mic-btn')?.classList.remove('recording');
+  };
+  rec.onerror = () => { _voiceRecState.listening = false; _voiceRecState.handsfree = false; };
+  _voiceRec = rec;
+  return rec;
+}
+
+function startHandsfreeListen(){
+  const rec = ensureRecognizer();
+  if (!rec || _voiceRecState.listening) return;
+  _voiceRecState.handsfree = true;
+  _voiceRecState.listening = true;
+  document.getElementById('mic-btn')?.classList.add('recording');
+  try{ rec.start(); }catch(_){ _voiceRecState.listening = false; _voiceRecState.handsfree = false; }
+}
+
+function setupMic(){
+  const btn = document.getElementById('mic-btn');
+  const rec = ensureRecognizer();
+  if (!rec){ btn.style.opacity = '.3'; btn.title = 'Ditado não suportado neste navegador'; return; }
   btn.onclick = () => {
-    if (listening){ rec.stop(); listening = false; btn.classList.remove('recording'); }
-    else { rec.start(); listening = true; btn.classList.add('recording'); }
+    if (_voiceRecState.listening){
+      _voiceRecState.handsfree = false;
+      try{ rec.stop(); }catch(_){}
+      _voiceRecState.listening = false;
+      btn.classList.remove('recording');
+    } else {
+      // clicar no mic com Modo Voz ligado = mãos-livres (auto-envia); senão, dita
+      _voiceRecState.handsfree = !!state.voiceMode;
+      _voiceRecState.listening = true;
+      btn.classList.add('recording');
+      try{ rec.start(); }catch(_){ _voiceRecState.listening = false; btn.classList.remove('recording'); }
+    }
   };
 }
 
