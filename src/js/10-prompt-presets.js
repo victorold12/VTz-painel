@@ -336,6 +336,15 @@ function toggleTheme(){ applyTheme(state.theme === 'dark' ? 'light' : 'dark'); }
 
 /* ---------- Init ---------- */
 document.addEventListener('DOMContentLoaded', () => {
+  // Rodando dentro do app Electron: herda a URL do backend que foi usada no
+  // pareamento (injetada pelo preload). Sem isto, o painel não sabia qual
+  // backend usar e a aba "Agente Local" ficava vazia mesmo com o agente
+  // pareado. Só adota se ainda não há backend configurado neste painel.
+  if (window.jarvisDesktop?.backendUrl && !state.backendUrl){
+    state.backendUrl = String(window.jarvisDesktop.backendUrl).replace(/\/+$/, '');
+    localStorage.setItem('vtz_backend_url', state.backendUrl);
+  }
+
   document.getElementById('env-detail').textContent = isVtzOS
     ? 'Rodando dentro do VTZ OS — tools pesadas disponíveis (execute_code, browse_web).'
     : 'Rodando como site standalone — apenas tools leves disponíveis.';
