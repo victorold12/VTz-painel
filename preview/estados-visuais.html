@@ -2025,33 +2025,47 @@ function closePicker(){
 
 /* Catálogo ao vivo: prefere o backend (que já tem a chave), cai no OpenRouter
    público. Falha silenciosa — o snapshot cobre. */
-let catalogTried = false;
+let carregando = false;
 async function loadCatalog(){
-  if (catalogTried || pk.live) return;
-  catalogTried = true;
+  if (pk.live || carregando) return;      // já tem catálogo bom: não repete
+  carregando = true;
+  $('#pk-note').textContent = 'Carregando catálogo…';
+
+  // 1º o backend (fonte única, com cache e a chave do usuário); 2º o OpenRouter
+  // público, que serve quando o painel roda sem backend configurado.
   const fontes = [];
-  if (API.base) fontes.push(API.base + '/api/models');
-  fontes.push('https://openrouter.ai/api/v1/models');
-  for (const url of fontes){
+  if (API.base) fontes.push({url: API.base + '/api/models', proprio: true});
+  fontes.push({url: 'https://openrouter.ai/api/v1/models', proprio: false});
+
+  for (const {url, proprio} of fontes){
     try{
-      const r = await fetch(url, {headers: API.base && url.startsWith(API.base) ? API.headers() : {}});
+      const r = await fetch(url, {headers: proprio ? API.headers() : {}});
       if (!r.ok) continue;
       const j = await r.json();
       const arr = j.data || j.models || [];
       if (!Array.isArray(arr) || !arr.length) continue;
-      pk.models = arr
-        .filter(m => m.id)
-        .map(m => ({id:m.id, name:m.name || m.id, pricing:m.pricing || {},
-                    context_length:m.context_length, architecture:m.architecture}));
+
+      pk.models = arr.filter(m => m.id).map(m => ({
+        id:m.id, name:m.name || m.id, pricing:m.pricing || {},
+        context_length:m.context_length, architecture:m.architecture,
+      }));
       pk.live = true;
-      $('#pk-note').textContent =
-        `${pk.models.length} modelos do catálogo ao vivo do OpenRouter · preço por 1M tokens.`;
+      // o backend informa se entregou cache velho — repassa o aviso, não esconde
+      $('#pk-note').textContent = j.warning
+        ? `${pk.models.length} modelos · ${j.warning}`
+        : `${pk.models.length} modelos do catálogo ao vivo · preço por 1M tokens.`;
       renderList();
+      carregando = false;
       return;
-    }catch(e){ /* próxima fonte */ }
+    }catch(e){ /* tenta a próxima fonte */ }
   }
+
+  // nenhuma fonte respondeu: segue com o snapshot, dizendo que é snapshot.
+  // `carregando` volta a false pra tentar de novo na próxima abertura.
+  carregando = false;
   $('#pk-note').textContent =
-    'Catálogo local (sem acesso ao OpenRouter agora). Os preços são de um snapshot e podem ter mudado.';
+    `Catálogo local (${pk.models.length} modelos) — sem acesso ao OpenRouter agora. `
+    + 'Os preços são de um snapshot e podem ter mudado.';
 }
 
 $('#model-btn').onclick = openPicker;
