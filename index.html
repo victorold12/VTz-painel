@@ -517,6 +517,12 @@
   </div>
   <div class="projects-bar" id="projects-bar"></div>
   <div class="history-list" id="history-list"></div>
+  <!-- Acesso ao JARVIS (Seção 6): canto inferior esquerdo, acima da conta -->
+  <div class="jarvis-entry" id="jarvis-entry" role="button" tabindex="0" title="Abrir o JARVIS (voz)">
+    <div class="je-head"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><circle cx="9" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.2" fill="currentColor" stroke="none"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1" fill="currentColor" stroke="none"/></svg></div>
+    <div class="je-label">J.A.R.V.I.S.</div>
+    <div class="je-sub">voz · wake word</div>
+  </div>
   <div class="account-wrap">
     <div class="account-menu" id="account-menu"></div>
     <button class="sidebar-footer" id="account-btn" aria-label="Conta e configurações">
@@ -662,6 +668,59 @@
     </div>
   </div>
 </div>
+
+<!-- ===================== CENA JARVIS (Seção 6) =====================
+     Overlay em cima do painel: esfera de partículas, ondas orgânicas e os
+     4 estados (idle / escutando / pensando / entrega). Os canvas só ganham
+     contexto WebGL quando a cena abre (ver jarvisMonta em 31-jarvis.js). -->
+<section class="jarvis-overlay" id="jarvis-overlay" aria-hidden="true">
+  <canvas id="wave-canvas"></canvas>
+  <canvas id="particle-canvas"></canvas>
+  <div class="j-veil"></div>
+
+  <div class="j-shell">
+    <div class="j-top">
+      <button class="j-back" id="j-back"><i data-ico="arrowLeft"></i>Voltar ao painel</button>
+      <div class="j-brand"><span class="dot"></span>J.A.R.V.I.S.</div>
+      <div class="j-sub-agent" id="j-agent">—</div>
+      <div class="j-statechip" id="j-statechip">IDLE</div>
+    </div>
+
+    <div class="j-stage">
+      <div class="j-idle" id="j-idle">
+        <div class="j-badge">VTZ OS · agente local</div>
+        <div class="j-title">Qual é a sua próxima <em>grande ideia</em>?</div>
+        <div class="j-sub">Toque no microfone para falar — ou escreva abaixo</div>
+
+        <div class="j-composer">
+          <textarea class="j-input" id="j-input" rows="2" placeholder="Ex.: monta a planilha de eventos de julho e salva no desktop"></textarea>
+          <div class="j-crow">
+            <button class="j-go" id="j-go">Executar<i data-ico="sparkle"></i></button>
+          </div>
+        </div>
+
+        <div class="j-chips">
+          <button class="j-chip" data-jfill="pesquisa os eventos de agosto e monta um xlsx"><i data-ico="search"></i>Pesquisa web</button>
+          <button class="j-chip" data-jfill="lê a pasta Downloads e organiza por tipo"><i data-ico="folder"></i>Arquivos do PC</button>
+          <button class="j-chip" data-jfill="gera um .reg reversível pra desligar o HAGS"><i data-ico="cpu"></i>Otimizar PC</button>
+          <button class="j-chip" data-jfill="resume meus e-mails de hoje"><i data-ico="mail"></i>Conectores</button>
+        </div>
+
+        <button class="j-mic" id="j-mic" title="Falar"><i data-ico="mic"></i></button>
+        <div class="j-hint">ou pressione <b>ESPAÇO</b></div>
+      </div>
+
+      <div class="j-caption" id="j-caption">
+        <div class="j-vu" id="j-vu"></div>
+        <div class="j-cap-text" id="j-cap-text">Ouvindo…</div>
+        <div class="j-cap-sub" id="j-cap-sub">escutando</div>
+        <button class="j-stop" id="j-stop"><i data-ico="square"></i>Parar</button>
+      </div>
+
+      <div class="j-deliver" id="j-deliver"></div>
+    </div>
+  </div>
+</section>
 
 <script src="app.js"></script>
 </body>

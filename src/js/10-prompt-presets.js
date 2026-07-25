@@ -633,6 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('backend-test-btn').onclick = testBackend;
   setupConfigNav();
   setupVoiceConfig();   // aba Voz (Seção 14) — o estado do PC é buscado ao abrir a aba
+  setupJarvis();        // cena JARVIS (Seção 6) — WebGL só liga quando a cena abre
   setupAccountMenu();
   autoDetectBackend();  // procura o backend local em segundo plano
   document.getElementById('goto-skills-btn').onclick = () => { switchView('skills'); toggleSidebar(false); };

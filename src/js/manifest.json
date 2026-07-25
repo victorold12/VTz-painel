@@ -29,5 +29,6 @@
   "27-pptx-dashboard-renderer.js",
   "28-visual-qa-loop.js",
   "29-agente-local.js",
-  "30-voice-config.js"
+  "30-voice-config.js",
+  "31-jarvis.js"
 ]
