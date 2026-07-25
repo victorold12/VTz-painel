@@ -257,7 +257,7 @@ async function refreshVoiceConfig(){
   }
   corpo.hidden = false;
   aviso.hidden = true;
-  try{ await vozCarregar(); }
+  try{ await vozCarregar(); await refreshEscuta(); ligaWakePolling(); }
   catch(e){
     corpo.hidden = true;
     aviso.hidden = false;
@@ -268,6 +268,7 @@ async function refreshVoiceConfig(){
 function setupVoiceConfig(){
   const up = document.getElementById('voz-upload');
   if (!up) return;
+  setupEscuta();
 
   up.onclick = () => document.getElementById('voz-file').click();
 
@@ -350,4 +351,121 @@ function setupVoiceConfig(){
     }catch(err){ vozMsg(err.message, 'erro'); }
     finally{ btn.disabled = false; }
   };
+}
+
+/* ============================================================
+   ESCUTA CONTÍNUA — "Ei, JARVIS" sem clicar em nada (Seção 9)
+
+   Regra desta tela: o custo aparece ANTES de ligar. O loop passa
+   cada trecho pelo whisper, então não é de graça, e a estimativa
+   vem do próprio agente (não é chute do painel).
+   ============================================================ */
+let _escutaState = { setup: null, cfg: null, running: false };
+
+async function refreshEscuta(){
+  const box = document.getElementById('voz-escuta');
+  if (!box) return;
+  try{
+    const j = await vozApi('GET', '/listen');
+    if (j.ok === false) throw new Error(j.reason || j.error || 'o agente recusou');
+    _escutaState = { setup: j.setup || {}, cfg: j.config || {}, running: !!j.running,
+                     chunks: j.chunks, hits: j.hits, erros: j.erros, ultimo: j.ultimoTexto };
+    renderEscuta();
+  }catch(e){
+    box.innerHTML = `<p class="hint erro">Não deu pra ler o estado da escuta: ${esc(e.message)}</p>`;
+  }
+}
+
+function renderEscuta(){
+  const box = document.getElementById('voz-escuta');
+  const s = _escutaState.setup || {};
+  const pronto = !!s.ready;
+  const linhas = [
+    ['Gravador de áudio', s.recorder || 'nenhum encontrado', !!s.recorder],
+    ['Modelo do whisper', s.whisper_model + (s.whisper_model_present ? '' : ' (não baixado)'),
+     !!s.whisper_model_present],
+    ['Estado', _escutaState.running ? 'ouvindo agora' : 'parada', _escutaState.running],
+  ];
+  let html = linhas.map(([k, v, ok]) =>
+    `<div class="voz-esc-linha"><span>${esc(k)}</span>` +
+    `<b class="${ok ? 'ok' : 'off'}">${esc(String(v))}</b></div>`).join('');
+
+  const c = s.custo || {};
+  if (c.aviso){
+    html += `<p class="voz-esc-custo">${esc(c.transcricoes_por_hora)} transcrições por hora · ${esc(c.aviso)}</p>`;
+  }
+  if (!pronto && s.recorder_hint){
+    html += `<p class="hint" style="margin-top:8px;">Pra habilitar: ${esc(s.recorder_hint)}</p>`;
+  }
+  if (_escutaState.running && typeof _escutaState.chunks === 'number'){
+    html += `<p class="hint" style="margin-top:8px;">${_escutaState.chunks} trecho(s) ouvido(s), ` +
+      `${_escutaState.hits || 0} vez(es) que o nome apareceu` +
+      (_escutaState.ultimo ? ` · último: "${esc(String(_escutaState.ultimo).slice(0, 60))}"` : '') + '</p>';
+  }
+  box.innerHTML = html;
+
+  const chunk = document.getElementById('voz-chunk');
+  if (chunk && _escutaState.cfg?.chunkSec) chunk.value = _escutaState.cfg.chunkSec;
+  const btn = document.getElementById('voz-escuta-toggle');
+  if (btn){
+    btn.textContent = _escutaState.running ? 'Desligar escuta' : 'Ligar escuta';
+    btn.disabled = !pronto && !_escutaState.running;
+  }
+}
+
+function escutaMsg(txt, cls){
+  const el = document.getElementById('voz-escuta-msg');
+  if (el){ el.textContent = txt; el.className = 'hint ' + (cls || ''); }
+}
+
+function setupEscuta(){
+  const btn = document.getElementById('voz-escuta-toggle');
+  if (!btn) return;
+  btn.onclick = async () => {
+    btn.disabled = true;
+    try{
+      if (_escutaState.running){
+        await vozApi('POST', '/listen/stop');
+        escutaMsg('Escuta desligada. O microfone parou.', 'ok');
+      } else {
+        const chunk = Number(document.getElementById('voz-chunk')?.value);
+        if (Number.isFinite(chunk)) await vozApi('PUT', '/listen', { chunkSec: chunk, enabled: true });
+        const j = await vozApi('POST', '/listen/start');
+        if (j.ok === false) throw new Error(j.reason || j.hint || 'o agente recusou');
+        escutaMsg(`Ouvindo pelo ${j.recorder}. ${j.custo?.aviso || ''}`, 'ok');
+      }
+      await refreshEscuta();
+    }catch(e){ escutaMsg(e.message, 'erro'); }
+    finally{ btn.disabled = false; }
+  };
+}
+
+/* ============================================================
+   Consumo do wake word: o PC ouviu, o painel executa.
+   Quem decide é o painel — o agente só avisa (ver /wake no hub).
+   ============================================================ */
+let _wakeTimer = null;
+
+async function puxaWake(){
+  if (!backendUrl() || !vozState.agentId) return;
+  try{
+    const r = await fetch(backendUrl() + '/api/agents/' +
+                          encodeURIComponent(vozState.agentId) + '/wake',
+                          { headers: backendHeaders() });
+    if (!r.ok) return;
+    const d = await r.json();
+    for (const ev of (d.events || [])){
+      /* Sem comando depois do nome ("ei jarvis" e mais nada) não há o que
+         executar: abre a cena e fica escutando, em vez de inventar tarefa. */
+      if (typeof abreJarvis === 'function') await abreJarvis();
+      if (ev.command && typeof runThinkingJarvis === 'function') runThinkingJarvis(ev.command);
+    }
+  }catch(e){ /* backend fora do ar não deve poluir o console num loop */ }
+}
+
+function ligaWakePolling(){
+  if (_wakeTimer) return;
+  /* 2s é o intervalo: a fila do backend guarda por 2 min, então nada se perde,
+     e é leve o suficiente pra não pesar no app. */
+  _wakeTimer = setInterval(() => { if (_escutaState.running) puxaWake(); }, 2000);
 }

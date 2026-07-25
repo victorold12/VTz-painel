@@ -940,6 +940,14 @@ function deliver(r, files){
   const mount = jq('#j-dl-files');
   files.forEach(f => { if (f.name) jCards[f.id] = new FileCard(mount, {...f, progress:100, status:'Concluído'}); });
   jfsm.go('delivering');
+  /* Tarefa do JARVIS costuma ser longa e você sai da frente — aviso nativo do
+     Windows quando ela termina. O processo principal só mostra se a janela não
+     estiver em foco (ver setupNotificacoes no Electron). */
+  if (window.jarvisDesktop?.notify){
+    const arq = files.filter(f => f.name).map(f => f.name).join(', ');
+    window.jarvisDesktop.notify('JARVIS: tarefa entregue',
+      arq ? `Pronto: ${arq}` : String(r.answer || '').replace(/\s+/g, ' ').slice(0, 180));
+  }
   jq('#j-again').onclick  = ()=> jfsm.go('idle');
   /* "Ver no chat": fecha o overlay e deixa o pedido no compositor do painel.
      Não reenvia sozinho — quem manda é você. */
@@ -968,4 +976,6 @@ function setupJarvis(){
 
 window.setupJarvis = setupJarvis;
 window.abreJarvis  = abreJarvis;
+/* usado pelo consumo do wake word: o PC ouviu, o painel executa */
+window.runThinkingJarvis = runThinking;
 })();

@@ -63,6 +63,15 @@ function playDing(){
 /* Hook comum pós-resposta: som + auto-título por IA */
 function afterAssistantDone(conv){
   playDing();
+  /* No app de PC, aviso do sistema quando a resposta chega e a janela está em
+     outra coisa. O ding só serve se você estiver ouvindo; a notificação chega
+     na barra de tarefas. Quem decide se notifica é o processo principal do
+     Electron (ele sabe se a janela está em foco) — ver setupNotificacoes. */
+  if (window.jarvisDesktop?.notify && (document.hidden || !document.hasFocus())){
+    const ultima = conv.messages[conv.messages.length - 1];
+    const previa = String(ultima?.content || '').replace(/\s+/g, ' ').slice(0, 180);
+    window.jarvisDesktop.notify(conv.title || 'Resposta pronta', previa);
+  }
   maybeAutoSpeak(conv); // Modo Voz: fala a resposta (e reinicia a escuta no mãos-livres)
   const realMsgs = conv.messages.filter(m => (m.role==='user'||m.role==='assistant') && !m._local);
   if (!conv.agentId && !conv._titled && realMsgs.length === 2){

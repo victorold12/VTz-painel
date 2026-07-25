@@ -1331,3 +1331,55 @@ body[data-jstate="delivering"] .j-deliver>*:nth-child(6){animation-delay:.45s}
   font-variant-numeric:tabular-nums}
 .hint.ok{color:var(--good)}
 .hint.erro{color:var(--danger)}
+
+/* ============================================================
+   TEMAS — o data-theme continua sendo só a BASE (claro/escuro).
+   A cor de destaque é outro eixo (data-accent), então cada
+   acento funciona nas duas bases sem duplicar o tema inteiro.
+   Cada par foi escolhido pra manter contraste legível: o tom
+   do escuro é mais claro, o do claro é mais escuro.
+   ============================================================ */
+:root[data-accent="ambar"]      { --violet:#f59e0b; --violet-dim:rgba(245,158,11,.16);
+  --blob-1:rgba(245,158,11,.13); --blob-2:rgba(255,138,0,.08); --blob-3:rgba(255,92,92,.06) }
+:root[data-accent="ciano"]      { --violet:#22d3ee; --violet-dim:rgba(34,211,238,.16);
+  --blob-1:rgba(34,211,238,.13); --blob-2:rgba(79,209,197,.09); --blob-3:rgba(59,130,246,.07) }
+:root[data-accent="verde"]      { --violet:#34d399; --violet-dim:rgba(52,211,153,.16);
+  --blob-1:rgba(52,211,153,.13); --blob-2:rgba(16,185,129,.09); --blob-3:rgba(132,204,22,.06) }
+:root[data-accent="rosa"]       { --violet:#f472b6; --violet-dim:rgba(244,114,182,.16);
+  --blob-1:rgba(244,114,182,.13); --blob-2:rgba(217,70,239,.08); --blob-3:rgba(255,92,173,.07) }
+:root[data-accent="azul"]       { --violet:#60a5fa; --violet-dim:rgba(96,165,250,.16);
+  --blob-1:rgba(96,165,250,.13); --blob-2:rgba(59,130,246,.09); --blob-3:rgba(14,165,233,.06) }
+:root[data-accent="grafite"]    { --violet:#a1a1b5; --violet-dim:rgba(161,161,181,.14);
+  --blob-1:rgba(161,161,181,.1); --blob-2:rgba(120,120,140,.07); --blob-3:rgba(90,90,110,.05) }
+
+/* No claro os mesmos acentos precisam escurecer, senão texto e ícone somem */
+:root[data-theme="light"][data-accent="ambar"]   { --violet:#a15c00; --violet-dim:rgba(161,92,0,.12) }
+:root[data-theme="light"][data-accent="ciano"]   { --violet:#0e7490; --violet-dim:rgba(14,116,144,.12) }
+:root[data-theme="light"][data-accent="verde"]   { --violet:#047857; --violet-dim:rgba(4,120,87,.12) }
+:root[data-theme="light"][data-accent="rosa"]    { --violet:#be185d; --violet-dim:rgba(190,24,93,.12) }
+:root[data-theme="light"][data-accent="azul"]    { --violet:#1d4ed8; --violet-dim:rgba(29,78,216,.12) }
+:root[data-theme="light"][data-accent="grafite"] { --violet:#4b4b5a; --violet-dim:rgba(75,75,90,.12) }
+
+.tema-grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.tema-op{display:flex;flex-direction:column;align-items:center;gap:7px;background:transparent;
+  border:1px solid var(--line);border-radius:13px;padding:11px 13px 9px;cursor:pointer;
+  color:var(--text-dim);font-size:11.5px;font-weight:600;transition:.18s}
+.tema-op:hover{border-color:var(--violet);color:var(--text)}
+.tema-op.on{border-color:var(--violet);color:var(--text);background:var(--violet-dim)}
+.tema-bola{width:26px;height:26px;border-radius:50%;border:1px solid var(--w15)}
+.tema-base{display:flex;gap:8px;margin-top:6px}
+.tema-base button{flex:0 0 auto}
+.tema-base button.on{background:var(--violet);border-color:var(--violet);color:#fff}
+
+/* escuta contínua (aba Voz) */
+.voz-escuta{background:var(--glass-card);border:1px solid var(--line);border-radius:12px;
+  padding:11px 13px;margin-bottom:10px}
+.voz-esc-linha{display:flex;align-items:center;gap:10px;font-size:12.5px;padding:3px 0;color:var(--text-dim)}
+.voz-esc-linha b{margin-left:auto;font-family:var(--mono);font-size:11.5px}
+.voz-esc-linha b.ok{color:var(--good)}
+.voz-esc-linha b.off{color:var(--text-faint)}
+.voz-esc-custo{margin-top:9px;padding-top:9px;border-top:1px solid var(--line);
+  font-size:11.5px;line-height:1.5;color:var(--amber)}
+.voz-escuta-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.voz-escuta-row input{background:var(--input-bg);border:1px solid var(--line);color:var(--text);
+  border-radius:9px;padding:7px 10px;font-size:12.5px;font-family:var(--mono)}

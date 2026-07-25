@@ -207,6 +207,16 @@
       <nav class="cfg-nav" id="cfg-nav"></nav>
       <div class="cfg-content">
       <div class="cfg-group" data-cat="conexao">
+        <h3>Aparência</h3>
+        <p class="hint" style="margin-bottom:6px;">Base do tema</p>
+        <div class="tema-base">
+          <button id="tema-escuro">Escuro</button>
+          <button id="tema-claro">Claro</button>
+        </div>
+        <p class="hint" style="margin:14px 0 0;">Cor de destaque — vale nas duas bases. Cada tom tem uma versão escurecida pro tema claro, senão ícone e link ficariam ilegíveis.</p>
+        <div class="tema-grid" id="tema-grid"></div>
+      </div>
+      <div class="cfg-group" data-cat="conexao">
         <h3>OpenRouter API Key</h3>
         <input type="password" id="api-key-input" placeholder="sk-or-v1-...">
         <button class="primary" id="save-key-btn">Salvar</button>
@@ -365,6 +375,16 @@
           <h4 style="margin:22px 0 8px;">Reconhecimento de fala (whisper.cpp)</h4>
           <select id="voz-stt-model" style="width:100%; max-width:420px;"></select>
           <p class="hint" id="voz-stt-hint" style="margin-top:8px;"></p>
+
+          <h4 style="margin:22px 0 8px;">Escuta contínua — "Ei, JARVIS"</h4>
+          <p class="hint" style="margin-bottom:10px;">Com isto ligado o Agente Local grava trechos curtos do microfone sem parar, passa cada um pelo whisper e só age quando ouve o nome. <b>Não é um detector de wake word dedicado</b>: é reconhecimento de fala rodando o tempo todo, e gasta CPU como tal — o número abaixo é a estimativa real.</p>
+          <div class="voz-escuta" id="voz-escuta"></div>
+          <div class="voz-escuta-row">
+            <label class="hint">Tamanho do trecho (s)</label>
+            <input type="number" id="voz-chunk" min="2" max="15" step="1" style="width:90px;">
+            <button id="voz-escuta-toggle">Ligar escuta</button>
+          </div>
+          <p class="hint" id="voz-escuta-msg" style="margin-top:8px;"></p>
 
           <div style="display:flex; gap:8px; align-items:center; margin-top:22px; flex-wrap:wrap;">
             <button id="voz-test">Testar</button>

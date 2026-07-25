@@ -332,7 +332,10 @@ function applyTheme(theme){
   const iconEl = document.getElementById('theme-icon');
   if (iconEl) iconEl.innerHTML = iconHTML(theme === 'dark' ? 'sun' : 'moon');
 }
-function toggleTheme(){ applyTheme(state.theme === 'dark' ? 'light' : 'dark'); }
+function toggleTheme(){
+  applyTheme(state.theme === 'dark' ? 'light' : 'dark');
+  if (typeof renderTemaGrid === 'function') renderTemaGrid();
+}
 
 /* ---------- Init ---------- */
 document.addEventListener('DOMContentLoaded', () => {
@@ -635,6 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupVoiceConfig();   // aba Voz (Seção 14) — o estado do PC é buscado ao abrir a aba
   setupJarvis();        // cena JARVIS (Seção 6) — WebGL só liga quando a cena abre
   setupBackendBridge(); // analytics/backup/memória do servidor
+  setupTemas();         // base clara/escura + cor de destaque
   setupAccountMenu();
   autoDetectBackend();  // procura o backend local em segundo plano
   document.getElementById('goto-skills-btn').onclick = () => { switchView('skills'); toggleSidebar(false); };

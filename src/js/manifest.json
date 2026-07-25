@@ -31,5 +31,6 @@
   "29-agente-local.js",
   "30-voice-config.js",
   "31-jarvis.js",
-  "32-backend-bridge.js"
+  "32-backend-bridge.js",
+  "33-temas.js"
 ]
