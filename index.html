@@ -320,6 +320,44 @@
         </div>
         <div id="audit-list" style="margin-top:10px;"></div>
       </div>
+      <div class="cfg-group" data-cat="voz">
+        <h3>Voz do JARVIS</h3>
+        <p class="hint" style="margin-bottom:12px;">A voz roda no <b>seu PC</b>, pelo Agente Local: <b>Chatterbox</b> clona a sua voz a partir de uma amostra, <b>Kokoro</b> tem vozes prontas e é o fallback, e o <b>navegador</b> sempre funciona. Nada de áudio é guardado no servidor.</p>
+
+        <p class="hint" id="voz-indisponivel" hidden></p>
+
+        <div id="voz-body" hidden>
+          <h4 style="margin:18px 0 8px;">Motor</h4>
+          <div id="voz-engines" class="voz-engines"></div>
+          <p class="hint" id="voz-engine-hint" style="margin-top:8px;"></p>
+
+          <div id="voz-voice-sec">
+            <h4 style="margin:22px 0 8px;">Voz</h4>
+            <select id="voz-voice" style="width:100%; max-width:420px;"></select>
+            <p class="hint" id="voz-voice-hint" style="margin-top:8px;"></p>
+          </div>
+
+          <div id="voz-samples-sec">
+            <h4 style="margin:22px 0 8px;">Minhas vozes (clonagem)</h4>
+            <div id="voz-samples" class="voz-samples"></div>
+            <input type="file" id="voz-file" accept="audio/*" hidden>
+            <button id="voz-upload" style="margin-top:10px;">Subir amostra de voz</button>
+            <p class="hint" style="margin-top:8px;">Alguns segundos de fala limpa bastam. O arquivo vai direto pro seu PC — não fica guardado no servidor.</p>
+          </div>
+
+          <div id="voz-calib"></div>
+
+          <h4 style="margin:22px 0 8px;">Reconhecimento de fala (whisper.cpp)</h4>
+          <select id="voz-stt-model" style="width:100%; max-width:420px;"></select>
+          <p class="hint" id="voz-stt-hint" style="margin-top:8px;"></p>
+
+          <div style="display:flex; gap:8px; align-items:center; margin-top:22px; flex-wrap:wrap;">
+            <button id="voz-test">Testar</button>
+            <button class="primary" id="voz-save">Salvar</button>
+            <span class="hint voz-msg" id="voz-msg" style="margin:0;"></span>
+          </div>
+        </div>
+      </div>
       <div class="cfg-group" data-cat="conexao">
         <h3>Diagnóstico</h3>
         <p class="hint" style="margin-bottom:10px;">Roda um teste real contra a API e mostra exatamente o que funciona e o que falha.</p>

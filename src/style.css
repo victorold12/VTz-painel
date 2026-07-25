@@ -1020,3 +1020,39 @@
   @media (prefers-reduced-motion: reduce){
     .empty-logo{animation:none;}
   }
+
+/* ===== Aba de voz (Config > Voz) — Seção 14 ===== */
+.voz-engines{display:flex;gap:8px;flex-wrap:wrap}
+.voz-engine{flex:1;min-width:170px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:5px;
+  background:var(--w05);border:1px solid var(--w08);border-radius:13px;padding:12px 13px;transition:.18s;color:var(--text)}
+.voz-engine:hover{border-color:var(--violet)}
+.voz-engine.on{background:var(--violet-dim);border-color:var(--violet)}
+.voz-en-top{display:flex;align-items:center;gap:7px}
+.voz-en-top b{font-size:13px;font-weight:700}
+.voz-tag{font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 6px;border-radius:5px;background:var(--w08);color:var(--text-faint)}
+.voz-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-left:auto}
+.voz-dot.up{background:var(--good);box-shadow:0 0 7px var(--good)}
+.voz-dot.down{background:var(--danger)}
+.voz-dot.unknown{background:var(--text-faint)}
+.voz-desc{font-size:10.5px;color:var(--text-faint);line-height:1.45}
+.voz-state{font-size:10px;color:var(--text-faint);font-family:var(--mono)}
+
+.voz-samples{display:flex;flex-direction:column;gap:6px}
+.voz-sample{display:flex;align-items:center;gap:10px;background:var(--w05);
+  border:1px solid var(--w08);border-radius:11px;padding:9px 12px}
+.voz-sample.on{border-color:var(--violet);background:var(--violet-dim)}
+.voz-sm-name{flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.voz-sm-size{font-size:10.5px;color:var(--text-faint);font-family:var(--mono)}
+.voz-sample button{background:none;border:0;color:var(--text-faint);cursor:pointer;
+  padding:3px 5px;font-size:13px;line-height:1;transition:.15s}
+.voz-sample button:hover{color:var(--danger)}
+
+.voz-slider{display:grid;grid-template-columns:1fr auto;gap:3px 10px;align-items:center;
+  max-width:520px;margin-bottom:14px}
+.voz-sname{font-size:12.5px;font-weight:600}
+.voz-sval{font-size:11.5px;color:var(--violet);font-family:var(--mono);font-variant-numeric:tabular-nums}
+.voz-slider input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--violet);height:4px;cursor:pointer}
+.voz-sdesc{grid-column:1/-1;margin:0}
+.voz-msg.erro{color:var(--danger)}
+.voz-msg.ok{color:var(--good)}
