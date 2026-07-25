@@ -1238,6 +1238,15 @@ body:not([data-jstate="idle"]) .j-idle{opacity:0;transform:translateY(-26px) sca
   opacity:0;transition:opacity var(--t-slow) var(--ease-inout),transform var(--t-slow) var(--ease-inout)}
 body[data-jstate="listening"] .j-caption,body[data-jstate="thinking"] .j-caption{opacity:1;pointer-events:auto}
 body[data-jstate="delivering"] .j-caption{opacity:0;transform:translateX(-50%) translateY(20px)}
+/* Erro termina sempre em idle, onde as regras acima escondem a legenda — e a
+   mensagem sumia junto. Quem reexibe é mostraErroJarvis(), com estilo inline
+   (opacity é disputado por três regras de estado; inline encerra a disputa).
+   O resto fica aqui: em idle a legenda cai em cima do microfone, então no erro
+   ela vira um cartão com fundo próprio, deslocado pra baixo. */
+.j-caption.erro{bottom:4%;background:rgba(10,10,14,.94);border:1px solid rgba(255,107,107,.32);
+  border-radius:14px;padding:14px 22px;max-width:min(620px,86vw);gap:8px}
+.j-caption.erro .j-cap-text{font-size:16px}
+body[data-jerro="1"] .j-cap-sub{color:var(--bad,#ff6b6b)}
 .j-cap-text{font-size:19px;font-weight:600;letter-spacing:-.01em;max-width:560px;line-height:1.4}
 .j-cap-sub{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;color:var(--text-faint);text-transform:uppercase}
 /* medidor de voz — reage ao áudio real */

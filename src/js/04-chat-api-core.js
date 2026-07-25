@@ -27,6 +27,27 @@ function trackUsage(usage, modelId, conv){
   if (conv){ conv.cost = (conv.cost || 0) + cost; }
   updateCostBadge();
 }
+/* Conta do OpenRouter sem crédito. Repetir o mesmo pedido não resolve — só um
+   modelo grátis responde. Perde qualidade, mas o app continua de pé em vez de
+   virar uma tela de erro.
+
+   Avisa em toast de propósito: cair pra um modelo mais fraco em silêncio faria
+   você culpar o app por uma resposta ruim sem saber que o crédito acabou. */
+async function quedaPraGratis(payload, opts, respostaPaga){
+  const atual = payload.model || '';
+  const lista = (state.models && state.models.length) ? state.models : FALLBACK_MODELS;
+  const gratis = lista.find(m => isFreeModel(m) && !isImageModel(m) && m.id !== atual);
+  if (!gratis) return respostaPaga;   // sem grátis à mão: quem chamou mostra o 402
+  toast(`Sem crédito no OpenRouter — respondendo com ${gratis.name || gratis.id}.`, 'warn');
+  try{
+    const res = await orFetch({ ...payload, model: gratis.id }, opts);
+    return res.ok ? res : respostaPaga;   // grátis também falhou: mostra o erro original
+  }catch(e){
+    if (e.name === 'AbortError') throw e;
+    return respostaPaga;
+  }
+}
+
 /* Retry com backoff: 429/5xx/erro de rede tenta de novo sozinho (2 retries) */
 async function orFetchRetry(payload, opts = {}){
   let lastErr;
@@ -38,6 +59,8 @@ async function orFetchRetry(payload, opts = {}){
     }
     try{
       const res = await orFetch(payload, opts);
+      /* 402 é sem crédito, não instabilidade: não entra no laço de retry. */
+      if (res.status === 402) return await quedaPraGratis(payload, opts, res);
       if (res.ok || ![429,500,502,503,504,529].includes(res.status)) return res;
       lastErr = new Error('API ' + res.status);
     }catch(e){

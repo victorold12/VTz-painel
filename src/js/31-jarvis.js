@@ -845,6 +845,7 @@ async function abreJarvis(){
 }
 
 function fechaJarvis(){
+  limpaErroJarvis();
   jarvisState.aberto = false;
   document.body.dataset.jscene = 'painel';
   document.body.dataset.jstate = 'idle';
@@ -862,6 +863,7 @@ async function jarvisDescobreAgente(){
 }
 
 function startListening(text){
+  limpaErroJarvis();
   jQuery = text || '';
   jfsm.go('listening');
   driver.startListening();   // quem fecha a escuta é o VAD (speechEnd), não um timer
@@ -881,14 +883,40 @@ driver.on('speechEnd', ()=>{
   runThinking(q);
 });
 
+/* Mostrar o erro é mais delicado do que parece: a legenda (.j-caption) só é
+   visível em listening/thinking, e todo caminho de erro termina em idle. Escrever
+   nela e ir pra idle apagava a mensagem da tela — a cena fechava a escuta e ficava
+   muda, parecendo que o JARVIS simplesmente ignorou o pedido.
+
+   Então: marca data-jerro no body (o CSS mantém a legenda de pé enquanto durar) E
+   manda um toast, que vive fora da cena e aparece de qualquer jeito. */
+function mostraErroJarvis(msg){
+  document.body.dataset.jerro = '1';
+  jq('#j-cap-text').textContent = msg;
+  jq('#j-cap-sub').textContent  = 'erro';
+  jfsm.go('idle');
+  /* Estilo inline em vez de regra CSS: a legenda tem opacity/pointer-events
+     definidos por estado em várias regras, e uma regra a mais aqui vira uma
+     disputa de cascata que quebra silenciosamente quando alguém mexer no CSS
+     depois. Inline ganha sempre, e limpaErroJarvis desfaz. */
+  const cap = jq('#j-caption');
+  if (cap){ cap.classList.add('erro');
+    cap.style.opacity = '1'; cap.style.pointerEvents = 'auto'; cap.style.transform = 'translateX(-50%)'; }
+  try{ toast(msg, 'err'); }catch(e){ /* toast é reforço, não pode derrubar o erro */ }
+}
+function limpaErroJarvis(){
+  delete document.body.dataset.jerro;
+  const cap = jq('#j-caption');
+  if (cap){ cap.classList.remove('erro');
+    cap.style.opacity = ''; cap.style.pointerEvents = ''; cap.style.transform = ''; }
+}
+
 /* Um só dono do erro: qualquer 'error' do driver cai na legenda do JARVIS
    enquanto ele estiver aberto. Sem isso, erro de microfone ficava sem dono. */
 driver.on('error', msg =>{
   if (!jarvisState.aberto) return;
   if (jActiveReq){ jActiveReq(msg); return; }
-  jq('#j-cap-text').textContent = msg;
-  jq('#j-cap-sub').textContent  = 'erro';
-  jfsm.go('idle');
+  mostraErroJarvis(msg);
 });
 
 function resetPipe(){
@@ -899,6 +927,7 @@ function resetPipe(){
 function runThinking(text){
   const q = (text || jQuery || jq('#j-input').value.trim() || '').trim();
   if (!q) return;                        // sem pedido real, nada roda
+  limpaErroJarvis();
   jQuery = q;
   driver.stopListening();
   jfsm.go('thinking');
@@ -913,11 +942,7 @@ function runThinking(text){
   driver.on('fileBegin',    d => byId[d.id] = Object.assign({}, d));
   driver.on('fileProgress', d => { if (byId[d.id]) Object.assign(byId[d.id], d); });
   driver.on('result',       r => { jActiveReq = null; deliver(r, Object.values(byId)); });
-  jActiveReq = msg =>{
-    jq('#j-cap-text').textContent = msg;
-    jq('#j-cap-sub').textContent  = 'erro';
-    jfsm.go('idle');
-  };
+  jActiveReq = msg => mostraErroJarvis(msg);
   driver.submit(q);
 }
 
