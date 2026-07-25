@@ -107,6 +107,64 @@ header.topbar{display:flex;align-items:center;gap:10px;padding:14px 16px;backgro
   border-bottom:1px solid var(--w08);position:relative;flex-shrink:0}
 header.topbar:after{content:"";position:absolute;bottom:-1px;left:15%;width:70%;height:1px;
   background:linear-gradient(90deg,transparent,rgba(139,92,246,.5),transparent)}
+/* ===== PICKER DE MODELOS (logo + nome + custo por 1M) ===== */
+.pk-overlay{position:fixed;inset:0;z-index:140;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.62);backdrop-filter:blur(6px);opacity:0;visibility:hidden;
+  transition:opacity var(--t-mid) var(--ease-out),visibility var(--t-mid)}
+.pk-overlay.open{opacity:1;visibility:visible}
+.pk-sheet{width:min(560px,calc(100vw - 32px));max-height:min(78vh,720px);display:flex;flex-direction:column;
+  background:var(--glass-modal);backdrop-filter:blur(30px) saturate(160%);
+  -webkit-backdrop-filter:blur(30px) saturate(160%);
+  border:1px solid var(--w12);border-radius:var(--radius-lg);overflow:hidden;
+  box-shadow:0 32px 90px -20px rgba(0,0,0,.85);
+  transform:translateY(14px) scale(.98);transition:transform var(--t-mid) var(--ease-spring)}
+.pk-overlay.open .pk-sheet{transform:none}
+.pk-head{display:flex;align-items:center;gap:10px;padding:16px 18px 12px}
+.pk-head h3{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.pk-count{font-size:11px;color:var(--text-faint);font-family:var(--mono)}
+.pk-close{margin-left:auto;background:var(--w06);border:1px solid var(--w08);color:var(--text-dim);
+  width:28px;height:28px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.16s}
+.pk-close:hover{border-color:var(--violet);color:var(--violet)}
+.pk-search{margin:0 18px 10px;display:flex;align-items:center;gap:8px;padding:9px 12px;
+  background:var(--input-bg);border:1px solid var(--line);border-radius:11px;transition:border-color .18s}
+.pk-search:focus-within{border-color:var(--violet)}
+.pk-search svg.icon{width:15px;height:15px;color:var(--text-faint)}
+.pk-search input{flex:1;background:none;border:0;outline:none;color:var(--text);font-size:13.5px}
+.pk-search input::placeholder{color:var(--text-faint)}
+.pk-chips{display:flex;gap:6px;padding:0 18px 10px;flex-wrap:wrap}
+.pk-chip{background:var(--w05);border:1px solid var(--w08);color:var(--text-dim);
+  padding:5px 11px;border-radius:99px;font-size:11.5px;font-weight:600;cursor:pointer;transition:.16s;white-space:nowrap}
+.pk-chip:hover{border-color:var(--violet);color:var(--text)}
+.pk-chip.on{background:var(--violet-dim);border-color:var(--violet);color:var(--violet)}
+.pk-list{flex:1;min-height:0;overflow-y:auto;padding:2px 10px 14px;scrollbar-width:thin}
+.pk-list::-webkit-scrollbar{width:6px}
+.pk-list::-webkit-scrollbar-thumb{background:var(--w12);border-radius:99px}
+.pk-row{display:flex;align-items:center;gap:11px;padding:10px;border-radius:12px;cursor:pointer;
+  border:1px solid transparent;transition:background .15s,border-color .15s}
+.pk-row:hover{background:var(--w05)}
+.pk-row.sel{background:var(--violet-dim);border-color:rgba(139,92,246,.35)}
+.pk-badge{width:32px;height:32px;flex-shrink:0;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:800;color:#fff;letter-spacing:.02em;overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.pk-badge svg{width:19px;height:19px;display:block}
+.pk-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pk-name{font-size:13.5px;font-weight:650;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-meta{font-size:10.5px;color:var(--text-faint);font-family:var(--mono);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-price{font-size:11px;font-weight:600;color:var(--text-dim);font-variant-numeric:tabular-nums;
+  text-align:right;white-space:nowrap;flex-shrink:0}
+.pk-price .free{color:var(--good)}
+.pk-price small{display:block;font-size:9px;font-weight:500;color:var(--text-faint);letter-spacing:.04em}
+.pk-star{background:none;border:0;color:var(--text-faint);cursor:pointer;font-size:15px;
+  padding:2px 4px;flex-shrink:0;transition:.15s;line-height:1}
+.pk-star:hover{color:var(--amber)}
+.pk-star.on{color:var(--amber)}
+.pk-check{color:var(--violet);flex-shrink:0}
+.pk-empty{text-align:center;color:var(--text-faint);font-size:12.5px;padding:34px 20px;line-height:1.6}
+.pk-sep{font-size:9.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--text-faint);padding:14px 10px 6px}
+.pk-note{padding:8px 18px 0;font-size:10.5px;color:var(--text-faint);line-height:1.5;border-top:1px solid var(--w06)}
+
 .model-picker-btn{display:flex;align-items:center;gap:6px;background:var(--w05);border:1px solid var(--line);
   color:var(--text);font-weight:600;font-size:13px;padding:8px 13px;border-radius:20px;cursor:pointer;transition:.18s}
 .model-picker-btn:hover{border-color:var(--violet)}
@@ -505,7 +563,8 @@ body[data-jstate="delivering"] .j-deliver>*:nth-child(6){animation-delay:.45s}
     <div class="chat-col">
       <header class="topbar">
         <button class="model-picker-btn" id="model-btn">
-          <span class="name">Claude Opus 5</span><span class="chev"><i data-ico="chevronDown"></i></span>
+          <span id="model-badge-slot"></span>
+          <span class="name" id="model-name">RouteLLM</span><span class="chev"><i data-ico="chevronDown"></i></span>
         </button>
         <div class="top-spacer"></div>
         <div class="cost-badge" id="cost-badge">$0.0000</div>
@@ -621,6 +680,24 @@ body[data-jstate="delivering"] .j-deliver>*:nth-child(6){animation-delay:.45s}
 
 </div>
 
+<!-- ===================== PICKER DE MODELOS ===================== -->
+<div class="pk-overlay" id="pk-overlay" aria-hidden="true">
+  <div class="pk-sheet" role="dialog" aria-label="Selecionar modelo">
+    <div class="pk-head">
+      <h3>Selecionar modelo</h3>
+      <span class="pk-count" id="pk-count"></span>
+      <button class="pk-close" id="pk-close" title="Fechar (Esc)"><i data-ico="x"></i></button>
+    </div>
+    <label class="pk-search">
+      <i data-ico="search"></i>
+      <input id="pk-search" type="text" placeholder="Buscar modelo ou provedor…" autocomplete="off">
+    </label>
+    <div class="pk-chips" id="pk-chips"></div>
+    <div class="pk-list" id="pk-list"></div>
+    <div class="pk-note" id="pk-note"></div>
+  </div>
+</div>
+
 <script>
 "use strict";
 /* ================================================================
@@ -669,6 +746,7 @@ const ICONS = {
   box:`<path d="m21 8-9-5-9 5v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v9"/>`,
   chip:`<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9z"/>`
 };
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function ico(name, cls){
   return `<svg class="icon ${cls||''}" ${SW}>${ICONS[name]||ICONS.file}</svg>`;
 }
@@ -1193,10 +1271,26 @@ class Stepper {
    progresso e resposta só existem se o backend disser que existem.
    Sem backend configurado → erro honesto, nunca resposta fabricada.
    ================================================================ */
+/* Seleção padrão de modelo. Fica aqui (e não no picker) porque o driver lê
+   isto antes do picker existir — uma constante só, sem duas verdades. */
+const MODEL_DEFAULT = '__router__';
+
 const API = {
   get base(){ return (localStorage.getItem('vtz_backend_url') || '').replace(/\/+$/,''); },
   get token(){ return localStorage.getItem('vtz_backend_token') || ''; },
-  get model(){ return localStorage.getItem('vtz_model') || ''; },
+  /* Modelo escolhido. As entradas de roteamento (__router__ etc.) não são ids
+     reais — nesse caso não manda `model` e sim `route`, e quem escolhe é o
+     backend. Mandar "__router__" como id daria 400 no OpenRouter. */
+  /* Sem nada salvo, o padrão é RouteLLM — o mesmo que o picker mostra no botão.
+     Se divergisse, o botão diria "RouteLLM" e o backend não receberia a dica. */
+  get model(){
+    const v = localStorage.getItem('vtz_model') || MODEL_DEFAULT;
+    return v.startsWith('__') ? '' : v;
+  },
+  get route(){
+    const v = localStorage.getItem('vtz_model') || MODEL_DEFAULT;
+    return {'__router__':'auto', '__router_free__':'free', '__fusion__':'fusion'}[v] || '';
+  },
   get agentId(){ return localStorage.getItem('vtz_agent_id') || ''; },
   headers(extra){
     const h = Object.assign({'Content-Type':'application/json'}, extra||{});
@@ -1302,6 +1396,7 @@ class BackendDriver extends Driver {
       stream:true
     };
     if(API.model) body.model = API.model;
+    if(API.route) body.route = API.route;             // roteamento automático (RouteLLM)
     if(API.agentId) body.agent_id = API.agentId;     // habilita ações de PC via Agente Local
 
     try{
@@ -1515,16 +1610,17 @@ function sendChat(text){
   driver.on('fileProgress', d => chatCards[d.id] && chatCards[d.id].update(d));
 
   /* Texto aparece conforme o backend envia — o cursor é o stream real, não animação falsa. */
+  const asHtml = t => t.replace(/</g,'&lt;').replace(/\n/g,'<br>');
   driver.on('token', chunk =>{
     if(!bubble) bubble = addMsg('assistant', '');
     streamed += chunk;
-    bubble.innerHTML = streamed.replace(/</g,'&lt;') + '<span class="caret"></span>';
+    bubble.innerHTML = asHtml(streamed) + '<span class="caret"></span>';
     scrollDown();
   });
   driver.on('result', r =>{
     if(stepper) stepper.finish();
     if(!bubble) bubble = addMsg('assistant', '');
-    bubble.innerHTML = r.answer || streamed;
+    bubble.innerHTML = asHtml(r.answer || streamed);
     chatBusy = false; activeReq = null; scrollDown(); resetPipe();
   });
   activeReq = msg =>{
@@ -1671,6 +1767,301 @@ addEventListener('keydown', e=>{
   if(e.code === 'Space'){ e.preventDefault(); jfsm.state === 'idle' ? startListening() : jfsm.go('idle'); }
   if(e.key === 'Escape') setScene('chat');
 });
+
+
+/* ================================================================
+   14. PICKER DE MODELOS — logo do provedor, nome e custo por 1M.
+   Preço vem do catálogo do OpenRouter (fonte da verdade). Quando o
+   catálogo ao vivo não carrega (offline, CSP de preview), cai no
+   snapshot abaixo — que é rede de segurança, não fonte de verdade.
+   ================================================================ */
+
+/* Marcas desenhadas inline: funcionam offline e dentro do preview, onde
+   requisição a host externo é bloqueada. Cor da marca + glifo simples;
+   quem não tem glifo próprio usa monograma. */
+const PROVIDER = {
+  'openai':            {label:'AI', color:'#10a37f', glyph:'rosette'},
+  'anthropic':         {label:'AN', color:'#d97757', glyph:'burst'},
+  'google':            {label:'GG', color:'#1a73e8', glyph:'quad'},
+  'deepseek':          {label:'DS', color:'#4d6bfe', glyph:null},
+  'meta-llama':        {label:'ML', color:'#0668e1', glyph:'loop'},
+  'mistralai':         {label:'MI', color:'#ff7000', glyph:'bars'},
+  'x-ai':              {label:'XA', color:'#1a1a1a', glyph:'ex'},
+  'qwen':              {label:'QW', color:'#6236ff', glyph:null},
+  'z-ai':              {label:'ZA', color:'#7c5cff', glyph:null},
+  'bytedance':         {label:'BD', color:'#1c1c22', glyph:null},
+  'bytedance-seed':    {label:'BD', color:'#1c1c22', glyph:null},
+  'black-forest-labs': {label:'BF', color:'#26262e', glyph:null},
+  'microsoft':         {label:'MS', color:'#0078d4', glyph:'quad'},
+  'perplexity':        {label:'PX', color:'#20b8cd', glyph:null},
+  'cohere':            {label:'CO', color:'#39594d', glyph:null},
+  'minimax':           {label:'MM', color:'#ff3366', glyph:null},
+  'moonshotai':        {label:'MO', color:'#16162a', glyph:null},
+  'nvidia':            {label:'NV', color:'#76b900', glyph:null},
+  'amazon':            {label:'AZ', color:'#ff9900', glyph:null},
+  'ai21':              {label:'A21',color:'#e8433a', glyph:null},
+  'nousresearch':      {label:'NO', color:'#2f3640', glyph:null},
+  'cognitivecomputations':{label:'CC', color:'#4a4a55', glyph:null},
+};
+
+const GLYPH = {
+  rosette:`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linejoin="round">
+    <path d="M12 3.2 19 7.2v9.6L12 20.8 5 16.8V7.2z"/><path d="M12 8.4 15.4 10.3v3.4L12 15.6 8.6 13.7v-3.4z"/></svg>`,
+  burst:`<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2.6 14 9.4l6.8 2-6.8 2L12 20.2l-2-6.8-6.8-2 6.8-2z"/></svg>`,
+  quad:`<svg viewBox="0 0 24 24"><rect x="3.4" y="3.4" width="7.4" height="7.4" rx="1.2" fill="#fff" opacity=".95"/>
+    <rect x="13.2" y="3.4" width="7.4" height="7.4" rx="1.2" fill="#fff" opacity=".62"/>
+    <rect x="3.4" y="13.2" width="7.4" height="7.4" rx="1.2" fill="#fff" opacity=".62"/>
+    <rect x="13.2" y="13.2" width="7.4" height="7.4" rx="1.2" fill="#fff" opacity=".9"/></svg>`,
+  loop:`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round">
+    <path d="M4 12c0-2.6 1.5-4.4 3.4-4.4 2.6 0 4 3.6 4.6 4.4.6.8 2 4.4 4.6 4.4 1.9 0 3.4-1.8 3.4-4.4S18.5 7.6 16.6 7.6c-2.6 0-4 3.6-4.6 4.4-.6.8-2 4.4-4.6 4.4C5.5 16.4 4 14.6 4 12z"/></svg>`,
+  bars:`<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="3.4" fill="#fff" opacity=".95"/>
+    <rect x="3" y="10.3" width="18" height="3.4" fill="#fff" opacity=".68"/>
+    <rect x="3" y="16.6" width="18" height="3.4" fill="#fff" opacity=".9"/></svg>`,
+  ex:`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round">
+    <path d="M5 5l14 14M19 5L5 19"/></svg>`,
+};
+
+function providerOf(id){
+  const p = (String(id).split('/')[0] || '?').toLowerCase();
+  return PROVIDER[p] || {label:p.slice(0,2).toUpperCase(), color:'#4a4a55', glyph:null};
+}
+function badgeHTML(id){
+  const pv = providerOf(id);
+  const inner = pv.glyph ? GLYPH[pv.glyph] : esc(pv.label);
+  return `<span class="pk-badge" style="background:${pv.color}">${inner}</span>`;
+}
+
+/* Entradas especiais: roteamento automático. Ficam no topo da lista. */
+const ROUTERS = [
+  {id:'__router__',      name:'RouteLLM',      desc:'escolhe a melhor IA para cada tarefa'},
+  {id:'__router_free__', name:'RouteLLM Free', desc:'escolhe só entre modelos grátis'},
+  {id:'__fusion__',      name:'Fusion',        desc:'2 IAs em paralelo, fundidas na melhor resposta'},
+];
+const IS_ROUTER = id => ROUTERS.some(r => r.id === id);
+
+/* Snapshot de preços (pesquisado, mesmo do site). Substituído pelo
+   catálogo ao vivo assim que ele carrega. */
+const MODEL_SNAPSHOT = [
+  {"id":"openai/gpt-5.5","name":"GPT-5.5","pricing":{"prompt":"0.000005","completion":"0.00003"},"context_length":400000},
+  {"id":"openai/gpt-5.4","name":"GPT-5.4","pricing":{"prompt":"0.0000025","completion":"0.000015"},"context_length":400000},
+  {"id":"openai/gpt-4.1","name":"GPT-4.1","pricing":{"prompt":"0.000002","completion":"0.000008"},"context_length":1047576},
+  {"id":"openai/gpt-4.1-mini","name":"GPT-4.1 Mini","pricing":{"prompt":"0.0000004","completion":"0.0000016"},"context_length":1047576},
+  {"id":"openai/gpt-4.1-nano","name":"GPT-4.1 Nano","pricing":{"prompt":"0.0000001","completion":"0.0000004"},"context_length":1047576},
+  {"id":"openai/o4-mini","name":"o4-mini","pricing":{"prompt":"0.0000011","completion":"0.0000044"},"context_length":200000},
+  {"id":"openai/o3-mini","name":"o3-mini","pricing":{"prompt":"0.0000011","completion":"0.0000044"},"context_length":200000},
+  {"id":"openai/gpt-3.5-turbo","name":"GPT-3.5 Turbo","pricing":{"prompt":"0.000001","completion":"0.000002"},"context_length":16385},
+  {"id":"openai/gpt-image-1","name":"GPT Image 1","pricing":{"prompt":"0.00001","completion":"0.00001"},"context_length":4096,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"openai/gpt-image-1-mini","name":"GPT Image 1 Mini","pricing":{"prompt":"0.0000025","completion":"0.0000025"},"context_length":4096,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"openai/gpt-image-2","name":"GPT Image 2","pricing":{"prompt":"0.000008","completion":"0.000008"},"context_length":4096,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"anthropic/claude-opus-4.8","name":"Claude Opus 4.8","pricing":{"prompt":"0.000005","completion":"0.000025"},"context_length":200000},
+  {"id":"anthropic/claude-sonnet-5","name":"Claude Sonnet 5","pricing":{"prompt":"0.000002","completion":"0.00001"},"context_length":200000},
+  {"id":"anthropic/claude-sonnet-4.6","name":"Claude Sonnet 4.6","pricing":{"prompt":"0.000003","completion":"0.000015"},"context_length":200000},
+  {"id":"anthropic/claude-haiku-4.5","name":"Claude Haiku 4.5","pricing":{"prompt":"0.000001","completion":"0.000005"},"context_length":200000},
+  {"id":"anthropic/claude-haiku-3.5","name":"Claude Haiku 3.5","pricing":{"prompt":"0.0000008","completion":"0.000004"},"context_length":200000},
+  {"id":"anthropic/claude-haiku-3","name":"Claude Haiku 3","pricing":{"prompt":"0.00000025","completion":"0.00000125"},"context_length":200000},
+  {"id":"anthropic/claude-fable-5","name":"Claude Fable 5","pricing":{"prompt":"0.00001","completion":"0.00005"},"context_length":128000},
+  {"id":"anthropic/claude-3.5-sonnet","name":"Claude 3.5 Sonnet","pricing":{"prompt":"0.000003","completion":"0.000015"},"context_length":128000},
+  {"id":"google/gemini-3.1-pro","name":"Gemini 3.1 Pro","pricing":{"prompt":"0.000002","completion":"0.000012"},"context_length":1048576},
+  {"id":"google/gemini-3.5-flash","name":"Gemini 3.5 Flash","pricing":{"prompt":"0.0000015","completion":"0.000009"},"context_length":1048576},
+  {"id":"google/gemini-3.1-flash-lite","name":"Gemini 3.1 Flash Lite","pricing":{"prompt":"0.00000025","completion":"0.0000015"},"context_length":1048576},
+  {"id":"google/gemini-2.5-flash","name":"Gemini 2.5 Flash","pricing":{"prompt":"0.0000003","completion":"0.0000012"},"context_length":1048576},
+  {"id":"google/gemini-2.5-flash-image","name":"Nano Banana (Gemini 2.5 Flash Image)","pricing":{"prompt":"0.0000003","completion":"0.0000012"},"context_length":1048576,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"google/gemini-3.1-flash-image-preview","name":"Nano Banana 2 (Gemini 3.1 Flash Image)","pricing":{"prompt":"0.0000003","completion":"0.0000012"},"context_length":1048576,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"google/gemini-3.1-flash-lite-image","name":"Nano Banana 2 Lite (Gemini 3.1 Flash Lite Image)","pricing":{"prompt":"0.0000002","completion":"0.0000008"},"context_length":1048576,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"google/gemini-3-pro-image","name":"Nano Banana Pro (Gemini 3 Pro Image)","pricing":{"prompt":"0.000002","completion":"0.000012"},"context_length":1048576,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"deepseek/deepseek-v4-flash","name":"DeepSeek V4 Flash","pricing":{"prompt":"0.00000014","completion":"0.00000028"},"context_length":164000},
+  {"id":"deepseek/deepseek-r1","name":"DeepSeek R1","pricing":{"prompt":"0.0000006","completion":"0.0000024"},"context_length":164000},
+  {"id":"deepseek/deepseek-r1:free","name":"DeepSeek R1 (free)","pricing":{"prompt":"0","completion":"0"},"context_length":164000},
+  {"id":"meta-llama/llama-3.3-70b-instruct","name":"Llama 3.3 70B","pricing":{"prompt":"0.00000013","completion":"0.0000004"},"context_length":131072},
+  {"id":"meta-llama/llama-3.3-70b-instruct:free","name":"Llama 3.3 70B (free)","pricing":{"prompt":"0","completion":"0"},"context_length":131072},
+  {"id":"x-ai/grok-4.3","name":"Grok 4.3","pricing":{"prompt":"0.00000125","completion":"0.0000025"},"context_length":256000},
+  {"id":"qwen/qwen3.7-max","name":"Qwen3.7 Max","pricing":{"prompt":"0.0000025","completion":"0.0000075"},"context_length":262144},
+  {"id":"z-ai/glm-5.2","name":"GLM-5.2","pricing":{"prompt":"0.0000014","completion":"0.0000044"},"context_length":200000},
+  {"id":"z-ai/glm-4.7-flash","name":"GLM-4.7 Flash (free)","pricing":{"prompt":"0","completion":"0"},"context_length":200000},
+  {"id":"minimax/minimax-m3","name":"MiniMax M3","pricing":{"prompt":"0.0000006","completion":"0.0000024"},"context_length":1000000},
+  {"id":"black-forest-labs/flux.2-pro","name":"FLUX.2 Pro","pricing":{"prompt":"0","completion":"0"},"context_length":128000,"architecture":{"output_modalities":["image"]}},
+  {"id":"bytedance-seed/seedream-4.5","name":"Seedream 4.5","pricing":{"prompt":"0","completion":"0"},"context_length":128000,"architecture":{"output_modalities":["image"]}},
+  {"id":"x-ai/grok-imagine-image-quality","name":"Grok Imagine Image Quality","pricing":{"prompt":"0","completion":"0"},"context_length":256000,"architecture":{"output_modalities":["image"]}}];
+
+const pk = {
+  models: MODEL_SNAPSHOT.slice(),
+  live: false,
+  filter: null,                 // null | 'free' | 'cheap' | 'context' | 'fav'
+  query: '',
+  favs: JSON.parse(localStorage.getItem('vtz_favorites') || '[]'),
+  sel: localStorage.getItem('vtz_model') || MODEL_DEFAULT,
+};
+
+const perM = m => (parseFloat(m.pricing?.prompt || 0) + parseFloat(m.pricing?.completion || 0)) * 1e6;
+
+/* "quanto custa 1 milhão de tokens": entrada / saída, em dólar — que é a
+   moeda em que o OpenRouter cobra. Sem conversão embutida pra não fingir
+   precisão numa cotação que muda todo dia. */
+function priceHTML(m){
+  const inM  = parseFloat(m.pricing?.prompt || 0) * 1e6;
+  const outM = parseFloat(m.pricing?.completion || 0) * 1e6;
+  if (!inM && !outM) return `<span class="free">Grátis</span><small>1M tokens</small>`;
+  const fmt = v => v >= 100 ? '$' + Math.round(v) : v >= 1 ? '$' + v.toFixed(2) : '$' + v.toFixed(3);
+  return `${fmt(inM)} / ${fmt(outM)}<small>entrada / saída · 1M</small>`;
+}
+function ctxLabel(m){
+  const c = m.context_length || 0;
+  if (!c) return '';
+  return c >= 1e6 ? (c / 1e6).toFixed(c % 1e6 ? 1 : 0) + 'M ctx'
+       : c >= 1e3 ? Math.round(c / 1e3) + 'k ctx' : c + ' ctx';
+}
+
+function modelLabel(id){
+  const r = ROUTERS.find(x => x.id === id);
+  if (r) return r.name;
+  const m = pk.models.find(x => x.id === id);
+  return m ? (m.name || m.id) : id;
+}
+function paintModelButton(){
+  $('#model-name').textContent = modelLabel(pk.sel);
+  $('#model-badge-slot').innerHTML = IS_ROUTER(pk.sel)
+    ? `<span class="pk-badge" style="background:var(--violet);width:20px;height:20px">${ico('sparkle')}</span>`
+    : badgeHTML(pk.sel);
+  const b = $('#model-badge-slot .pk-badge');
+  if (b && !IS_ROUTER(pk.sel)){ b.style.width = '20px'; b.style.height = '20px'; b.style.borderRadius = '6px'; }
+}
+
+const PK_CHIPS = [
+  {key:null,       label:'Todos'},
+  {key:'fav',      label:'★ Favoritos'},
+  {key:'free',     label:'Grátis'},
+  {key:'cheap',    label:'Custo ↓'},
+  {key:'context',  label:'Contexto ↑'},
+];
+
+function renderChips(){
+  $('#pk-chips').innerHTML = PK_CHIPS.map(c =>
+    `<button class="pk-chip${pk.filter === c.key ? ' on' : ''}" data-k="${c.key ?? ''}">${c.label}</button>`
+  ).join('');
+  $$('#pk-chips .pk-chip').forEach(b => b.onclick = ()=>{
+    const k = b.dataset.k || null;
+    pk.filter = (pk.filter === k) ? null : k;
+    renderChips(); renderList();
+  });
+}
+
+function renderList(){
+  const q = pk.query.trim().toLowerCase();
+  let list = pk.models.slice();
+
+  if (pk.filter === 'free')    list = list.filter(m => perM(m) === 0);
+  if (pk.filter === 'fav')     list = list.filter(m => pk.favs.includes(m.id));
+  if (pk.filter === 'cheap')   list.sort((a,b) => perM(a) - perM(b));
+  if (pk.filter === 'context') list.sort((a,b) => (b.context_length||0) - (a.context_length||0));
+  if (q) list = list.filter(m =>
+    m.id.toLowerCase().includes(q) || (m.name||'').toLowerCase().includes(q));
+
+  // favoritos primeiro quando não há ordenação escolhida
+  if (!pk.filter || pk.filter === 'free'){
+    list.sort((a,b) => (pk.favs.includes(b.id)?1:0) - (pk.favs.includes(a.id)?1:0));
+  }
+
+  const routers = (pk.filter === 'fav' || pk.filter === 'free') ? []
+    : ROUTERS.filter(r => !q || r.name.toLowerCase().includes(q) || r.desc.includes(q));
+
+  const el = $('#pk-list');
+  $('#pk-count').textContent = `${list.length} modelo${list.length === 1 ? '' : 's'}`;
+
+  if (!routers.length && !list.length){
+    el.innerHTML = `<div class="pk-empty">${
+      pk.filter === 'fav' ? 'Nenhum favorito ainda.<br>Toque na estrela de um modelo pra fixar aqui.'
+                          : 'Nenhum modelo encontrado.'}</div>`;
+    return;
+  }
+
+  const row = (item, isRouter) => {
+    const sel = item.id === pk.sel;
+    const badge = isRouter
+      ? `<span class="pk-badge" style="background:var(--violet)">${ico('sparkle')}</span>`
+      : badgeHTML(item.id);
+    return `<div class="pk-row${sel ? ' sel' : ''}" data-id="${esc(item.id)}">
+      ${badge}
+      <div class="pk-info">
+        <span class="pk-name">${esc(item.name || item.id)}</span>
+        <span class="pk-meta">${isRouter ? esc(item.desc) : esc(item.id) + (ctxLabel(item) ? ' · ' + ctxLabel(item) : '')}</span>
+      </div>
+      ${isRouter ? '' : `<span class="pk-price">${priceHTML(item)}</span>`}
+      ${isRouter ? '' : `<button class="pk-star${pk.favs.includes(item.id) ? ' on' : ''}" data-fav="${esc(item.id)}" title="Favoritar">${pk.favs.includes(item.id) ? '★' : '☆'}</button>`}
+      ${sel ? `<span class="pk-check">${ico('check')}</span>` : ''}
+    </div>`;
+  };
+
+  el.innerHTML =
+    (routers.length ? `<div class="pk-sep">Automático</div>` + routers.map(r => row(r, true)).join('') : '') +
+    (list.length ? `<div class="pk-sep">Modelos${pk.live ? '' : ' · catálogo local'}</div>` + list.map(m => row(m, false)).join('') : '');
+
+  $$('#pk-list .pk-row').forEach(r => r.onclick = e =>{
+    if (e.target.closest('.pk-star')) return;
+    pk.sel = r.dataset.id;
+    localStorage.setItem('vtz_model', pk.sel);
+    paintModelButton(); closePicker();
+  });
+  $$('#pk-list .pk-star').forEach(s => s.onclick = e =>{
+    e.stopPropagation();
+    const id = s.dataset.fav;
+    pk.favs = pk.favs.includes(id) ? pk.favs.filter(x => x !== id) : [...pk.favs, id];
+    localStorage.setItem('vtz_favorites', JSON.stringify(pk.favs));
+    renderList();
+  });
+}
+
+function openPicker(){
+  $('#pk-overlay').classList.add('open');
+  $('#pk-overlay').setAttribute('aria-hidden','false');
+  $('#pk-search').value = pk.query = '';
+  renderChips(); renderList();
+  loadCatalog();
+  setTimeout(()=> $('#pk-search').focus(), 120);
+}
+function closePicker(){
+  $('#pk-overlay').classList.remove('open');
+  $('#pk-overlay').setAttribute('aria-hidden','true');
+}
+
+/* Catálogo ao vivo: prefere o backend (que já tem a chave), cai no OpenRouter
+   público. Falha silenciosa — o snapshot cobre. */
+let catalogTried = false;
+async function loadCatalog(){
+  if (catalogTried || pk.live) return;
+  catalogTried = true;
+  const fontes = [];
+  if (API.base) fontes.push(API.base + '/api/models');
+  fontes.push('https://openrouter.ai/api/v1/models');
+  for (const url of fontes){
+    try{
+      const r = await fetch(url, {headers: API.base && url.startsWith(API.base) ? API.headers() : {}});
+      if (!r.ok) continue;
+      const j = await r.json();
+      const arr = j.data || j.models || [];
+      if (!Array.isArray(arr) || !arr.length) continue;
+      pk.models = arr
+        .filter(m => m.id)
+        .map(m => ({id:m.id, name:m.name || m.id, pricing:m.pricing || {},
+                    context_length:m.context_length, architecture:m.architecture}));
+      pk.live = true;
+      $('#pk-note').textContent =
+        `${pk.models.length} modelos do catálogo ao vivo do OpenRouter · preço por 1M tokens.`;
+      renderList();
+      return;
+    }catch(e){ /* próxima fonte */ }
+  }
+  $('#pk-note').textContent =
+    'Catálogo local (sem acesso ao OpenRouter agora). Os preços são de um snapshot e podem ter mudado.';
+}
+
+$('#model-btn').onclick = openPicker;
+$('#pk-close').onclick  = closePicker;
+$('#pk-overlay').onclick = e =>{ if (e.target.id === 'pk-overlay') closePicker(); };
+$('#pk-search').addEventListener('input', e =>{ pk.query = e.target.value; renderList(); });
+document.addEventListener('keydown', e =>{
+  if (e.key === 'Escape' && $('#pk-overlay').classList.contains('open')) closePicker();
+});
+paintModelButton();
 
 /* estado inicial */
 engine.setTarget(POSE.idle);
