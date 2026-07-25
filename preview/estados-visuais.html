@@ -108,6 +108,14 @@ header.topbar{display:flex;align-items:center;gap:10px;padding:14px 16px;backgro
 header.topbar:after{content:"";position:absolute;bottom:-1px;left:15%;width:70%;height:1px;
   background:linear-gradient(90deg,transparent,rgba(139,92,246,.5),transparent)}
 /* ===== PICKER DE MODELOS (logo + nome + custo por 1M) ===== */
+.route-chip{display:inline-flex;align-items:center;gap:7px;margin:2px 0 10px;
+  padding:5px 11px;border-radius:99px;background:var(--violet-dim);
+  border:1px solid rgba(139,92,246,.3);font-size:11px;color:var(--text-dim);
+  animation:rc-in .35s var(--ease-out)}
+.route-chip svg.icon{width:12px;height:12px;color:var(--violet)}
+.route-chip b{color:var(--violet);font-weight:700}
+.route-chip span{font-family:var(--mono);font-size:10.5px}
+@keyframes rc-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .pk-overlay{position:fixed;inset:0;z-index:140;display:flex;align-items:center;justify-content:center;
   background:rgba(0,0,0,.62);backdrop-filter:blur(6px);opacity:0;visibility:hidden;
   transition:opacity var(--t-mid) var(--ease-out),visibility var(--t-mid)}
@@ -1454,6 +1462,9 @@ class BackendDriver extends Driver {
           answer += ev.text ?? ev.content ?? '';
           this.emit('token', ev.text ?? ev.content ?? '');
           break;
+        case 'route':                                 // RouteLLM decidiu (ou não deu)
+          this.emit('route', ev);
+          break;
         case 'usage':
           this.emit('usage', ev);                     // tokens/custo reais
           break;
@@ -1558,7 +1569,7 @@ const chatLog = $('#chat-log'), chatBody = $('#chat-body'), input = $('#chat-inp
 let chatBusy = false, chatCards = {};
 
 /* limpa só o pipeline; 'audio' é global (VU meter) e nunca é zerado aqui */
-const PIPE = ['stepsBegin','step','fileBegin','fileProgress','result','token'];
+const PIPE = ['stepsBegin','step','fileBegin','fileProgress','result','token','route'];
 function resetPipe(){ PIPE.forEach(e => driver.h[e] = []); }
 
 function scrollDown(){ chatBody.scrollTop = chatBody.scrollHeight; }
@@ -1610,6 +1621,19 @@ function sendChat(text){
   driver.on('fileProgress', d => chatCards[d.id] && chatCards[d.id].update(d));
 
   /* Texto aparece conforme o backend envia — o cursor é o stream real, não animação falsa. */
+  /* Qual modelo o roteador escolheu — some ficar sem saber quem respondeu. */
+  driver.on('route', ev =>{
+    const alvo = ev.model ? modelLabel(ev.model)
+               : ev.models ? ev.models.map(modelLabel).join(' + ')
+               : (ev.note || 'modelo padrão');
+    const chip = document.createElement('div');
+    chip.className = 'route-chip';
+    chip.innerHTML = `${ico('sparkle')}<b>${ev.mode === 'fusion' ? 'Fusion' :
+      ev.mode === 'free' ? 'RouteLLM Free' : 'RouteLLM'}</b>
+      <span>${esc(alvo)}</span>`;
+    mount.appendChild(chip); scrollDown();
+  });
+
   const asHtml = t => t.replace(/</g,'&lt;').replace(/\n/g,'<br>');
   driver.on('token', chunk =>{
     if(!bubble) bubble = addMsg('assistant', '');
