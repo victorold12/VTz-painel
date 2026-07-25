@@ -50,13 +50,18 @@ const FALLBACK_MODELS = [
 
 async function fetchModels(){
   try{
-    const res = await fetch(OR_BASE + '/models');
-    const data = await res.json();
-    state.models = data.data || [];
+    /* Backend primeiro (cache de 30 min, e funciona quando a rede bloqueia o
+       host do OpenRouter), OpenRouter direto como reserva — ver
+       fetchCatalogoModelos em 32-backend-bridge.js. */
+    const cat = await fetchCatalogoModelos();
+    state.models = cat.data || [];
+    state.catalogSource = cat.fonte;
+    if (cat.aviso) console.warn('Catálogo de modelos:', cat.aviso);
     if (!state.models.length) throw new Error('resposta vazia');
   }catch(e){
     console.error('Fetch ao vivo falhou, usando fallback datado (2026-07-07):', e);
     state.models = FALLBACK_MODELS;
+    state.catalogSource = 'fallback';
   }
   if (!state.model && state.models.length) state.model = state.models[0].id;
   updateModelLabel();

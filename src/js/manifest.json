@@ -30,5 +30,6 @@
   "28-visual-qa-loop.js",
   "29-agente-local.js",
   "30-voice-config.js",
-  "31-jarvis.js"
+  "31-jarvis.js",
+  "32-backend-bridge.js"
 ]

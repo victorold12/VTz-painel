@@ -1289,3 +1289,45 @@ body[data-jstate="delivering"] .j-deliver>*:nth-child(6){animation-delay:.45s}
   .jarvis-entry .je-head,.j-mic:before{animation:none}
   .jarvis-overlay{transition:opacity 1ms linear}
 }
+
+/* ============================================================
+   PONTE COM O BACKEND — analytics do servidor e memória
+   ============================================================ */
+.ana-titulo{font-size:13px;font-weight:700;letter-spacing:.02em;margin:0 0 10px}
+.ana-sep{height:1px;background:var(--line);margin:26px 0 18px}
+.ana-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.ana-head .ana-titulo{margin:0}
+.ana-sel{margin-left:auto;background:var(--input-bg);border:1px solid var(--line);color:var(--text);
+  border-radius:9px;padding:6px 10px;font-size:12px}
+.ana-alerta{margin-top:12px;padding:11px 13px;border-radius:11px;font-size:12.5px;line-height:1.5;
+  background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.4);color:var(--danger)}
+.ana-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:16px}
+.ana-bloco{background:var(--glass-card);border:1px solid var(--line);border-radius:13px;padding:13px 14px}
+.ana-bloco h4{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-faint);margin:0 0 9px}
+.ana-linha{display:flex;align-items:center;gap:10px;font-size:12.5px;padding:4px 0;color:var(--text-dim)}
+.ana-linha span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ana-linha b{color:var(--text);font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+
+.mem-diario{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.mem-dia{background:var(--glass-card);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+.mem-dia-top{display:flex;align-items:center;gap:10px;font-size:12px;margin-bottom:5px}
+.mem-dia-top b{font-family:var(--mono)}
+.mem-dia-top span{margin-left:auto;color:var(--text-faint);font-size:11px}
+.mem-dia-txt{font-size:12.5px;line-height:1.55;color:var(--text-dim)}
+.mem-busca-row{display:flex;gap:8px}
+.mem-busca-row input{flex:1;background:var(--input-bg);border:1px solid var(--line);color:var(--text);
+  border-radius:10px;padding:9px 12px;font-size:12.5px}
+.mem-busca-res{display:flex;flex-direction:column;gap:7px;margin-top:10px}
+.mem-selo{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;padding:4px 9px;border-radius:999px;border:1px solid var(--line);
+  color:var(--text-faint);margin-bottom:8px}
+.mem-selo.ok{border-color:rgba(79,209,197,.45);color:var(--good)}
+.mem-res{display:flex;align-items:baseline;gap:10px;font-size:12.5px;background:var(--glass-card);
+  border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.mem-res b{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;color:var(--violet);flex-shrink:0}
+.mem-res span{flex:1;min-width:0;color:var(--text-dim);line-height:1.5}
+.mem-res i{font-family:var(--mono);font-size:11px;color:var(--text-faint);font-style:normal;
+  font-variant-numeric:tabular-nums}
+.hint.ok{color:var(--good)}
+.hint.erro{color:var(--danger)}

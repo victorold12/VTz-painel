@@ -378,6 +378,9 @@ function renderAnalytics(){
     card.innerHTML = `<div class="metric-label">${label}</div><div class="metric-val ${cls}">${val}</div>`;
     grid.appendChild(card);
   });
+  /* Segundo bloco, de outra fonte: o log de auditoria do backend. Fica separado
+     porque mede outra coisa — o que foi executado no PC, não o uso do navegador. */
+  renderServerAnalytics();
 }
 
 /* ---------- Mic (ditado + mãos-livres do Modo Voz) ----------

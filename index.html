@@ -282,6 +282,21 @@
         <button id="update-memory-btn" style="margin-top:6px;">Atualizar memória agora</button>
         <p class="hint" style="margin-top:8px;">A memória automática usa um modelo barato pra destilar entidades e relações (fração de centavo por atualização) e roda em 2º plano a cada poucas mensagens. Você pode editar/apagar qualquer linha acima — ao salvar à mão elas viram fatos simples, e a memória automática reconstrói as relações depois.</p>
       </div>
+      <div class="cfg-group" data-cat="respostas">
+        <h3>Memória no servidor (grafo, diário e busca)</h3>
+        <p class="hint" style="margin-bottom:10px;">Estas três ações rodam no Backend VTz OS, não no navegador. <b>Extrair</b> lê a conversa aberta e funde os fatos duráveis no grafo. <b>Resumo diário</b> mostra o que cada dia consolidou. A <b>busca</b> diz se comparou vetores (semântica, acha sinônimo) ou termos (léxica) — se não houver provedor de embeddings configurado, ela avisa em vez de fingir.</p>
+        <button class="primary" id="mem-extrair">Extrair fatos desta conversa</button>
+        <button id="mem-diario-btn">Ver resumo diário</button>
+        <button id="mem-reindex">Reindexar busca</button>
+        <p class="hint" id="mem-acao-msg" style="margin-top:8px;"></p>
+        <div id="mem-diario" class="mem-diario"></div>
+        <label class="hint" style="display:block; margin:14px 0 4px;">Buscar na memória</label>
+        <div class="mem-busca-row">
+          <input type="text" id="mem-busca" placeholder="ex.: onde eu moro">
+          <button id="mem-busca-btn">Buscar</button>
+        </div>
+        <div id="mem-busca-res" class="mem-busca-res"></div>
+      </div>
       <div class="cfg-group" data-cat="backend">
         <h3>Backend VTz OS (opcional)</h3>
         <p class="hint" style="margin-bottom:10px;">URL do servidor (repo <b>servidor</b>). Se você rodar o backend na sua máquina, o site <b>detecta sozinho</b> em <code>localhost:8000</code> — só preencha aqui se usar outra URL (ex.: backend publicado na nuvem). Com ele ligado: busca com imagem da fonte, pesquisa profunda no servidor e conectores.</p>
@@ -395,6 +410,19 @@
         <input type="file" id="import-backup-file" accept="application/json" style="display:none;">
       </div>
       <div class="cfg-group" data-cat="dados">
+        <h3>Backup do servidor (Backend VTz OS)</h3>
+        <p class="hint" style="margin-bottom:10px;">Coisa diferente do backup acima: aqui vai o que mora no <b>banco do servidor</b> — a memória em grafo, a camada diária e a lista de dispositivos pareados. O token de pareamento <b>não</b> vai no arquivo, e restaurar <b>não</b> repareia dispositivo nem recria auditoria (pareamento é decisão presencial; auditoria é registro deste banco).</p>
+        <button class="primary" id="srv-backup-export">Baixar backup do servidor</button>
+        <button id="srv-backup-import">Restaurar no servidor</button>
+        <input type="file" id="srv-backup-file" accept="application/json" style="display:none;">
+        <label class="hint" style="display:block; margin:10px 0 4px;">Como restaurar</label>
+        <select id="srv-backup-mode">
+          <option value="merge">Juntar com o que já está lá (padrão)</option>
+          <option value="replace">Substituir tudo pelo arquivo</option>
+        </select>
+        <p class="hint" id="srv-backup-msg" style="margin-top:8px;"></p>
+      </div>
+      <div class="cfg-group" data-cat="dados">
         <h3>Ambiente</h3>
         <p class="hint" id="env-detail">Detectando contexto...</p>
       </div>
@@ -458,8 +486,21 @@
      </div><!-- /cfg-shell -->
     </section>
     <section id="analytics-view" class="view">
+      <h3 class="ana-titulo">Neste navegador</h3>
       <div class="metrics-grid" id="metrics-grid"></div>
       <p class="analytics-note">Todos os números acima são reais, calculados do teu uso neste navegador (conversas salvas + contador de custo). Não há dados simulados.</p>
+
+      <div class="ana-sep"></div>
+      <div class="ana-head">
+        <h3 class="ana-titulo">No servidor — ações executadas no PC</h3>
+        <select id="ana-dias" class="ana-sel" title="Janela de tempo">
+          <option value="1">últimas 24h</option>
+          <option value="7">últimos 7 dias</option>
+          <option value="30">últimos 30 dias</option>
+          <option value="90">últimos 90 dias</option>
+        </select>
+      </div>
+      <div id="srv-metrics"></div>
     </section>
   </main>
 </div>
