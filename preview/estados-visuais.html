@@ -107,6 +107,86 @@ header.topbar{display:flex;align-items:center;gap:10px;padding:14px 16px;backgro
   border-bottom:1px solid var(--w08);position:relative;flex-shrink:0}
 header.topbar:after{content:"";position:absolute;bottom:-1px;left:15%;width:70%;height:1px;
   background:linear-gradient(90deg,transparent,rgba(139,92,246,.5),transparent)}
+/* ===== ABA DE CONFIGURAÇÃO DE VOZ (Seção 14) ===== */
+.vz-overlay{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.66);backdrop-filter:blur(6px);opacity:0;visibility:hidden;
+  transition:opacity var(--t-mid) var(--ease-out),visibility var(--t-mid)}
+.vz-overlay.open{opacity:1;visibility:visible}
+.vz-sheet{width:min(620px,calc(100vw - 32px));max-height:min(86vh,860px);display:flex;flex-direction:column;
+  background:var(--glass-modal);backdrop-filter:blur(30px) saturate(160%);
+  -webkit-backdrop-filter:blur(30px) saturate(160%);
+  border:1px solid var(--w12);border-radius:var(--radius-lg);overflow:hidden;
+  box-shadow:0 32px 90px -20px rgba(0,0,0,.85);
+  transform:translateY(14px) scale(.985);transition:transform var(--t-mid) var(--ease-spring)}
+.vz-overlay.open .vz-sheet{transform:none}
+.vz-head{display:flex;align-items:center;gap:10px;padding:17px 20px 13px;border-bottom:1px solid var(--w06)}
+.vz-head h3{font-size:15.5px;font-weight:700;letter-spacing:-.01em}
+.vz-head .vz-sub{font-size:11px;color:var(--text-faint)}
+.vz-close{margin-left:auto;background:var(--w06);border:1px solid var(--w08);color:var(--text-dim);
+  width:28px;height:28px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.16s}
+.vz-close:hover{border-color:var(--violet);color:var(--violet)}
+.vz-body{flex:1;min-height:0;overflow-y:auto;padding:16px 20px 20px;display:flex;flex-direction:column;gap:18px;scrollbar-width:thin}
+.vz-body::-webkit-scrollbar{width:6px}
+.vz-body::-webkit-scrollbar-thumb{background:var(--w12);border-radius:99px}
+
+.vz-sec{display:flex;flex-direction:column;gap:9px}
+.vz-lbl{font-size:10px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--text-faint)}
+.vz-hint{font-size:11px;color:var(--text-faint);line-height:1.5}
+
+/* estado dos motores */
+.vz-engines{display:flex;gap:8px;flex-wrap:wrap}
+.vz-engine{flex:1;min-width:150px;text-align:left;cursor:pointer;
+  background:var(--w05);border:1px solid var(--w08);border-radius:13px;padding:12px 13px;transition:.18s}
+.vz-engine:hover{border-color:var(--violet)}
+.vz-engine.on{background:var(--violet-dim);border-color:var(--violet)}
+.vz-engine .vz-en-top{display:flex;align-items:center;gap:7px}
+.vz-engine .vz-name{font-size:13px;font-weight:700;color:var(--text)}
+.vz-engine .vz-tag{font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 6px;border-radius:5px;background:var(--w08);color:var(--text-faint)}
+.vz-engine .vz-desc{font-size:10.5px;color:var(--text-faint);margin-top:5px;line-height:1.45}
+.vz-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-left:auto}
+.vz-dot.up{background:var(--good);box-shadow:0 0 7px var(--good)}
+.vz-dot.down{background:var(--danger)}
+.vz-dot.unknown{background:var(--text-faint)}
+.vz-state{font-size:10px;color:var(--text-faint);font-family:var(--mono)}
+
+/* sliders de calibração */
+.vz-slider{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
+.vz-slider .vz-sname{font-size:12.5px;color:var(--text);font-weight:600}
+.vz-slider .vz-sval{font-size:11.5px;color:var(--violet);font-family:var(--mono);font-variant-numeric:tabular-nums}
+.vz-slider input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--violet);height:4px;cursor:pointer}
+.vz-slider .vz-sdesc{grid-column:1/-1;font-size:10.5px;color:var(--text-faint);line-height:1.45}
+
+/* seletor genérico */
+.vz-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.vz-select{flex:1;min-width:140px;background:var(--input-bg);border:1px solid var(--line);color:var(--text);
+  border-radius:10px;padding:9px 11px;font-size:12.5px;font-family:inherit}
+.vz-select:focus{outline:none;border-color:var(--violet)}
+.vz-btn{display:inline-flex;align-items:center;gap:7px;background:var(--w06);border:1px solid var(--w08);
+  color:var(--text);border-radius:10px;padding:9px 14px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.16s}
+.vz-btn:hover{border-color:var(--violet);color:var(--violet)}
+.vz-btn.primary{background:var(--violet);border-color:var(--violet);color:#fff}
+.vz-btn.primary:hover{filter:brightness(1.1);color:#fff}
+.vz-btn:disabled{opacity:.45;cursor:default}
+.vz-btn svg.icon{width:14px;height:14px}
+
+/* amostras de voz */
+.vz-samples{display:flex;flex-direction:column;gap:6px}
+.vz-sample{display:flex;align-items:center;gap:10px;background:var(--w05);border:1px solid var(--w08);
+  border-radius:11px;padding:9px 12px}
+.vz-sample.on{border-color:var(--violet);background:var(--violet-dim)}
+.vz-sample .vz-sm-name{flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vz-sample .vz-sm-size{font-size:10.5px;color:var(--text-faint);font-family:var(--mono)}
+.vz-sample button{background:none;border:0;color:var(--text-faint);cursor:pointer;padding:3px;transition:.15s}
+.vz-sample button:hover{color:var(--danger)}
+.vz-empty{font-size:11.5px;color:var(--text-faint);padding:12px;text-align:center;
+  border:1px dashed var(--w10);border-radius:11px;line-height:1.5}
+
+.vz-foot{display:flex;align-items:center;gap:9px;padding:13px 20px;border-top:1px solid var(--w06);flex-wrap:wrap}
+.vz-msg{flex:1;min-width:120px;font-size:11.5px;line-height:1.45}
+.vz-msg.erro{color:var(--danger)}
+.vz-msg.ok{color:var(--good)}
+
 /* ===== PICKER DE MODELOS (logo + nome + custo por 1M) ===== */
 .route-chip{display:inline-flex;align-items:center;gap:7px;margin:2px 0 10px;
   padding:5px 11px;border-radius:99px;background:var(--violet-dim);
@@ -576,7 +656,7 @@ body[data-jstate="delivering"] .j-deliver>*:nth-child(6){animation-delay:.45s}
         </button>
         <div class="top-spacer"></div>
         <div class="cost-badge" id="cost-badge">$0.0000</div>
-        <button class="icon-btn" title="Configuração"><i data-ico="settings"></i></button>
+        <button class="icon-btn" id="btn-config" title="Configuração de voz"><i data-ico="settings"></i></button>
         <button class="icon-btn" title="Exportar"><i data-ico="download"></i></button>
       </header>
 
@@ -686,6 +766,64 @@ body[data-jstate="delivering"] .j-deliver>*:nth-child(6){animation-delay:.45s}
     </div>
   </section>
 
+</div>
+
+<!-- ===================== CONFIGURAÇÃO DE VOZ (Seção 14) ===================== -->
+<div class="vz-overlay" id="vz-overlay" aria-hidden="true">
+  <div class="vz-sheet" role="dialog" aria-label="Configuração de voz">
+    <div class="vz-head">
+      <div>
+        <h3>Voz do JARVIS</h3>
+        <div class="vz-sub" id="vz-agent">—</div>
+      </div>
+      <button class="vz-close" id="vz-close" title="Fechar (Esc)"><i data-ico="x"></i></button>
+    </div>
+
+    <div class="vz-body" id="vz-body">
+      <div class="vz-sec">
+        <div class="vz-lbl">Motor</div>
+        <div class="vz-engines" id="vz-engines"></div>
+        <div class="vz-hint" id="vz-engine-hint"></div>
+      </div>
+
+      <div class="vz-sec" id="vz-voice-sec">
+        <div class="vz-lbl">Voz</div>
+        <div class="vz-row">
+          <select class="vz-select" id="vz-voice"></select>
+        </div>
+        <div class="vz-hint" id="vz-voice-hint"></div>
+      </div>
+
+      <div class="vz-sec" id="vz-samples-sec">
+        <div class="vz-lbl">Minhas vozes (clonagem)</div>
+        <div class="vz-samples" id="vz-samples"></div>
+        <div class="vz-row">
+          <input type="file" id="vz-file" accept="audio/*" hidden>
+          <button class="vz-btn" id="vz-upload"><i data-ico="plus"></i>Subir amostra de voz</button>
+        </div>
+        <div class="vz-hint">
+          Alguns segundos de fala limpa bastam. O arquivo vai direto pro seu PC —
+          não fica guardado no servidor.
+        </div>
+      </div>
+
+      <div class="vz-sec" id="vz-calib"></div>
+
+      <div class="vz-sec">
+        <div class="vz-lbl">Reconhecimento de fala (whisper.cpp)</div>
+        <div class="vz-row">
+          <select class="vz-select" id="vz-stt-model"></select>
+        </div>
+        <div class="vz-hint" id="vz-stt-hint"></div>
+      </div>
+    </div>
+
+    <div class="vz-foot">
+      <button class="vz-btn" id="vz-test"><i data-ico="play"></i>Testar</button>
+      <div class="vz-msg" id="vz-msg"></div>
+      <button class="vz-btn primary" id="vz-save"><i data-ico="check"></i>Salvar</button>
+    </div>
+  </div>
 </div>
 
 <!-- ===================== PICKER DE MODELOS ===================== -->
@@ -2100,6 +2238,345 @@ document.addEventListener('keydown', e =>{
   if (e.key === 'Escape' && $('#pk-overlay').classList.contains('open')) closePicker();
 });
 paintModelButton();
+
+
+/* ================================================================
+   15. CONFIGURAÇÃO DE VOZ (Seção 14 do prompt mestre)
+   Chatterbox principal (clona voz), Kokoro fallback (vozes prontas),
+   navegador como último recurso. Tudo mora no PC: esta aba só conversa
+   com o Agente Local através do backend, porque o agente nunca abre
+   porta (Seção 8).
+   ================================================================ */
+const MOTORES = [
+  {id:'chatterbox', nome:'Chatterbox', tag:'principal',
+   desc:'Clona a sua voz a partir de uma amostra. Roda local.'},
+  {id:'kokoro', nome:'Kokoro', tag:'fallback',
+   desc:'Vozes prontas, mais leve. Usado se o Chatterbox não estiver de pé.'},
+  {id:'navegador', nome:'Navegador', tag:'sem instalar',
+   desc:'Voz do próprio sistema, pelo navegador. Sempre funciona, soa mais robótica.'},
+];
+
+/* Vozes prontas do Kokoro em português. Só entram quando o motor é Kokoro. */
+const VOZES_KOKORO = [
+  {id:'pf_dora', nome:'Dora (feminina, PT-BR)'},
+  {id:'pm_alex', nome:'Alex (masculina, PT-BR)'},
+  {id:'pm_santa', nome:'Santa (masculina, PT-BR)'},
+];
+
+/* Descrição de cada controle — o usuário precisa saber o que está mexendo. */
+const CALIB = {
+  exaggeration:{nome:'Expressividade', desc:'Quanta emoção o Chatterbox coloca na fala. Baixo soa mais neutro.'},
+  cfg_weight:{nome:'Fidelidade à referência', desc:'Quanto ele segue a amostra de voz. Menor deixa a fala mais solta e rápida.'},
+  temperature:{nome:'Variação', desc:'Quanto a entonação muda entre falas iguais.'},
+  speed:{nome:'Velocidade', desc:'Ritmo da fala (Kokoro).'},
+};
+const CALIB_POR_MOTOR = {
+  chatterbox:['exaggeration','cfg_weight','temperature'],
+  kokoro:['speed'],
+  navegador:[],
+};
+
+const vz = {
+  aberto:false, carregando:false,
+  agentId:null,
+  cfg:null, ranges:null, engines:null, samples:[], stt:null, sttModels:[],
+  pend:{},                 // mudanças ainda não salvas
+};
+
+function vzMsg(texto, tipo){
+  const el = $('#vz-msg');
+  el.textContent = texto || '';
+  el.className = 'vz-msg' + (tipo ? ' ' + tipo : '');
+}
+
+async function vzApi(metodo, caminho, corpo){
+  if(!API.base) throw new Error('Backend não configurado.');
+  if(!vz.agentId) throw new Error('Nenhum Agente Local pareado.');
+  const r = await fetch(`${API.base}/api/voice/${encodeURIComponent(vz.agentId)}${caminho}`, {
+    method: metodo,
+    headers: API.headers(),
+    body: corpo === undefined ? undefined : JSON.stringify(corpo),
+  });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.detail || `Backend respondeu ${r.status}`);
+  return j;
+}
+
+/* valor atual de um campo: o pendente, senão o salvo */
+const vzVal = k => (vz.pend[k] !== undefined ? vz.pend[k] : vz.cfg?.[k]);
+
+function vzRenderMotores(){
+  const atual = vzVal('engine');
+  $('#vz-engines').innerHTML = MOTORES.map(m =>{
+    const est = vz.engines?.[m.id];
+    // 'navegador' não é servidor: não faz sentido dizer que está fora do ar
+    const dot = m.id === 'navegador' ? 'up'
+              : est ? (est.up ? 'up' : 'down') : 'unknown';
+    const estado = m.id === 'navegador' ? 'disponível'
+                 : est ? (est.up ? 'no ar' : (est.reason || 'fora do ar')) : '—';
+    return `<button class="vz-engine${m.id===atual?' on':''}" data-eng="${m.id}">
+      <div class="vz-en-top">
+        <span class="vz-name">${m.nome}</span>
+        <span class="vz-tag">${m.tag}</span>
+        <span class="vz-dot ${dot}"></span>
+      </div>
+      <div class="vz-desc">${m.desc}</div>
+      <div class="vz-state">${esc(estado)}</div>
+    </button>`;
+  }).join('');
+
+  $$('#vz-engines .vz-engine').forEach(b => b.onclick = ()=>{
+    vz.pend.engine = b.dataset.eng;
+    vzRenderTudo();
+    vzMsg('Motor alterado — clique em Salvar pra aplicar.');
+  });
+
+  const escolhido = vz.engines?.[atual];
+  $('#vz-engine-hint').textContent =
+    atual === 'navegador'
+      ? 'A fala sai pelo navegador. Nada pra instalar, mas a voz não é clonada.'
+      : escolhido && !escolhido.up
+        ? `O ${atual} não está rodando agora. Se você falar, o JARVIS tenta o outro motor automaticamente.`
+        : '';
+}
+
+function vzRenderVoz(){
+  const motor = vzVal('engine');
+  const sec = $('#vz-voice-sec'), amostras = $('#vz-samples-sec');
+  if(motor === 'navegador'){
+    sec.style.display = 'none'; amostras.style.display = 'none';
+    return;
+  }
+  sec.style.display = ''; 
+  amostras.style.display = motor === 'chatterbox' ? '' : 'none';
+
+  const atual = vzVal('voice');
+  const opcoes = motor === 'kokoro'
+    ? VOZES_KOKORO.map(v => ({id:v.id, nome:v.nome}))
+    : vz.samples.map(s => ({id:s.name, nome:s.name}));
+
+  $('#vz-voice').innerHTML =
+    `<option value="">${motor === 'chatterbox' ? 'Voz padrão do modelo' : 'Padrão'}</option>` +
+    opcoes.map(o => `<option value="${esc(o.id)}"${o.id===atual?' selected':''}>${esc(o.nome)}</option>`).join('');
+
+  $('#vz-voice-hint').textContent = motor === 'chatterbox'
+    ? (vz.samples.length ? 'Escolha uma das suas vozes clonadas.'
+       : 'Sem amostra ainda — suba um áudio abaixo pra clonar a sua voz.')
+    : 'Vozes prontas do Kokoro (não clona).';
+
+  $('#vz-voice').onchange = e =>{
+    vz.pend.voice = e.target.value || null;
+    vzMsg('Voz alterada — clique em Salvar.');
+  };
+}
+
+function vzRenderAmostras(){
+  const el = $('#vz-samples');
+  const atual = vzVal('voice');
+  if(!vz.samples.length){
+    el.innerHTML = `<div class="vz-empty">Nenhuma amostra ainda.<br>
+      Suba alguns segundos da sua voz pra o JARVIS falar com ela.</div>`;
+    return;
+  }
+  const kb = n => n >= 1048576 ? (n/1048576).toFixed(1)+' MB' : Math.round(n/1024)+' KB';
+  el.innerHTML = vz.samples.map(s => `
+    <div class="vz-sample${s.name===atual?' on':''}">
+      <span class="vz-sm-name">${esc(s.name)}</span>
+      <span class="vz-sm-size">${kb(s.size||0)}</span>
+      <button data-del="${esc(s.name)}" title="Apagar">${ico('x')}</button>
+    </div>`).join('');
+
+  $$('#vz-samples [data-del]').forEach(b => b.onclick = async ()=>{
+    const nome = b.dataset.del;
+    try{
+      vzMsg('Apagando…');
+      await vzApi('DELETE', `/sample/${encodeURIComponent(nome)}`);
+      await vzCarregar();
+      vzMsg('Amostra apagada.', 'ok');
+    }catch(e){ vzMsg(e.message, 'erro'); }
+  });
+}
+
+function vzRenderCalib(){
+  const motor = vzVal('engine');
+  const campos = CALIB_POR_MOTOR[motor] || [];
+  const el = $('#vz-calib');
+  if(!campos.length){ el.innerHTML = ''; return; }
+
+  el.innerHTML = `<div class="vz-lbl">Calibração</div>` + campos.map(k =>{
+    const faixa = vz.ranges?.[k] || {min:0, max:1};
+    const valor = vzVal(k) ?? faixa.min;
+    const passo = (faixa.max - faixa.min) / 100;
+    return `<div class="vz-slider">
+      <span class="vz-sname">${CALIB[k].nome}</span>
+      <span class="vz-sval" id="vz-v-${k}">${Number(valor).toFixed(2)}</span>
+      <input type="range" id="vz-r-${k}" min="${faixa.min}" max="${faixa.max}"
+             step="${passo}" value="${valor}">
+      <span class="vz-sdesc">${CALIB[k].desc}</span>
+    </div>`;
+  }).join('');
+
+  campos.forEach(k =>{
+    const r = $('#vz-r-'+k);
+    r.oninput = ()=>{
+      vz.pend[k] = parseFloat(r.value);
+      $('#vz-v-'+k).textContent = vz.pend[k].toFixed(2);
+    };
+  });
+}
+
+function vzRenderStt(){
+  const sel = $('#vz-stt-model');
+  const atual = vz.stt?.model;
+  sel.innerHTML = (vz.sttModels.length ? vz.sttModels : ['tiny','base','small','medium','large-v3'])
+    .map(m =>{
+      const nota = m === 'base' ? ' — padrão, leve'
+                 : m === 'tiny' ? ' — mais rápido, menos preciso'
+                 : m.startsWith('large') ? ' — mais preciso, muita RAM' : '';
+      return `<option value="${m}"${m===atual?' selected':''}>${m}${nota}</option>`;
+    }).join('');
+  sel.onchange = e =>{ vz.pend._stt_model = e.target.value; vzMsg('Modelo alterado — clique em Salvar.'); };
+
+  $('#vz-stt-hint').textContent = vz.stt?.model_present
+    ? `Modelo pronto em ${vz.stt.model_path}`
+    : (vz.stt?.hint || 'Modelo do whisper ainda não baixado.');
+}
+
+function vzRenderTudo(){
+  vzRenderMotores(); vzRenderVoz(); vzRenderAmostras(); vzRenderCalib(); vzRenderStt();
+  hydrateIcons();
+}
+
+async function vzCarregar(){
+  vz.carregando = true;
+  try{
+    const j = await vzApi('GET', '/status');
+    if(j.ok === false) throw new Error(j.reason || j.error || 'o agente não respondeu');
+    vz.cfg = j.config || {};
+    vz.ranges = j.ranges || {};
+    vz.engines = j.engines || {};
+    vz.samples = j.samples || [];
+    vz.stt = j.stt || {};
+    vz.sttModels = j.stt_models || [];
+    vz.pend = {};
+    vzRenderTudo();
+    vzMsg('');
+  }finally{ vz.carregando = false; }
+}
+
+async function vzAbrir(){
+  vz.agentId = API.agentId;
+  $('#vz-overlay').classList.add('open');
+  $('#vz-overlay').setAttribute('aria-hidden','false');
+  $('#vz-agent').textContent = vz.agentId ? `Agente ${vz.agentId}` : 'nenhum agente pareado';
+
+  if(!API.base || !vz.agentId){
+    // sem backend/agente esta aba não tem o que configurar — dizer isso é melhor
+    // que mostrar controles que não fazem nada
+    $('#vz-body').innerHTML = `<div class="vz-empty">
+      A voz do JARVIS roda no seu PC, pelo Agente Local.<br><br>
+      ${!API.base ? 'Configure a URL do backend' : 'Pareie o Agente Local'} pra ajustar
+      motor, voz e calibração aqui.</div>`;
+    return;
+  }
+  try{ await vzCarregar(); }
+  catch(e){
+    $('#vz-body').innerHTML = `<div class="vz-empty">Não consegui falar com o Agente Local.<br><br>
+      <span style="color:var(--danger)">${esc(e.message)}</span></div>`;
+  }
+}
+function vzFechar(){
+  $('#vz-overlay').classList.remove('open');
+  $('#vz-overlay').setAttribute('aria-hidden','true');
+}
+
+/* ---- subir amostra ---- */
+$('#vz-upload').onclick = ()=> $('#vz-file').click();
+$('#vz-file').onchange = async e =>{
+  const f = e.target.files?.[0];
+  e.target.value = '';
+  if(!f) return;
+  if(f.size > 8*1024*1024){ vzMsg('Arquivo maior que 8 MB.', 'erro'); return; }
+  try{
+    vzMsg('Enviando…');
+    const buf = await f.arrayBuffer();
+    // base64 em pedaços: String.fromCharCode com o array inteiro estoura a pilha
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    for(let i=0;i<bytes.length;i+=8192){
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i+8192));
+    }
+    const j = await vzApi('POST', '/sample', {name:f.name, data_base64: btoa(bin)});
+    if(j.ok === false) throw new Error(j.error || 'o agente recusou');
+    await vzCarregar();
+    vzMsg(`"${j.saved?.name || f.name}" salva no seu PC.`, 'ok');
+  }catch(err){ vzMsg(err.message, 'erro'); }
+};
+
+/* ---- testar (ouvir antes de salvar) ---- */
+$('#vz-test').onclick = async ()=>{
+  const btn = $('#vz-test');
+  btn.disabled = true;
+  try{
+    vzMsg('Gerando áudio…');
+    const overrides = {...vz.pend};
+    delete overrides._stt_model;
+    const j = await vzApi('POST', '/speak', {
+      text:'Olá, senhor. Sistemas operando normalmente.', overrides});
+
+    if(j.ok === false){
+      if(j.delegate === 'browser' && window.speechSynthesis){
+        const u = new SpeechSynthesisUtterance('Olá, senhor. Sistemas operando normalmente.');
+        u.lang = 'pt-BR'; speechSynthesis.speak(u);
+        vzMsg('Falando pelo navegador.', 'ok');
+      }else{
+        vzMsg(j.reason || 'não consegui gerar o áudio', 'erro');
+      }
+      return;
+    }
+    const bin = atob(j.audio_base64);
+    const arr = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([arr], {type:j.mime || 'audio/wav'}));
+    const a = new Audio(url);
+    a.onended = ()=> URL.revokeObjectURL(url);
+    try{
+      await a.play();
+    }catch(err){
+      // o motor respondeu, mas o áudio não toca. Erro cru do navegador aqui é
+      // ("no supported source was found") inútil — diz o que de fato houve.
+      URL.revokeObjectURL(url);
+      vzMsg(`O ${j.engine} devolveu ${j.bytes || arr.length} bytes, mas o navegador `
+            + `não conseguiu tocar (formato ${j.mime || 'desconhecido'}).`, 'erro');
+      return;
+    }
+    vzMsg(j.fallback ? `Tocando — foi o ${j.engine} (fallback).` : `Tocando (${j.engine}).`, 'ok');
+  }catch(err){ vzMsg(err.message, 'erro'); }
+  finally{ btn.disabled = false; }
+};
+
+/* ---- salvar ---- */
+$('#vz-save').onclick = async ()=>{
+  const btn = $('#vz-save');
+  btn.disabled = true;
+  try{
+    const {_stt_model, ...voz} = vz.pend;
+    if(!Object.keys(voz).length && !_stt_model){ vzMsg('Nada mudou.'); return; }
+    vzMsg('Salvando…');
+    if(Object.keys(voz).length) await vzApi('PUT', '/config', voz);
+    if(_stt_model) await vzApi('PUT', '/stt', {model:_stt_model});
+    await vzCarregar();
+    vzMsg('Salvo no seu PC.', 'ok');
+  }catch(err){ vzMsg(err.message, 'erro'); }
+  finally{ btn.disabled = false; }
+};
+
+$('#vz-close').onclick = vzFechar;
+$('#vz-overlay').onclick = e =>{ if(e.target.id === 'vz-overlay') vzFechar(); };
+document.addEventListener('keydown', e =>{
+  if(e.key === 'Escape' && $('#vz-overlay').classList.contains('open')) vzFechar();
+});
+$('#btn-config').onclick = vzAbrir;
 
 /* estado inicial */
 engine.setTarget(POSE.idle);
