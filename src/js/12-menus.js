@@ -72,7 +72,8 @@ function persistConversations(){
     }
   }
   updateSessionPanel();
-  scheduleCloudSync();
+  scheduleCloudSync();          // Firebase (conta Google)
+  scheduleBackendSync();       // espelho no Backend VTz OS — destinos diferentes, não se atropelam
 }
 
 /* ---------- Login opcional + sync na nuvem (Firebase) ----------

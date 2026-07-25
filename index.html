@@ -443,6 +443,18 @@
         <p class="hint" id="srv-backup-msg" style="margin-top:8px;"></p>
       </div>
       <div class="cfg-group" data-cat="dados">
+        <h3>Conversas em todos os aparelhos</h3>
+        <p class="hint" style="margin-bottom:10px;">A conversa continua sendo escrita <b>aqui, no navegador</b> — o app funciona sem servidor. Com o Backend VTz OS ligado, ela também é espelhada lá, e aí aparece no outro aparelho e sobrevive a limpar o cache. <b>Regra de conflito:</b> se a mesma conversa foi mexida em dois lugares, vale a versão editada por último — inteira. Mensagem nunca é mesclada, porque juntar as duas metades daria uma conversa que nunca aconteceu.</p>
+        <button id="conv-sync-btn">Sincronizar agora</button>
+        <p class="hint" id="conv-sync-estado" style="margin-top:8px;">—</p>
+      </div>
+      <div class="cfg-group" data-cat="dados">
+        <h3>Backup automático do servidor</h3>
+        <div id="auto-backup" class="auto-backup"></div>
+        <button id="auto-backup-btn" style="margin-top:10px;">Tirar snapshot agora</button>
+        <p class="hint" id="auto-backup-msg" style="margin-top:8px;"></p>
+      </div>
+      <div class="cfg-group" data-cat="dados">
         <h3>Ambiente</h3>
         <p class="hint" id="env-detail">Detectando contexto...</p>
       </div>

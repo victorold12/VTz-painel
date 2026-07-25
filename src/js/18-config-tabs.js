@@ -22,7 +22,11 @@ function setupConfigNav(){
   const show = (cat) => {
     groups.forEach(g => { g.hidden = g.dataset.cat !== cat; });
     nav.querySelectorAll('.cfg-nav-item').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
-    if (cat === 'dados') updateStorageMeter();
+    if (cat === 'dados'){
+      updateStorageMeter();
+      renderConvSync();
+      renderAutoBackup();   // sem isto o quadro do backup abria vazio
+    }
     if (cat === 'agente'){ refreshAgentsList(); refreshAuditList(); }
     if (cat === 'voz') refreshVoiceConfig();
   };

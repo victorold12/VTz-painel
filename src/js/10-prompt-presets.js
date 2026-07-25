@@ -639,6 +639,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupJarvis();        // cena JARVIS (Seção 6) — WebGL só liga quando a cena abre
   setupBackendBridge(); // analytics/backup/memória do servidor
   setupTemas();         // base clara/escura + cor de destaque
+  setupConversasSync(); // espelho das conversas + backup automático do servidor
   setupAccountMenu();
   autoDetectBackend();  // procura o backend local em segundo plano
   document.getElementById('goto-skills-btn').onclick = () => { switchView('skills'); toggleSidebar(false); };
