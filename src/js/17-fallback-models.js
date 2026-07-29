@@ -42,6 +42,17 @@ const FALLBACK_MODELS = [
   {id:'qwen/qwen3.7-max', name:'Qwen3.7 Max', pricing:{prompt:'0.0000025',completion:'0.0000075'}, context_length:262144},
   {id:'z-ai/glm-5.2', name:'GLM-5.2', pricing:{prompt:'0.0000014',completion:'0.0000044'}, context_length:200000},
   {id:'z-ai/glm-4.7-flash', name:'GLM-4.7 Flash (free)', pricing:{prompt:'0',completion:'0'}, context_length:200000},
+  /* Grátis de famílias variadas. Só valem quando o catálogo ao vivo do
+     OpenRouter não responde (rede caída, chave inválida) — com ele no ar, quem
+     manda é a lista de verdade. Estão aqui pra que, nesse cenário, o RouteLLM
+     Free ainda tenha um raciocinador, um de código e um leve, em vez de cair
+     sempre no mesmo modelo. Se algum sair do ar, o app tenta o próximo. */
+  {id:'qwen/qwen3-coder:free', name:'Qwen3 Coder (free)', pricing:{prompt:'0',completion:'0'}, context_length:262144},
+  {id:'qwen/qwen3-235b-a22b:free', name:'Qwen3 235B (free)', pricing:{prompt:'0',completion:'0'}, context_length:131072},
+  {id:'moonshotai/kimi-k2:free', name:'Kimi K2 (free)', pricing:{prompt:'0',completion:'0'}, context_length:200000},
+  {id:'google/gemma-3-27b-it:free', name:'Gemma 3 27B (free)', pricing:{prompt:'0',completion:'0'}, context_length:96000},
+  {id:'mistralai/mistral-small-3.2-24b-instruct:free', name:'Mistral Small 3.2 (free)', pricing:{prompt:'0',completion:'0'}, context_length:96000},
+  {id:'nvidia/llama-3.3-nemotron-super-49b-v1:free', name:'Nemotron Super 49B (free)', pricing:{prompt:'0',completion:'0'}, context_length:131072},
   {id:'minimax/minimax-m3', name:'MiniMax M3', pricing:{prompt:'0.0000006',completion:'0.0000024'}, context_length:1000000},
   {id:'black-forest-labs/flux.2-pro', name:'FLUX.2 Pro', pricing:{prompt:'0',completion:'0'}, architecture:{output_modalities:['image']}, context_length:128000},
   {id:'bytedance-seed/seedream-4.5', name:'Seedream 4.5', pricing:{prompt:'0',completion:'0'}, architecture:{output_modalities:['image']}, context_length:128000},

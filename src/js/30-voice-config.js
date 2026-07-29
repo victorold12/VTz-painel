@@ -9,11 +9,22 @@
    configuração. Validar nos dois lados criaria duas verdades, e a que importa é
    a da máquina onde o áudio toca. */
 
+/* `porta` e `comoInstalar` existem porque "não está rodando" sozinho é um beco
+   sem saída: o painel constatava o problema e não dizia o que fazer, e não havia
+   documentação nenhuma no repositório. Os dois são servidores Python que rodam
+   NO SEU PC — não vêm no instalador de propósito (juntos passam de 3 GB, contra
+   110 MB do app inteiro). Quem não quiser instalar nada usa o Navegador. */
 const VOZ_MOTORES = [
-  { id:'chatterbox', nome:'Chatterbox', tag:'principal',
-    desc:'Clona a sua voz a partir de uma amostra. Roda local.' },
-  { id:'kokoro', nome:'Kokoro', tag:'fallback',
-    desc:'Vozes prontas, mais leve. Usado se o Chatterbox não estiver de pé.' },
+  { id:'chatterbox', nome:'Chatterbox', tag:'principal', porta: 8004,
+    desc:'Clona a sua voz a partir de uma amostra. Roda local.',
+    comoInstalar: 'Servidor Python no seu PC, porta 8004. Precisa de Python 3.11+ e ' +
+      'baixa ~2 GB de modelo na primeira vez (funciona melhor com placa de vídeo). ' +
+      'Instruções: github.com/resemble-ai/chatterbox' },
+  { id:'kokoro', nome:'Kokoro', tag:'fallback', porta: 8880,
+    desc:'Vozes prontas, mais leve. Usado se o Chatterbox não estiver de pé.',
+    comoInstalar: 'Servidor Python no seu PC, porta 8880. Bem mais leve que o ' +
+      'Chatterbox (~350 MB) e roda bem só com processador, mas não clona a sua voz. ' +
+      'Instruções: github.com/remsky/Kokoro-FastAPI' },
   { id:'navegador', nome:'Navegador', tag:'sem instalar',
     desc:'Voz do próprio sistema. Sempre funciona, soa mais robótica.' },
 ];
@@ -95,12 +106,24 @@ function vozRenderMotores(){
   });
 
   const est = vozState.engines?.[atual];
-  document.getElementById('voz-engine-hint').textContent =
-    atual === 'navegador'
-      ? 'A fala sai pelo navegador. Nada pra instalar, mas a voz não é clonada.'
-      : est && !est.up
-        ? 'O ' + atual + ' não está rodando agora. Se você falar, o JARVIS tenta o outro motor automaticamente.'
-        : '';
+  const motor = VOZ_MOTORES.find(m => m.id === atual);
+  const hint = document.getElementById('voz-engine-hint');
+  if (atual === 'navegador'){
+    hint.textContent = 'A fala sai pelo navegador. Nada pra instalar, mas a voz não é clonada.';
+  } else if (!est?.up){
+    /* `!est?.up` e não `est && !est.up`: sem PC pareado o estado é DESCONHECIDO,
+       e a versão antiga deixava a dica em branco justamente aí — o momento em que
+       a pessoa mais precisa saber o que falta. Desconhecido e fora do ar levam à
+       mesma orientação.
+
+       Antes esta mensagem só dizia que não estava rodando — e não havia lugar
+       nenhum, no app ou no repositório, que explicasse como fazer rodar. */
+    hint.textContent = 'O ' + (motor?.nome || atual) + ' não está rodando na porta ' +
+      (motor?.porta || '?') + ' deste PC. Enquanto isso a fala sai pelo Navegador, ' +
+      'que sempre funciona. Para ligar: ' + (motor?.comoInstalar || '');
+  } else {
+    hint.textContent = '';
+  }
 }
 
 function vozRenderVoz(){

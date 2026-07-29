@@ -1,16 +1,78 @@
-/* Só modelos gratuitos, com um "papel" inferido do id — usado pelo RouteLLM Free */
+/* ---------- RouteLLM Free: quais grátis entram na disputa ----------
+
+   Preferência por FAMÍLIA, nunca por id exato. Modelo grátis entra e sai do
+   catálogo do OpenRouter toda semana; uma lista de ids fixos viraria, em pouco
+   tempo, um roteador apontando pra modelo que não existe mais. O padrão casa a
+   família — se ela sair do ar, o item some da conta sozinho, sem quebrar nada.
+
+   A ordem é opinião: quem é bom em quê entre os grátis. Nota alta = entra
+   primeiro na lista que o classificador vê. */
+const FREE_RANK = [
+  { re:/deepseek.*(r1|reasoner|think)/,        nota:100, papel:'raciocínio, matemática e análise longa' },
+  { re:/(qwen|qwq).*(coder|code)/,             nota:95,  papel:'código' },
+  { re:/deepseek/,                             nota:92,  papel:'uso geral forte' },
+  { re:/llama-?4/,                             nota:90,  papel:'uso geral, contexto longo' },
+  { re:/(qwen ?3|qwen-?3|qwq)/,                nota:88,  papel:'raciocínio e código' },
+  { re:/llama-?3\.[13].*(70b|405b)/,           nota:85,  papel:'tarefas complexas' },
+  { re:/(kimi|moonshot)/,                      nota:82,  papel:'contexto muito longo' },
+  { re:/nemotron/,                             nota:80,  papel:'instruções detalhadas' },
+  { re:/qwen.*(72b|32b)/,                      nota:78,  papel:'tarefas complexas' },
+  { re:/glm/,                                  nota:75,  papel:'conversa rápida' },
+  { re:/gemma-?3/,                             nota:72,  papel:'uso geral leve' },
+  { re:/mistral|ministral|magistral/,          nota:70,  papel:'uso geral leve' },
+  { re:/phi-?[45]/,                            nota:65,  papel:'respostas curtas e diretas' },
+  { re:/llama/,                                nota:60,  papel:'uso geral' },
+];
+
+function freeNota(id){
+  const s = String(id).toLowerCase();
+  const achou = FREE_RANK.find(r => r.re.test(s));
+  return achou || { nota: 40, papel: 'uso geral' };   // desconhecido participa, mas por último
+}
+
+/* Só modelos gratuitos, com papel e ordem de preferência — usado pelo RouteLLM Free.
+
+   Antes isto era `free.slice(0, 12)`: os 12 PRIMEIROS na ordem em que o
+   OpenRouter devolveu, que é arbitrária. Dava pra ficar com doze modelos
+   fraquinhos da mesma família enquanto os bons nem apareciam pro classificador.
+
+   Agora ordena por nota e depois garante VARIEDADE: de nada adianta o
+   classificador receber doze opções se todas fazem a mesma coisa — ele precisa
+   de um raciocinador, um de código, um rápido. Primeiro entra o melhor de cada
+   papel; o resto das vagas vai pros de nota mais alta que sobraram. */
 function freeCandidates(){
-  const free = state.models.filter(m => isFreeModel(m) && !isImageModel(m));
-  const role = (id) => {
-    const s = id.toLowerCase();
-    if (s.includes('r1') || s.includes('reason') || s.includes('think')) return 'raciocínio e matemática';
-    if (s.includes('coder') || s.includes('code')) return 'código';
-    if (s.includes('70b') || s.includes('72b') || s.includes('large') || s.includes('405b')) return 'tarefas complexas';
-    if (s.includes('mini') || s.includes('small') || s.includes('8b') || s.includes('flash')) return 'conversas rápidas';
-    return 'uso geral';
-  };
-  // no máximo 12 candidatos pra não estourar o prompt do classificador
-  return free.slice(0, 12).map(m => ({ id: m.id, role: role(m.id) }));
+  const free = state.models
+    .filter(m => isFreeModel(m) && !isImageModel(m))
+    .map(m => {
+      const { nota, papel } = freeNota(m.id);
+      return { id: m.id, role: papel, nota, ctx: Number(m.context_length) || 0 };
+    })
+    // contexto como desempate: mesmo nível, ganha quem aguenta conversa mais longa
+    .sort((a, b) => (b.nota - a.nota) || (b.ctx - a.ctx));
+
+  const escolhidos = [];
+  const papeisVistos = new Set();
+  for (const c of free){
+    if (papeisVistos.has(c.role)) continue;
+    papeisVistos.add(c.role);
+    escolhidos.push(c);
+  }
+  for (const c of free){
+    if (escolhidos.length >= 12) break;
+    if (!escolhidos.includes(c)) escolhidos.push(c);
+  }
+  // reordena por nota: o classificador tende a olhar mais o topo da lista
+  return escolhidos.slice(0, 12).sort((a, b) => b.nota - a.nota)
+                   .map(c => ({ id: c.id, role: c.role }));
+}
+
+/* O classificador é uma chamada a mais em TODA mensagem, então precisa ser
+   rápido e grátis. Prefere um modelo leve: pedir a um raciocinador pra escolher
+   modelo faz o app parecer travado antes mesmo de começar a responder. */
+function freeClassifier(){
+  const leves = state.models.filter(m => isFreeModel(m) && !isImageModel(m)
+                                    && /flash|mini|small|lite|8b|9b|12b|glm/i.test(m.id));
+  return (leves[0] || state.models.find(m => isFreeModel(m) && !isImageModel(m)))?.id || null;
 }
 function isFreeModel(m){
   if (!m) return false;
@@ -22,8 +84,7 @@ async function classifyWithLLM(userText, signal, freeOnly){
   const candidates = routerCandidates(freeOnly);
   if (!candidates.length) return null;
   // classificador: sempre um modelo grátis (custo zero); senão o tier fast configurado
-  const freeModel = state.models.find(m => isFreeModel(m) && !isImageModel(m));
-  const classifier = freeModel?.id || state.routerConfig.fast;
+  const classifier = freeClassifier() || state.routerConfig.fast;
   if (!classifier) return null;
   const listText = candidates.map(c => `- ${c.id} (${c.role})`).join('\n');
   const res = await orFetch({ model: classifier, messages:[
