@@ -74,11 +74,23 @@ async function fetchModels(){
     state.models = FALLBACK_MODELS;
     state.catalogSource = 'fallback';
   }
-  if (!state.model && state.models.length) state.model = state.models[0].id;
+  pickDefaultRouterConfig();
+  /* Modelo da primeira vez. Era `state.models[0].id` — o primeiro que o
+     OpenRouter devolveu, numa ordem que é dele. Na prática isso abria o app com
+     um modelo sorteado: podia ser o mais fraco da lista, e o teste com catálogo
+     controlado abria em "GPT-5 Nano". Quem instala e manda a primeira mensagem
+     julga o app por essa resposta.
+
+     Agora começa no tier Equilibrado, que é a escolha que o próprio roteador
+     faria pro caso comum — e por isso vem depois de pickDefaultRouterConfig. */
+  if (!state.model && state.models.length){
+    state.model = state.routerConfig.balanced
+      || state.models.find(m => !isImageModel(m))?.id
+      || state.models[0].id;
+  }
   updateModelLabel();
   renderPickerTabs();
   populateImageModelSelect();
-  pickDefaultRouterConfig();
   populateRouterSelects();
   updateSessionPanel();
 }

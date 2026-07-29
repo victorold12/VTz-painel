@@ -290,6 +290,13 @@
         <select id="router-balanced-select"></select>
         <label class="hint">Potente (código / análise longa)</label>
         <select id="router-power-select"></select>
+        <label class="hint" style="display:block; margin:14px 0 4px;">Quando o roteador escolhe sozinho, o que ele deve priorizar</label>
+        <select id="router-vies-select" style="max-width:260px;">
+          <option value="economia">Economia — grátis sempre que der</option>
+          <option value="equilibrio">Equilíbrio — barato no trivial, bom no resto</option>
+          <option value="qualidade">Qualidade — a melhor resposta, tenho crédito</option>
+        </select>
+        <p class="hint" id="router-vies-msg" style="margin-top:8px;"></p>
       </div>
       <div class="cfg-group" data-cat="custo">
         <h3>Custo</h3>

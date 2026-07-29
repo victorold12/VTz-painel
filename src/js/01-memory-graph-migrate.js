@@ -101,6 +101,11 @@ const state = {
   toolsEnabled: false,
   pickerTab: 'all',
   routerConfig: JSON.parse(localStorage.getItem('vtz_router_config') || 'null') || {fast:'', balanced:'', power:''},
+  /* Como o roteador automático decide entre qualidade e preço. Padrão
+     'equilibrio' porque é o único honesto pra quem acabou de instalar: não dá
+     pra saber se a pessoa tem crédito. Quem tem, põe em 'qualidade' e o
+     classificador para de economizar por conta própria. */
+  routerVies: localStorage.getItem('vtz_router_vies') || 'equilibrio',
   skills: JSON.parse(localStorage.getItem('vtz_skills') || 'null') || [],
   agents: JSON.parse(localStorage.getItem('vtz_agents') || 'null') || [],
   favorites: JSON.parse(localStorage.getItem('vtz_favorites') || '[]'),

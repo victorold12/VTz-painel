@@ -76,7 +76,19 @@ function resolveRouterModel(text){
   return {tier, modelId};
 }
 function pickDefaultRouterConfig(){
-  const findBy = (subs) => state.models.find(m => subs.some(s => m.id.includes(s)) && !isImageModel(m))?.id;
+  /* Testa os padrões NA ORDEM e pega o melhor de cada família (ver
+     melhorDaFamilia, em 24-humanize.js). Antes era um `find` com `subs.some()`:
+     vencia quem aparecesse primeiro no catálogo, não o primeiro da lista. Como
+     `state.models` vem na ordem do OpenRouter, o tier "Potente" podia acabar
+     preenchido com um `gpt-4.1-nano` — o último padrão da lista, e a variante
+     mais fraca dele. */
+  const findBy = (subs) => {
+    for (const s of subs){
+      const m = melhorDaFamilia(s);
+      if (m) return m.id;
+    }
+    return undefined;
+  };
   if (!state.routerConfig.fast) state.routerConfig.fast = findBy(['flash-lite','haiku-3','gpt-4.1-nano','gemma']) || state.models.find(m=>!isImageModel(m))?.id;
   if (!state.routerConfig.balanced) state.routerConfig.balanced = findBy(['gemini-2.5-flash','deepseek-v4-flash','flash']) || state.routerConfig.fast;
   if (!state.routerConfig.power) state.routerConfig.power = findBy(['claude-sonnet','claude-opus','gpt-5','gpt-4.1']) || state.routerConfig.balanced;
@@ -95,6 +107,25 @@ function populateRouterSelects(){
     });
     sel.onchange = () => { state.routerConfig[tier] = sel.value; localStorage.setItem('vtz_router_config', JSON.stringify(state.routerConfig)); };
   });
+  setupRouterVies();
+}
+
+/* O viés é uma frase no prompt do classificador, e é a diferença entre gastar o
+   crédito do mês e não gastar nada. Por isso fica aqui, com o efeito escrito
+   embaixo — e não escondido numa constante do código. */
+function setupRouterVies(){
+  const sel = document.getElementById('router-vies-select');
+  const msg = document.getElementById('router-vies-msg');
+  if (!sel) return;
+  const explica = () => { if (msg) msg.textContent = viesDoRoteador(); };
+  sel.value = state.routerVies;
+  explica();
+  sel.onchange = () => {
+    state.routerVies = sel.value;
+    localStorage.setItem('vtz_router_vies', sel.value);
+    explica();
+    toast('Roteamento automático: ' + sel.options[sel.selectedIndex].text.split('—')[0].trim() + '.');
+  };
 }
 
 /* ---------- Tool registry ---------- */

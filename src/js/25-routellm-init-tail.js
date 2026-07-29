@@ -80,15 +80,46 @@ function isFreeModel(m){
   const p = m.pricing;
   return p && parseFloat(p.prompt||0) === 0 && parseFloat(p.completion||0) === 0;
 }
+/* A instrução que decide o comportamento do roteador. É uma frase, e é a
+   diferença entre gastar R$50 por mês e não gastar nada — por isso fica visível
+   na configuração em vez de escondida numa constante.
+
+   'equilibrio' é o padrão de instalação: sem saber se existe crédito, mandar o
+   roteador escolher o modelo caro seria decidir pelo bolso de outra pessoa. */
+const VIES_ROTEADOR = {
+  economia: 'PRIORIDADE: custo. Use o modelo grátis sempre que ele der conta. ' +
+    'Só suba de nível se a tarefa for claramente impossível pro grátis, e mesmo ' +
+    'assim pare no mais barato que resolve.',
+  equilibrio: 'PRIORIDADE: equilíbrio. Tarefa trivial (saudação, pergunta de uma ' +
+    'linha, formatação) vai no grátis ou no mais barato. Tarefa de verdade vai no ' +
+    'modelo adequado, sem medo do preço. Não use o mais caro por padrão.',
+  qualidade: 'PRIORIDADE: qualidade da resposta. Há crédito disponível e o custo ' +
+    'NÃO é a restrição principal. Escolha o modelo que dá a melhor resposta pra ' +
+    'esta tarefa. Só use um modelo barato ou grátis quando ele for genuinamente ' +
+    'tão bom quanto o caro pra este pedido específico — o que acontece em ' +
+    'saudações, respostas de uma linha e reformatação de texto, não em código, ' +
+    'análise ou escrita longa.',
+};
+function viesDoRoteador(){
+  return VIES_ROTEADOR[state.routerVies] || VIES_ROTEADOR.equilibrio;
+}
+
 async function classifyWithLLM(userText, signal, freeOnly){
   const candidates = routerCandidates(freeOnly);
   if (!candidates.length) return null;
   // classificador: sempre um modelo grátis (custo zero); senão o tier fast configurado
   const classifier = freeClassifier() || state.routerConfig.fast;
   if (!classifier) return null;
-  const listText = candidates.map(c => `- ${c.id} (${c.role})`).join('\n');
+  /* Com o preço na lista, "equilibrar qualidade e custo" deixa de ser adivinhação.
+     Antes o classificador recebia só ids e papéis e era mandado economizar sem
+     saber quanto custava nada — na prática ele decidia pelo nome do modelo. */
+  const listText = candidates.map(c => {
+    const p = Number(c.preco) || 0;
+    const etiqueta = p === 0 ? 'grátis' : `US$ ${p.toFixed(2)}/M tokens de saída`;
+    return `- ${c.id} (${c.role}) — ${etiqueta}`;
+  }).join('\n');
   const res = await orFetch({ model: classifier, messages:[
-      { role:'system', content:`Você é um roteador de modelos de IA. Analise a tarefa do usuário e escolha o MELHOR modelo da lista abaixo, equilibrando qualidade e custo (não escolha modelo caro pra tarefa trivial).\n${listText}\nResponda APENAS com JSON válido: {"model":"<id exato da lista>"}` },
+      { role:'system', content:`Você é um roteador de modelos de IA. Analise a tarefa do usuário e escolha o MELHOR modelo da lista abaixo.\n${listText}\n\n${viesDoRoteador()}\n\nResponda APENAS com JSON válido: {"model":"<id exato da lista>"}` },
       { role:'user', content: userText.slice(0, 2000) }
     ]}, { signal });
   if (!res.ok) throw new Error('classificador falhou');
@@ -103,12 +134,39 @@ async function classifyWithLLM(userText, signal, freeOnly){
    Sem o delay do debate sequencial: as duas respostas são pedidas ao mesmo tempo
    (Promise.all), então o tempo total ≈ o do modelo mais lento, não a soma. Um
    modelo grátis funde as duas na melhor versão. */
+/* O par que vai responder em paralelo.
+
+   DUAS CORREÇÕES, e as duas mudam a resposta que chega na tela:
+
+   1. Escolhe o melhor de cada família (melhorDaFamilia), não o primeiro que o
+      catálogo devolveu. `/gemini-3/` casava com `gemini-3.1-flash-lite` tão bem
+      quanto com `gemini-3.1-pro` — e aí o "forte" do par era o modelo leve.
+
+   2. FABRICANTES DIFERENTES, obrigatoriamente. Fundir duas respostas só vale
+      quando os dois erram em lugares diferentes; dois modelos da mesma casa,
+      treinados no mesmo dado com o mesmo método, tendem a errar no MESMO lugar.
+      Nesse caso o fusor recebe a mesma alucinação duas vezes e conclui que ela
+      está confirmada — pior que uma resposta só, porque vem com confiança. */
 function fusionPair(){
-  // um forte + um rápido/barato distinto, ambos presentes no catálogo
-  const strong = state.models.find(m => /claude-opus|gpt-5\.5|claude-sonnet-5|gemini-3/.test(m.id) && !isImageModel(m))
-              || state.models.find(m => !isImageModel(m) && !isFreeModel(m));
-  const fast = state.models.find(m => /deepseek|gemini-2\.5-flash|gpt-5-mini|llama-3\.3/.test(m.id) && !isImageModel(m) && m.id !== strong?.id)
-            || state.models.find(m => !isImageModel(m) && m.id !== strong?.id);
+  const provedor = (id) => String(id).split('/')[0];
+
+  const fortes = ['claude-opus', 'gpt-5', 'gemini-3.1-pro', 'claude-sonnet', 'grok'];
+  let strong = null;
+  for (const f of fortes){ strong = melhorDaFamilia(f); if (strong) break; }
+  strong = strong || state.models.find(m => !isImageModel(m) && !isFreeModel(m));
+  if (!strong) return [];
+
+  /* O segundo é o contraponto: bom, barato e de outra casa. A ordem aqui é
+     proposital — famílias com jeito de raciocinar diferente primeiro. */
+  const contrapontos = ['deepseek', 'qwen', 'llama', 'gemini-2.5-flash', 'glm', 'mistral', 'gpt-5'];
+  let fast = null;
+  for (const f of contrapontos){
+    const m = melhorDaFamilia(f);
+    if (m && m.id !== strong.id && provedor(m.id) !== provedor(strong.id)){ fast = m; break; }
+  }
+  /* Sem nenhum de outra casa no catálogo, aceita da mesma: uma fusão correlata
+     ainda é melhor que "Preciso de ao menos 2 modelos". */
+  fast = fast || state.models.find(m => !isImageModel(m) && m.id !== strong.id);
   return [strong, fast].filter(Boolean).map(m => m.id);
 }
 async function runFusion(conv, ctrl, thinking){
