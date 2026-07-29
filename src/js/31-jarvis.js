@@ -98,11 +98,17 @@ function fmtSize(bytes){
 /* ---------- 3. STATE MACHINE ----------
    Nós do JARVIS + estados do chat, independentes.
    Transições disparadas por EVENTO, nunca por tempo fixo.        */
+/* `erro` é um nó como qualquer outro, alcançável de todos os demais. Antes o
+   erro não era estado: a mensagem ia pra legenda e a cena voltava pra idle, onde
+   o CSS esconde a legenda — a cena fechava a escuta e ficava muda, parecendo que
+   o pedido tinha sido ignorado. Estado de verdade significa que a tela sabe
+   mostrar erro sem ninguém forçar estilo por fora. */
 const JARVIS_GRAPH = {
-  idle:       ['listening'],
-  listening:  ['thinking','idle'],
-  thinking:   ['delivering','idle'],
-  delivering: ['idle','listening']
+  idle:       ['listening','erro'],
+  listening:  ['thinking','idle','erro'],
+  thinking:   ['delivering','idle','erro'],
+  delivering: ['idle','listening','erro'],
+  erro:       ['idle','listening']
 };
 class FSM {
   constructor(graph, initial){
@@ -348,9 +354,36 @@ class ParticleEngine {
   }
   setAudio(level){ this.audioT = Math.max(0, Math.min(1, level)); }
 
+  /* Degradação por FPS MEDIDO. A detecção de renderer por software (no
+     construtor) só pega a ausência total de GPU; uma integrada fraca se declara
+     hardware e engasga do mesmo jeito nos 24 mil pontos — e aí a cena que devia
+     impressionar vira uma apresentação de slides.
+
+     Mede a média móvel e corta pela metade quando cai abaixo de 40fps por 2
+     segundos seguidos. Corta no máximo duas vezes (24k → 12k → 6k): abaixo
+     disso o problema não é densidade, e ficar reduzindo pra sempre trocaria uma
+     cena feia por uma cena vazia. Nunca volta a subir — oscilar a densidade na
+     tela chama mais atenção que a queda de fps. */
+  _vigiaFps(now){
+    if (!this._fpsT){ this._fpsT = now; this._fpsN = 0; this._cortes = 0; this._ruim = 0; return; }
+    this._fpsN += 1;
+    const janela = now - this._fpsT;
+    if (janela < 1000) return;
+    const fps = this._fpsN * 1000 / janela;
+    this._fpsT = now; this._fpsN = 0;
+    if (this._cortes >= 2) return;
+    this._ruim = (fps < 40) ? this._ruim + 1 : 0;
+    if (this._ruim >= 2){
+      this._ruim = 0; this._cortes += 1;
+      this.N = Math.max(1500, Math.round(this.N / 2));
+      console.warn(`[VTz] ${fps.toFixed(0)}fps na cena JARVIS — densidade reduzida para ${this.N} pontos`);
+    }
+  }
+
   _loop(now){
     requestAnimationFrame(this._loop);
     const gl = this.gl, dt = 1/60;
+    if (this.alpha > 0.01) this._vigiaFps(now);
     const k = 1 - Math.pow(0.002, dt);        // suavização exponencial
     this.W.r += (this.T.r - this.W.r)*k*1.7;
     this.W.v += (this.T.v - this.W.v)*k*1.7;
@@ -770,7 +803,9 @@ const POSE = {
   idle:       {r:.35, v:.10, s:.05, offX:0,    scale:0.90, alpha:0   },
   listening:  {r:1,   v:0,   s:0,   offX:0,    scale:0.78, alpha:1   },
   thinking:   {r:0,   v:1,   s:0,   offX:0,    scale:0.74, alpha:1   },
-  delivering: {r:0,   v:0,   s:1,   offX:0.80, scale:0.66, alpha:1   }
+  delivering: {r:0,   v:0,   s:1,   offX:0.80, scale:0.66, alpha:1   },
+  /* Mesma pose de repouso do idle: no erro a cena para, quem fala é a legenda. */
+  erro:       {r:.35, v:.10, s:.05, offX:0,    scale:0.90, alpha:0   }
 };
 const CAPTION = {
   listening: {text:'Ouvindo…',            sub:'escutando'},
@@ -897,25 +932,17 @@ driver.on('speechEnd', ()=>{
 
    Então: marca data-jerro no body (o CSS mantém a legenda de pé enquanto durar) E
    manda um toast, que vive fora da cena e aparece de qualquer jeito. */
+/* O texto entra ANTES da transição de propósito: CAPTION não tem entrada pra
+   `erro`, então o listener da FSM não reescreve a legenda e a mensagem
+   sobrevive. O toast é reforço — vive fora da cena e aparece de qualquer jeito. */
 function mostraErroJarvis(msg){
-  document.body.dataset.jerro = '1';
   jq('#j-cap-text').textContent = msg;
   jq('#j-cap-sub').textContent  = 'erro';
-  jfsm.go('idle');
-  /* Estilo inline em vez de regra CSS: a legenda tem opacity/pointer-events
-     definidos por estado em várias regras, e uma regra a mais aqui vira uma
-     disputa de cascata que quebra silenciosamente quando alguém mexer no CSS
-     depois. Inline ganha sempre, e limpaErroJarvis desfaz. */
-  const cap = jq('#j-caption');
-  if (cap){ cap.classList.add('erro');
-    cap.style.opacity = '1'; cap.style.pointerEvents = 'auto'; cap.style.transform = 'translateX(-50%)'; }
+  jfsm.go('erro');
   try{ toast(msg, 'err'); }catch(e){ /* toast é reforço, não pode derrubar o erro */ }
 }
 function limpaErroJarvis(){
-  delete document.body.dataset.jerro;
-  const cap = jq('#j-caption');
-  if (cap){ cap.classList.remove('erro');
-    cap.style.opacity = ''; cap.style.pointerEvents = ''; cap.style.transform = ''; }
+  if (jfsm.state === 'erro') jfsm.go('idle');
 }
 
 /* Um só dono do erro: qualquer 'error' do driver cai na legenda do JARVIS

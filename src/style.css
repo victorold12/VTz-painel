@@ -1195,7 +1195,10 @@ body[data-jstate="delivering"] .j-brand .dot{background:var(--violet);box-shadow
 /* --- painel idle (ref 6) --- */
 .j-idle{width:100%;max-width:660px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;
   transition:opacity var(--t-slow) var(--ease-inout),transform var(--t-slow) var(--ease-inout)}
-body:not([data-jstate="idle"]) .j-idle{opacity:0;transform:translateY(-26px) scale(.97);pointer-events:none}
+/* `erro` entra junto com `idle`: depois de uma falha o campo de pedido e o
+   microfone precisam continuar ali, senão a única saída seria fechar a cena.
+   Erro é o momento em que a pessoa MAIS quer tentar de novo. */
+body:not([data-jstate="idle"]):not([data-jstate="erro"]) .j-idle{opacity:0;transform:translateY(-26px) scale(.97);pointer-events:none}
 .j-badge{font-size:11px;font-weight:700;color:var(--text-dim);background:rgba(255,255,255,.06);
   border:1px solid var(--w08);border-radius:999px;padding:6px 15px;backdrop-filter:blur(10px)}
 .j-title{font-size:36px;font-weight:600;letter-spacing:-.03em;line-height:1.15}
@@ -1238,15 +1241,15 @@ body:not([data-jstate="idle"]) .j-idle{opacity:0;transform:translateY(-26px) sca
   opacity:0;transition:opacity var(--t-slow) var(--ease-inout),transform var(--t-slow) var(--ease-inout)}
 body[data-jstate="listening"] .j-caption,body[data-jstate="thinking"] .j-caption{opacity:1;pointer-events:auto}
 body[data-jstate="delivering"] .j-caption{opacity:0;transform:translateX(-50%) translateY(20px)}
-/* Erro termina sempre em idle, onde as regras acima escondem a legenda — e a
-   mensagem sumia junto. Quem reexibe é mostraErroJarvis(), com estilo inline
-   (opacity é disputado por três regras de estado; inline encerra a disputa).
-   O resto fica aqui: em idle a legenda cai em cima do microfone, então no erro
-   ela vira um cartão com fundo próprio, deslocado pra baixo. */
-.j-caption.erro{bottom:4%;background:rgba(10,10,14,.94);border:1px solid rgba(255,107,107,.32);
+/* `erro` é um estado da FSM (JARVIS_GRAPH), não um estilo forçado por fora:
+   mesma família das três regras acima, e por isso não disputa cascata com elas.
+   Vira um cartão com fundo próprio, deslocado pra baixo — na altura padrão a
+   legenda cairia em cima do botão do microfone. */
+body[data-jstate="erro"] .j-caption{opacity:1;pointer-events:auto;transform:translateX(-50%);
+  bottom:4%;background:rgba(10,10,14,.94);border:1px solid rgba(255,107,107,.32);
   border-radius:14px;padding:14px 22px;max-width:min(620px,86vw);gap:8px}
-.j-caption.erro .j-cap-text{font-size:16px}
-body[data-jerro="1"] .j-cap-sub{color:var(--bad,#ff6b6b)}
+body[data-jstate="erro"] .j-cap-text{font-size:16px}
+body[data-jstate="erro"] .j-cap-sub{color:var(--bad,#ff6b6b)}
 .j-cap-text{font-size:19px;font-weight:600;letter-spacing:-.01em;max-width:560px;line-height:1.4}
 .j-cap-sub{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;color:var(--text-faint);text-transform:uppercase}
 /* medidor de voz — reage ao áudio real */
