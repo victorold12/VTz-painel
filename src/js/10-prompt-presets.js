@@ -640,6 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupBackendBridge(); // analytics/backup/memória do servidor
   setupTemas();         // base clara/escura + cor de destaque
   setupConversasSync(); // espelho das conversas + backup automático do servidor
+  setupQrCelular();     // atalho pra abrir este painel no celular
   setupAccountMenu();
   autoDetectBackend();  // procura o backend local em segundo plano
   document.getElementById('goto-skills-btn').onclick = () => { switchView('skills'); toggleSidebar(false); };

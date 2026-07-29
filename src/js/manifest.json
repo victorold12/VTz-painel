@@ -33,5 +33,6 @@
   "31-jarvis.js",
   "32-backend-bridge.js",
   "33-temas.js",
-  "34-conversas-sync.js"
+  "34-conversas-sync.js",
+  "35-qr-celular.js"
 ]

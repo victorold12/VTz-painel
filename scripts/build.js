@@ -72,6 +72,25 @@ const VENDOR = [
   ['html2canvas/dist/html2canvas.min.js', 'html2canvas.min.js'],
 ];
 
+/* O qrcode não vem com um arquivo pronto pro navegador — é CommonJS em vários
+   módulos. Como o build já usa esbuild, empacota aqui num arquivo só, em vez de
+   puxar de CDN (o CSP bloqueia) ou de escrever um codificador de QR na mão. */
+async function bundleQrcode() {
+  const saida = path.join(root, 'vendor', 'qrcode.min.js');
+  await esbuild.build({
+    entryPoints: [path.join(root, 'node_modules', 'qrcode', 'lib', 'browser.js')],
+    outfile: saida,
+    bundle: true,
+    minify: true,
+    format: 'iife',
+    globalName: 'QRCode',
+    platform: 'browser',
+    target: 'es2020',
+    logLevel: 'warning',
+  });
+  console.log(`vendor/qrcode.min.js: ${bytes(fs.statSync(saida).size)}`);
+}
+
 function copiaVendor() {
   const destDir = path.join(root, 'vendor');
   fs.mkdirSync(destDir, { recursive: true });
@@ -91,6 +110,7 @@ function copiaVendor() {
 
 async function main() {
   copiaVendor();
+  await bundleQrcode();
   await buildJs();
   await buildCss();
 }
