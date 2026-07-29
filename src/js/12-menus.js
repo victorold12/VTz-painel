@@ -188,7 +188,15 @@ async function pullFromCloud(uid){
     const doc = await fbDb.collection('vtzllm_users').doc(uid).get();
     if (!doc.exists){ await pushToCloud(); return; }
     const d = doc.data();
-    if (Array.isArray(d.conversations)) localStorage.setItem('vtz_conversations', JSON.stringify(d.conversations));
+    /* Conversas passam pela MESMA mesclagem do backend (34-conversas-sync.js),
+       nunca por sobrescrita em bloco. O retrato do Firebase não tem noção de
+       apagado nem de qual lado é mais recente: escrever ele inteiro por cima
+       apagava a edição feita neste aparelho e ressuscitava conversa excluída —
+       e isso valia mesmo sem backend nenhum, entre dois navegadores do mesmo
+       usuário. O resto do payload (agentes, skills, prompt) continua vindo em
+       bloco: lá o retrato mais recente é a resposta certa. */
+    const mescladas = mesclaConversas(d.conversations);
+    if (mescladas) localStorage.setItem('vtz_conversations', JSON.stringify(state.conversations));
     if (Array.isArray(d.agents)){ state.agents = d.agents; localStorage.setItem('vtz_agents', JSON.stringify(d.agents)); }
     if (Array.isArray(d.skills)){ state.skills = d.skills; localStorage.setItem('vtz_skills', JSON.stringify(d.skills)); }
     if (typeof d.globalPrompt === 'string') localStorage.setItem('vtz_global_prompt', d.globalPrompt);
@@ -204,7 +212,9 @@ async function pullFromCloud(uid){
     // restaurar backup também atualiza a fonte única (Seção 7), se há backend
     if (backendUrl() && typeof pushMemoryToBackend === 'function') pushMemoryToBackend();
     if (Array.isArray(d.projects)){ state.projects = d.projects; localStorage.setItem('vtz_projects', JSON.stringify(d.projects)); }
-    state.conversations = JSON.parse(localStorage.getItem('vtz_conversations') || '[]');
+    /* state.conversations já está certo: mesclaConversas escreve nele direto.
+       Recarregar do localStorage aqui era necessário quando a linha acima
+       sobrescrevia o disco pelas costas da memória. */
     renderProjectsBar(); renderHistoryList(); renderChat();
     setSyncStatus('Sincronizado ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}));
     toast('Dados da nuvem carregados.');

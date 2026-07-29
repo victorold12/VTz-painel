@@ -25,6 +25,7 @@ const sParaMs = (s) => (Number(s) || 0) * 1000;
 const CONV_LOTE = 150;                    // o backend recusa acima de 200
 const CHAVE_DESDE = 'vtz_conv_sync_desde';
 const CHAVE_LAPIDES = 'vtz_conv_lapides';
+const CHAVE_APAGADAS = 'vtz_conv_apagadas';
 
 let _convSyncTimer = null;
 let _convSyncRodando = false;
@@ -43,10 +44,51 @@ function registraLapide(id){
     l.push(id);
     localStorage.setItem(CHAVE_LAPIDES, JSON.stringify(l.slice(-500)));
   }
+  registraApagada(id);
 }
 function limpaLapides(ids){
   const restantes = lapidesLocais().filter(x => !ids.includes(x));
   localStorage.setItem(CHAVE_LAPIDES, JSON.stringify(restantes));
+}
+
+/* Memória LONGA do que foi apagado aqui — diferente das lápides, que somem
+   assim que o backend as recebe. Precisa ser longa porque existe mais de uma
+   nuvem: o Firebase guarda um retrato do localStorage sem noção de apagado, e
+   sem esta lista ele reintroduz a conversa na primeira descida depois que a
+   lápide já foi consumida pelo backend. Guarda só o id. */
+function apagadasLocais(){
+  try{ return JSON.parse(localStorage.getItem(CHAVE_APAGADAS) || '[]'); }
+  catch(e){ return []; }
+}
+function registraApagada(id){
+  const a = apagadasLocais();
+  if (!a.includes(id)){
+    a.push(id);
+    localStorage.setItem(CHAVE_APAGADAS, JSON.stringify(a.slice(-1000)));
+  }
+}
+
+/* Mescla uma lista vinda de FORA no que está aqui. Um só caminho pros dois
+   destinos (backend e Firebase) porque a regra tem que ser a mesma: sobrescrever
+   em bloco perde a edição feita neste aparelho e ressuscita o que foi apagado.
+
+   Regra: por conversa, vence quem tem updatedAt maior. Nunca mescla mensagens —
+   intercalar as mensagens de dois aparelhos produz uma conversa que nunca
+   aconteceu. Devolve quantas foram aplicadas. */
+function mesclaConversas(lista){
+  if (!Array.isArray(lista)) return 0;
+  const apagadas = apagadasLocais();
+  let aplicadas = 0;
+  lista.forEach(vinda => {
+    if (!vinda || !vinda.id) return;
+    if (apagadas.includes(vinda.id)) return;          // apagada aqui: não volta
+    const local = state.conversations.find(c => c.id === vinda.id);
+    if (local && (local.updatedAt || 0) >= (vinda.updatedAt || 0)) return;
+    if (local) Object.assign(local, vinda);
+    else state.conversations.push(vinda);
+    aplicadas += 1;
+  });
+  return aplicadas;
 }
 
 /* Converte a conversa do painel pro formato da rota. O que o backend não
@@ -87,17 +129,10 @@ async function convBaixa(){
   const d = await convApi('/api/conversations?since=' + desde);
   let aplicadas = 0;
 
-  (d.conversations || []).forEach(remota => {
-    const local = state.conversations.find(c => c.id === remota.id);
-    const remotaMs = sParaMs(remota.updated_at);
-    /* Só sobrescreve se a do servidor for MAIS NOVA. Se a local estiver na
-       frente, ela é que vai subir no próximo empurrão. */
-    if (local && (local.updatedAt || 0) >= remotaMs) return;
-    const convertida = convDoBackend(remota);
-    if (local) Object.assign(local, convertida);
-    else state.conversations.push(convertida);
-    aplicadas += 1;
-  });
+  /* Mesma regra que o Firebase usa (mesclaConversas): mais nova vence, apagada
+     aqui não volta. Se a local estiver na frente, ela é que sobe no próximo
+     empurrão. */
+  aplicadas += mesclaConversas((d.conversations || []).map(convDoBackend));
 
   (d.deleted || []).forEach(morta => {
     const idx = state.conversations.findIndex(c => c.id === morta.id);
