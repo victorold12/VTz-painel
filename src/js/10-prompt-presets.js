@@ -642,6 +642,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupConversasSync(); // espelho das conversas + backup automático do servidor
   setupQrCelular();     // atalho pra abrir este painel no celular
   setupPwa();           // instalar como aplicativo / abrir offline
+  setupAcordaBackend(); // cutuca o backend pra ele não hibernar durante a sessão
   setupAccountMenu();
   autoDetectBackend();  // procura o backend local em segundo plano
   document.getElementById('goto-skills-btn').onclick = () => { switchView('skills'); toggleSidebar(false); };

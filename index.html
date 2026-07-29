@@ -367,6 +367,11 @@
         <button class="primary" id="backend-test-btn" style="margin-top:8px;">Testar backend</button>
         <pre id="backend-status" style="display:none; margin-top:10px; background:var(--input-bg); border:1px solid var(--line); border-radius:10px; padding:11px; font-size:11px; line-height:1.6; white-space:pre-wrap; word-break:break-word;"></pre>
       </div>
+      <div class="cfg-group" data-cat="backend">
+        <h3>Manter o servidor acordado</h3>
+        <p class="hint" style="margin-bottom:10px;">Servidor de plano grátis <b>hiberna</b> depois de uns 15 minutos parado, e a primeira mensagem depois disso espera o container subir — meio minuto olhando pra tela. Com o painel aberto ele é cutucado de tempos em tempos, e não hiberna enquanto você está usando. <b>Isso não cobre o primeiro acesso do dia:</b> pra o servidor nunca dormir é preciso um cutucador de fora (cron-job.org, UptimeRobot) batendo em <code>/api/health</code> — está explicado no README do repo <b>servidor</b>.</p>
+        <p class="hint" id="acorda-estado">—</p>
+      </div>
       <div class="cfg-group" data-cat="agente">
         <h3>Agente Local</h3>
         <p class="hint" style="margin-bottom:12px;">Instale o Agente Local no seu PC pra habilitar ações que precisam da sua máquina: arquivo, comando, organização de pastas. Sem ele, o chat continua funcionando normalmente — só as ações do PC ficam indisponíveis. Ver <code>agente-local/README.md</code> no repositório <b>servidor</b> pra instalar.</p>

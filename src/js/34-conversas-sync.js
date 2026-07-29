@@ -258,7 +258,7 @@ async function renderAutoBackup(){
       `<div class="ab-linha"><span>Snapshots guardados</span><b>${d.existem} (mantém ${d.manter})</b></div>` +
       `<div class="ab-linha"><span>Último</span><b>` +
       (ultimo ? `${esc(ultimo.arquivo)} · ${(ultimo.bytes / 1024).toFixed(0)} KB` : '—') + '</b></div>' +
-      `<p class="ab-aviso">${esc(d.aviso)}</p>`;
+      `<p class="ab-aviso${d.efemero ? ' perigo' : ''}">${esc(d.aviso)}</p>`;
     if (!d.ligado){
       html += '<p class="hint" style="margin-top:8px;">Pra ligar, defina <code>BACKUP_EVERY_HOURS=6</code> ' +
         'no ambiente do servidor (e <code>BACKUP_KEEP</code> se quiser guardar mais que 14).</p>';
