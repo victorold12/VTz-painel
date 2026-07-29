@@ -34,5 +34,6 @@
   "32-backend-bridge.js",
   "33-temas.js",
   "34-conversas-sync.js",
-  "35-qr-celular.js"
+  "35-qr-celular.js",
+  "36-pwa.js"
 ]
