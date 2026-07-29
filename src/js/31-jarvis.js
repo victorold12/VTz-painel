@@ -533,14 +533,21 @@ class FileCard {
 /* Config do backend: reusa o que o painel já sabe (state.backendUrl,
    backendHeaders, state.apiKey). Não duplica fonte de verdade. */
 const JMODEL_DEFAULT = (typeof MODEL_DEFAULT !== 'undefined') ? MODEL_DEFAULT : '__router__';
+/* A chave é 'vtz_or_model' — a mesma que o seletor de modelos do painel grava
+   (17-fallback-models.js). Antes esta cena lia 'vtz_model', chave que NINGUÉM
+   escreve: o getItem devolvia null sempre, e o JARVIS ignorava silenciosamente
+   o modelo escolhido no painel, rodando sempre no padrão. */
+function jarvisModeloEscolhido(){
+  return localStorage.getItem('vtz_or_model') || JMODEL_DEFAULT;
+}
 const API = {
   get base(){ return backendUrl(); },
   get model(){
-    const v = localStorage.getItem('vtz_model') || JMODEL_DEFAULT;
+    const v = jarvisModeloEscolhido();
     return v.startsWith('__') ? '' : v;
   },
   get route(){
-    const v = localStorage.getItem('vtz_model') || JMODEL_DEFAULT;
+    const v = jarvisModeloEscolhido();
     return {'__router__':'auto', '__router_free__':'free', '__fusion__':'fusion'}[v] || '';
   },
   get agentId(){ return jarvisState.agentId || ''; },

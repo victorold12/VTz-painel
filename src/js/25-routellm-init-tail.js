@@ -63,8 +63,13 @@ async function runFusion(conv, ctrl, thinking){
 
   thinking.update('Consultando 2 modelos em paralelo…');
   // dispara as duas ao MESMO tempo
+  /* orFetchRetry, não orFetch: é o que traz o teto de tempo com repetição em
+     instabilidade e, principalmente, a queda pra modelo grátis quando o crédito
+     acaba. Com orFetch cru, ficar sem crédito derrubava o Fusion inteiro
+     ("Nenhum dos modelos respondeu") enquanto o chat normal seguia respondendo —
+     a mesma conta, dois comportamentos. */
   const calls = models.map(model =>
-    orFetch({ model, messages: msgs }, { signal: ctrl.signal })
+    orFetchRetry({ model, messages: msgs }, { signal: ctrl.signal })
       .then(r => r.ok ? r.json() : null)
       .then(d => ({ model, text: d?.choices?.[0]?.message?.content || '', usage: d?.usage }))
       .catch(() => ({ model, text: '', usage: null }))
@@ -82,7 +87,7 @@ async function runFusion(conv, ctrl, thinking){
   const lastUser = contentToText([...conv.messages].reverse().find(m => m.role==='user')?.content || '');
   const fuseSystem = `Você recebe a mesma pergunta respondida por ${valid.length} modelos de IA diferentes. Produza UMA resposta final, a melhor possível: combine os acertos de cada uma, corrija erros, elimine redundância e contradições. Responda no idioma da pergunta, direto, sem citar "modelo A/B" nem explicar que houve fusão — entregue só a resposta final.`;
   const fuseUser = `PERGUNTA:\n${lastUser}\n\n` + valid.map((r,i) => `RESPOSTA ${i+1} (${r.model}):\n${r.text}`).join('\n\n---\n\n');
-  const fr = await orFetch({ model: fuser, messages:[
+  const fr = await orFetchRetry({ model: fuser, messages:[
     { role:'system', content: fuseSystem },
     { role:'user', content: fuseUser }
   ]}, { signal: ctrl.signal });

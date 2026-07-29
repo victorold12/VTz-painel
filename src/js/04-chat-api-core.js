@@ -1,8 +1,37 @@
+/* Teto de espera ATÉ A RESPOSTA COMEÇAR. Provedor que engasga não devolve erro:
+   ele simplesmente não responde, e sem teto a interface fica "pensando" pra
+   sempre, sem nada pra clicar além de recarregar a página.
+
+   O teto vale só até o cabeçalho chegar, e é por isso que não dá pra usar
+   AbortSignal.timeout aqui: aquele sinal continua ativo enquanto o corpo é
+   lido, e cortaria uma resposta longa em streaming no meio da frase. Depois que
+   a resposta começa, quem manda é o usuário (botão Parar).
+
+   Ajustável por vtz_or_timeout_ms no localStorage: 2 minutos cobre a maioria,
+   mas modelo de raciocínio longo em conexão ruim estoura — e nesse caso o certo
+   é a pessoa poder esperar mais, não o app decidir que falhou. */
+function orTimeoutMs(){
+  const v = Number(localStorage.getItem('vtz_or_timeout_ms'));
+  return (Number.isFinite(v) && v >= 1000) ? v : 120000;
+}
+
 /* Chamada única à API de chat — todas as features passam por aqui */
 function orFetch(payload, opts = {}){
   // Roteamento por throughput: mesma qualidade (modelo idêntico), mas o OpenRouter
   // escolhe o provedor mais rápido no momento. Não sobrescreve preferências já postas.
   const body = payload.provider ? payload : { ...payload, provider: { sort: 'throughput' } };
+  const ctrl = new AbortController();
+  const cancelaPeloUsuario = () => ctrl.abort(opts.signal?.reason);
+  if (opts.signal){
+    if (opts.signal.aborted) ctrl.abort(opts.signal.reason);
+    else opts.signal.addEventListener('abort', cancelaPeloUsuario, { once:true });
+  }
+  const teto = orTimeoutMs();
+  const relogio = setTimeout(
+    () => ctrl.abort(new DOMException(
+      `O provedor não respondeu em ${Math.round(teto / 1000)}s.`, 'TimeoutError')),
+    teto);
+
   return fetch(OR_BASE + '/chat/completions', {
     method:'POST',
     headers:{
@@ -12,7 +41,10 @@ function orFetch(payload, opts = {}){
       'X-Title': SITE_TITLE,
     },
     body: JSON.stringify(body),
-    signal: opts.signal,
+    signal: ctrl.signal,
+  }).finally(() => {
+    clearTimeout(relogio);
+    opts.signal?.removeEventListener('abort', cancelaPeloUsuario);
   });
 }
 /* Contabilidade de custo unificada */
@@ -65,6 +97,12 @@ async function orFetchRetry(payload, opts = {}){
       lastErr = new Error('API ' + res.status);
     }catch(e){
       if (e.name === 'AbortError') throw e;
+      /* Tempo esgotado não entra no laço: já foram 2 minutos de espera, e mais
+         duas rodadas dariam 6. Falha na hora, dizendo o que houve — "erro de
+         rede" depois de seis minutos parados é a pior resposta possível. */
+      if (e.name === 'TimeoutError'){
+        throw new Error(e.message + ' Tente outro modelo ou verifique a conexão.');
+      }
       lastErr = e;
     }
   }
