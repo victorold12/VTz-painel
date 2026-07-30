@@ -53,6 +53,122 @@ async function textoDoArquivo(file){
   return bruto;
 }
 
+/* ---------- cofre local do texto indexado ----------
+
+   POR QUE ISTO EXISTE. O índice mora no SQLite do backend, e no plano grátis do
+   Render esse disco é EFÊMERO: some a cada deploy e a cada vez que o serviço
+   acorda de hibernar. Sem defesa, você indexaria seus documentos e um dia
+   qualquer o assistente simplesmente pararia de saber deles — sem erro, sem
+   aviso, só respostas piores. É a pior forma de perder dado: silenciosa.
+
+   Então o painel guarda uma cópia do TEXTO de cada documento indexado e, no
+   boot, compara com o que o servidor diz ter. O que faltar, ele reenvia sozinho.
+
+   IndexedDB e não localStorage: localStorage tem teto de ~5MB e é síncrono —
+   guardar o texto de alguns documentos ali estouraria a cota e derrubaria
+   TAMBÉM as conversas, que moram no mesmo lugar. O risco de gravar o documento
+   junto das conversas não vale a economia de vinte linhas. */
+const COFRE_DB = 'vtz-docs';
+const COFRE_LOJA = 'textos';
+
+function abreCofre(){
+  return new Promise((ok, falha) => {
+    let req;
+    try{ req = indexedDB.open(COFRE_DB, 1); }
+    catch(e){ return falha(e); }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(COFRE_LOJA)) db.createObjectStore(COFRE_LOJA, { keyPath:'name' });
+    };
+    req.onsuccess = () => ok(req.result);
+    req.onerror = () => falha(req.error || new Error('IndexedDB indisponível'));
+  });
+}
+
+/* Toda operação do cofre tolera falha: navegador em aba anônima, cota cheia ou
+   IndexedDB bloqueado por política não podem impedir de indexar um documento.
+   Sem cofre você perde a recuperação automática, não a funcionalidade. */
+async function cofreGrava(name, text){
+  try{
+    const db = await abreCofre();
+    await new Promise((ok, falha) => {
+      const tx = db.transaction(COFRE_LOJA, 'readwrite');
+      tx.objectStore(COFRE_LOJA).put({ name, text, at: Date.now() });
+      tx.oncomplete = ok; tx.onerror = () => falha(tx.error);
+    });
+    db.close();
+  }catch(e){ console.warn('[docs] cofre local indisponível:', e && e.message); }
+}
+
+async function cofreLista(){
+  try{
+    const db = await abreCofre();
+    const itens = await new Promise((ok, falha) => {
+      const req = db.transaction(COFRE_LOJA, 'readonly').objectStore(COFRE_LOJA).getAll();
+      req.onsuccess = () => ok(req.result || []);
+      req.onerror = () => falha(req.error);
+    });
+    db.close();
+    return itens;
+  }catch(e){ return []; }
+}
+
+async function cofreApaga(name){
+  try{
+    const db = await abreCofre();
+    await new Promise((ok) => {
+      const tx = db.transaction(COFRE_LOJA, 'readwrite');
+      tx.objectStore(COFRE_LOJA).delete(name);
+      tx.oncomplete = ok; tx.onerror = ok;
+    });
+    db.close();
+  }catch(e){ /* já não estava lá, ou sem cofre: nada a fazer */ }
+}
+
+/* Compara o que o servidor tem com o que o cofre guarda e reenvia a diferença.
+
+   SÓ REENVIA O QUE FALTA. Reenviar tudo a cada boot seria mais simples e
+   errado: gastaria embeddings de novo em documento que já está lá, toda vez
+   que o painel abrisse. */
+async function recuperaIndice(){
+  if (!backendUrl()) return { faltavam: 0 };
+  let noServidor;
+  try{ noServidor = await pontejson('/api/docs'); }
+  catch(e){ return { faltavam: 0 }; }   // backend fora do ar: não é hora de reindexar
+
+  const locais = await cofreLista();
+  if (!locais.length) return { faltavam: 0 };
+
+  const nomesLa = new Set((noServidor.documents || []).map(d => d.name));
+  const faltando = locais.filter(l => !nomesLa.has(l.name));
+  if (!faltando.length) return { faltavam: 0 };
+
+  /* O servidor perdeu o índice — quase sempre porque o container foi recriado.
+     Avisa ANTES de reenviar: se forem muitos documentos isso demora, e uma tela
+     parada sem explicação parece travamento. */
+  try{ toast(`O servidor perdeu ${faltando.length} documento(s) do índice. Reenviando…`, 'warn'); }catch(e){}
+
+  let refeitos = 0;
+  for (const doc of faltando){
+    try{
+      await pontejson('/api/docs', {
+        method: 'POST',
+        headers: backendHeaders({ 'Content-Type':'application/json' }),
+        body: JSON.stringify({ name: doc.name, text: doc.text }),
+      });
+      refeitos += 1;
+    }catch(e){ /* um documento que falha não pode impedir os outros */ }
+  }
+  try{
+    toast(refeitos === faltando.length
+      ? `Índice recuperado: ${refeitos} documento(s) de volta.`
+      : `Recuperei ${refeitos} de ${faltando.length}. Tente "Reindexar tudo".`,
+      refeitos === faltando.length ? 'ok' : 'warn');
+  }catch(e){}
+  renderDocumentos();
+  return { faltavam: faltando.length, refeitos };
+}
+
 async function enviaDocumento(file){
   const msg = document.getElementById('docs-msg');
   const diz = (t, cls) => { if (msg){ msg.textContent = t; msg.className = 'hint ' + (cls || ''); } };
@@ -66,6 +182,10 @@ async function enviaDocumento(file){
       headers: backendHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ name: file.name, text: texto }),
     });
+    /* Guarda o texto DEPOIS de o servidor confirmar. Guardar antes deixaria no
+       cofre um documento que nunca foi indexado, e a recuperação passaria a
+       "recuperar" algo que nunca existiu lá. */
+    await cofreGrava(d.name, texto);
     diz(`${d.name}: ${d.chunks} pedaço(s) indexado(s).` +
         (d.note ? ' ' + d.note : ''), d.note ? 'aviso' : 'ok');
     renderDocumentos();
@@ -115,6 +235,9 @@ async function apagaDocumento(docId, nome){
   if (!confirm(`Tirar "${nome || docId}" do índice? O arquivo no seu PC não é tocado.`)) return;
   try{
     await pontejson('/api/docs/' + encodeURIComponent(docId), { method: 'DELETE' });
+    /* Tira do cofre TAMBÉM, senão a recuperação automática traria de volta no
+       próximo boot o documento que você acabou de mandar apagar. */
+    if (nome) await cofreApaga(nome);
     toast('Documento removido do índice.');
     renderDocumentos();
   }catch(e){ toast('Falhou: ' + e.message, 'warn'); }
@@ -193,4 +316,7 @@ function setupDocumentos(){
     }catch(e){ if (msg){ msg.textContent = 'Falhou: ' + e.message; msg.className = 'hint erro'; } }
   };
   renderDocumentos();
+  /* Sem await: recuperar índice não pode segurar a montagem da tela. E com
+     folga no boot — o cutucão que acorda o backend sai primeiro. */
+  setTimeout(() => recuperaIndice(), 4000);
 }
