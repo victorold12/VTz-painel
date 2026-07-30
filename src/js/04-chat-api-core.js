@@ -1,8 +1,37 @@
+/* Teto de espera ATÉ A RESPOSTA COMEÇAR. Provedor que engasga não devolve erro:
+   ele simplesmente não responde, e sem teto a interface fica "pensando" pra
+   sempre, sem nada pra clicar além de recarregar a página.
+
+   O teto vale só até o cabeçalho chegar, e é por isso que não dá pra usar
+   AbortSignal.timeout aqui: aquele sinal continua ativo enquanto o corpo é
+   lido, e cortaria uma resposta longa em streaming no meio da frase. Depois que
+   a resposta começa, quem manda é o usuário (botão Parar).
+
+   Ajustável por vtz_or_timeout_ms no localStorage: 2 minutos cobre a maioria,
+   mas modelo de raciocínio longo em conexão ruim estoura — e nesse caso o certo
+   é a pessoa poder esperar mais, não o app decidir que falhou. */
+function orTimeoutMs(){
+  const v = Number(localStorage.getItem('vtz_or_timeout_ms'));
+  return (Number.isFinite(v) && v >= 1000) ? v : 120000;
+}
+
 /* Chamada única à API de chat — todas as features passam por aqui */
 function orFetch(payload, opts = {}){
   // Roteamento por throughput: mesma qualidade (modelo idêntico), mas o OpenRouter
   // escolhe o provedor mais rápido no momento. Não sobrescreve preferências já postas.
   const body = payload.provider ? payload : { ...payload, provider: { sort: 'throughput' } };
+  const ctrl = new AbortController();
+  const cancelaPeloUsuario = () => ctrl.abort(opts.signal?.reason);
+  if (opts.signal){
+    if (opts.signal.aborted) ctrl.abort(opts.signal.reason);
+    else opts.signal.addEventListener('abort', cancelaPeloUsuario, { once:true });
+  }
+  const teto = orTimeoutMs();
+  const relogio = setTimeout(
+    () => ctrl.abort(new DOMException(
+      `O provedor não respondeu em ${Math.round(teto / 1000)}s.`, 'TimeoutError')),
+    teto);
+
   return fetch(OR_BASE + '/chat/completions', {
     method:'POST',
     headers:{
@@ -12,7 +41,10 @@ function orFetch(payload, opts = {}){
       'X-Title': SITE_TITLE,
     },
     body: JSON.stringify(body),
-    signal: opts.signal,
+    signal: ctrl.signal,
+  }).finally(() => {
+    clearTimeout(relogio);
+    opts.signal?.removeEventListener('abort', cancelaPeloUsuario);
   });
 }
 /* Contabilidade de custo unificada */
@@ -27,6 +59,27 @@ function trackUsage(usage, modelId, conv){
   if (conv){ conv.cost = (conv.cost || 0) + cost; }
   updateCostBadge();
 }
+/* Conta do OpenRouter sem crédito. Repetir o mesmo pedido não resolve — só um
+   modelo grátis responde. Perde qualidade, mas o app continua de pé em vez de
+   virar uma tela de erro.
+
+   Avisa em toast de propósito: cair pra um modelo mais fraco em silêncio faria
+   você culpar o app por uma resposta ruim sem saber que o crédito acabou. */
+async function quedaPraGratis(payload, opts, respostaPaga){
+  const atual = payload.model || '';
+  const lista = (state.models && state.models.length) ? state.models : FALLBACK_MODELS;
+  const gratis = lista.find(m => isFreeModel(m) && !isImageModel(m) && m.id !== atual);
+  if (!gratis) return respostaPaga;   // sem grátis à mão: quem chamou mostra o 402
+  toast(`Sem crédito no OpenRouter — respondendo com ${gratis.name || gratis.id}.`, 'warn');
+  try{
+    const res = await orFetch({ ...payload, model: gratis.id }, opts);
+    return res.ok ? res : respostaPaga;   // grátis também falhou: mostra o erro original
+  }catch(e){
+    if (e.name === 'AbortError') throw e;
+    return respostaPaga;
+  }
+}
+
 /* Retry com backoff: 429/5xx/erro de rede tenta de novo sozinho (2 retries) */
 async function orFetchRetry(payload, opts = {}){
   let lastErr;
@@ -38,10 +91,18 @@ async function orFetchRetry(payload, opts = {}){
     }
     try{
       const res = await orFetch(payload, opts);
+      /* 402 é sem crédito, não instabilidade: não entra no laço de retry. */
+      if (res.status === 402) return await quedaPraGratis(payload, opts, res);
       if (res.ok || ![429,500,502,503,504,529].includes(res.status)) return res;
       lastErr = new Error('API ' + res.status);
     }catch(e){
       if (e.name === 'AbortError') throw e;
+      /* Tempo esgotado não entra no laço: já foram 2 minutos de espera, e mais
+         duas rodadas dariam 6. Falha na hora, dizendo o que houve — "erro de
+         rede" depois de seis minutos parados é a pior resposta possível. */
+      if (e.name === 'TimeoutError'){
+        throw new Error(e.message + ' Tente outro modelo ou verifique a conexão.');
+      }
       lastErr = e;
     }
   }
@@ -63,6 +124,16 @@ function playDing(){
 /* Hook comum pós-resposta: som + auto-título por IA */
 function afterAssistantDone(conv){
   playDing();
+  /* No app de PC, aviso do sistema quando a resposta chega e a janela está em
+     outra coisa. O ding só serve se você estiver ouvindo; a notificação chega
+     na barra de tarefas. Quem decide se notifica é o processo principal do
+     Electron (ele sabe se a janela está em foco) — ver setupNotificacoes. */
+  if (window.jarvisDesktop?.notify && (document.hidden || !document.hasFocus())){
+    const ultima = conv.messages[conv.messages.length - 1];
+    const previa = String(ultima?.content || '').replace(/\s+/g, ' ').slice(0, 180);
+    window.jarvisDesktop.notify(conv.title || 'Resposta pronta', previa);
+  }
+  maybeAutoSpeak(conv); // Modo Voz: fala a resposta (e reinicia a escuta no mãos-livres)
   const realMsgs = conv.messages.filter(m => (m.role==='user'||m.role==='assistant') && !m._local);
   if (!conv.agentId && !conv._titled && realMsgs.length === 2){
     conv._titled = true;

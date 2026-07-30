@@ -1,0 +1,2586 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>VTz LLM — Estados Visuais</title>
+<style>
+/* ============================================================
+   TOKENS — extraídos verbatim de victorold12/VTz-painel/style.css
+   Fonte da verdade. Não inventar valores.
+   ============================================================ */
+:root{
+  --void:#000000;--surface:#111114;--surface-2:#1a1a1e;
+  --text:#f2f2f5;--text-dim:#9a9aa5;--text-faint:#5c5c66;
+  --violet:#8b5cf6;--violet-dim:rgba(139,92,246,.15);
+  --danger:#ff6b6b;--amber:#ffb454;--good:#4fd1c5;
+  --input-bg:#000000;
+  --glass-card:rgba(22,22,26,.6);--glass-card-strong:rgba(22,22,26,.7);
+  --glass-msg:rgba(24,24,28,.65);--glass-tool:rgba(26,26,30,.6);
+  --glass-sheet:rgba(13,13,17,.82);--glass-modal:rgba(15,15,19,.85);
+  --glass-sidebar:rgba(9,9,11,.82);--glass-header:rgba(8,8,10,.72);
+  --w05:rgba(255,255,255,.05);--w06:rgba(255,255,255,.06);--w07:rgba(255,255,255,.07);
+  --w08:rgba(255,255,255,.08);--w10:rgba(255,255,255,.1);--w12:rgba(255,255,255,.12);
+  --w15:rgba(255,255,255,.15);--line:var(--w08);
+  --blob-1:rgba(139,92,246,.13);--blob-2:rgba(79,209,197,.09);--blob-3:rgba(255,92,173,.07);
+  --radius-lg:22px;--radius-md:14px;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"SF Mono",SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace;
+  /* NOVOS — motion, centralizados (regra: um só lugar define timing) */
+  --ease-out:cubic-bezier(.2,.8,.2,1);
+  --ease-inout:cubic-bezier(.65,0,.35,1);
+  --ease-spring:cubic-bezier(.34,1.42,.5,1);
+  --t-fast:180ms;--t-mid:320ms;--t-slow:560ms;--t-scene:720ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:var(--sans);background:var(--void);color:var(--text);overflow:hidden}
+button,input,textarea,select{font-family:inherit}
+svg.icon{width:18px;height:18px;flex-shrink:0;display:inline-block;vertical-align:middle}
+::-webkit-scrollbar{width:0}
+button{transition:transform .1s ease}button:active{transform:scale(.97)}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+
+/* ===== liquid bg (reaproveitado do beta) ===== */
+.liquid-bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.liquid-bg .blob{position:absolute;border-radius:50%;filter:blur(70px);will-change:transform}
+.liquid-bg .b1{width:55vmax;height:55vmax;background:radial-gradient(circle,var(--blob-1),transparent 70%);top:-18%;left:-12%;animation:drift1 26s ease-in-out infinite alternate}
+.liquid-bg .b2{width:45vmax;height:45vmax;background:radial-gradient(circle,var(--blob-2),transparent 70%);bottom:-20%;right:-10%;animation:drift2 32s ease-in-out infinite alternate}
+.liquid-bg .b3{width:35vmax;height:35vmax;background:radial-gradient(circle,var(--blob-3),transparent 70%);top:40%;left:55%;animation:drift3 38s ease-in-out infinite alternate}
+@keyframes drift1{0%{transform:translate(0) scale(1)}to{transform:translate(8vw,10vh) scale(1.15)}}
+@keyframes drift2{0%{transform:translate(0) scale(1.1)}to{transform:translate(-7vw,-8vh) scale(.95)}}
+@keyframes drift3{0%{transform:translate(0) scale(.95)}to{transform:translate(-10vw,6vh) scale(1.1)}}
+body[data-scene="jarvis"] .liquid-bg{opacity:.25;transition:opacity var(--t-scene) var(--ease-inout)}
+body[data-scene="chat"] .liquid-bg{opacity:1;transition:opacity var(--t-scene) var(--ease-inout)}
+
+/* =========================================================
+   CENA 1 — CHAT SHELL  (ref 1, layout Zyricon / paleta beta)
+   ========================================================= */
+.stage{position:relative;z-index:1;height:100dvh;display:flex}
+.scene{position:absolute;inset:0;display:flex;opacity:0;pointer-events:none;
+  transition:opacity var(--t-scene) var(--ease-inout), transform var(--t-scene) var(--ease-inout), filter var(--t-scene) var(--ease-inout)}
+.scene.on{opacity:1;pointer-events:auto}
+#scene-chat{transform:scale(1)}
+body[data-scene="jarvis"] #scene-chat{transform:scale(1.06);filter:blur(14px)}
+#scene-jarvis{transform:scale(1.04)}
+body[data-scene="jarvis"] #scene-jarvis{transform:scale(1)}
+
+.sidebar{width:250px;flex-shrink:0;background:var(--glass-sidebar);backdrop-filter:blur(26px) saturate(160%);
+  -webkit-backdrop-filter:blur(26px) saturate(160%);border-right:1px solid var(--line);display:flex;flex-direction:column}
+.sidebar-header{padding:18px 16px 8px;font-weight:800;font-size:16px;letter-spacing:.02em}
+.sidebar-header span{color:var(--violet)}
+.new-chat-btn{margin:8px 16px 14px;background:var(--w05);color:var(--text);border:1px solid var(--w08);
+  border-radius:12px;padding:11px;font-weight:600;font-size:13.5px;cursor:pointer;text-align:left;transition:.18s}
+.new-chat-btn:hover{border-color:var(--violet);color:var(--violet)}
+.side-group-label{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-faint);padding:12px 16px 5px}
+.side-nav{display:flex;flex-direction:column;padding:0 10px;gap:2px}
+.side-nav-item{display:flex;align-items:center;gap:10px;background:transparent;border:none;color:var(--text-dim);
+  padding:10px;border-radius:10px;font-size:14px;cursor:pointer;text-align:left;font-weight:600;
+  transition:background .18s ease,color .18s ease}
+.side-nav-item svg.icon{width:17px;height:17px}
+.side-nav-item:hover:not(.active){background:var(--w05);color:var(--text)}
+.side-nav-item.active{background:var(--violet-dim);color:var(--violet)}
+.side-spacer{flex:1;min-height:10px}
+
+/* --- entrada J.A.R.V.I.S. (canto inferior esquerdo, item 4 do brief) --- */
+.jarvis-entry{margin:10px;padding:14px 12px;border-radius:16px;cursor:pointer;position:relative;overflow:hidden;
+  background:linear-gradient(160deg,rgba(139,92,246,.14),rgba(79,209,197,.05));
+  border:1px solid rgba(139,92,246,.3);display:flex;flex-direction:column;align-items:center;gap:7px;
+  transition:border-color var(--t-fast) var(--ease-out),transform var(--t-fast) var(--ease-out)}
+.jarvis-entry:hover{border-color:var(--violet);transform:translateY(-2px)}
+.jarvis-entry:before{content:"";position:absolute;inset:-40%;background:conic-gradient(from 0deg,transparent 0 60%,rgba(139,92,246,.5) 78%,transparent 90%);
+  animation:je-spin 6s linear infinite;opacity:0;transition:opacity var(--t-mid)}
+.jarvis-entry:hover:before{opacity:.6}
+@keyframes je-spin{to{transform:rotate(360deg)}}
+.jarvis-entry>*{position:relative;z-index:1}
+.je-head{width:38px;height:38px;border-radius:12px;background:rgba(0,0,0,.55);border:1px solid rgba(139,92,246,.45);
+  display:flex;align-items:center;justify-content:center;color:var(--violet);box-shadow:0 0 18px rgba(139,92,246,.35)}
+.je-head svg.icon{width:22px;height:22px}
+.je-label{font-size:10px;font-weight:800;letter-spacing:.22em;color:var(--text);font-family:var(--mono)}
+.je-sub{font-size:10px;color:var(--text-faint)}
+.jarvis-entry .je-head{animation:je-breathe 3.4s ease-in-out infinite}
+@keyframes je-breathe{0%,100%{box-shadow:0 0 14px rgba(139,92,246,.28)}50%{box-shadow:0 0 26px rgba(139,92,246,.6)}}
+
+.chat-col{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+header.topbar{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--glass-header);
+  backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+  border-bottom:1px solid var(--w08);position:relative;flex-shrink:0}
+header.topbar:after{content:"";position:absolute;bottom:-1px;left:15%;width:70%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(139,92,246,.5),transparent)}
+/* ===== ABA DE CONFIGURAÇÃO DE VOZ (Seção 14) ===== */
+.vz-overlay{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.66);backdrop-filter:blur(6px);opacity:0;visibility:hidden;
+  transition:opacity var(--t-mid) var(--ease-out),visibility var(--t-mid)}
+.vz-overlay.open{opacity:1;visibility:visible}
+.vz-sheet{width:min(620px,calc(100vw - 32px));max-height:min(86vh,860px);display:flex;flex-direction:column;
+  background:var(--glass-modal);backdrop-filter:blur(30px) saturate(160%);
+  -webkit-backdrop-filter:blur(30px) saturate(160%);
+  border:1px solid var(--w12);border-radius:var(--radius-lg);overflow:hidden;
+  box-shadow:0 32px 90px -20px rgba(0,0,0,.85);
+  transform:translateY(14px) scale(.985);transition:transform var(--t-mid) var(--ease-spring)}
+.vz-overlay.open .vz-sheet{transform:none}
+.vz-head{display:flex;align-items:center;gap:10px;padding:17px 20px 13px;border-bottom:1px solid var(--w06)}
+.vz-head h3{font-size:15.5px;font-weight:700;letter-spacing:-.01em}
+.vz-head .vz-sub{font-size:11px;color:var(--text-faint)}
+.vz-close{margin-left:auto;background:var(--w06);border:1px solid var(--w08);color:var(--text-dim);
+  width:28px;height:28px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.16s}
+.vz-close:hover{border-color:var(--violet);color:var(--violet)}
+.vz-body{flex:1;min-height:0;overflow-y:auto;padding:16px 20px 20px;display:flex;flex-direction:column;gap:18px;scrollbar-width:thin}
+.vz-body::-webkit-scrollbar{width:6px}
+.vz-body::-webkit-scrollbar-thumb{background:var(--w12);border-radius:99px}
+
+.vz-sec{display:flex;flex-direction:column;gap:9px}
+.vz-lbl{font-size:10px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--text-faint)}
+.vz-hint{font-size:11px;color:var(--text-faint);line-height:1.5}
+
+/* estado dos motores */
+.vz-engines{display:flex;gap:8px;flex-wrap:wrap}
+.vz-engine{flex:1;min-width:150px;text-align:left;cursor:pointer;
+  background:var(--w05);border:1px solid var(--w08);border-radius:13px;padding:12px 13px;transition:.18s}
+.vz-engine:hover{border-color:var(--violet)}
+.vz-engine.on{background:var(--violet-dim);border-color:var(--violet)}
+.vz-engine .vz-en-top{display:flex;align-items:center;gap:7px}
+.vz-engine .vz-name{font-size:13px;font-weight:700;color:var(--text)}
+.vz-engine .vz-tag{font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 6px;border-radius:5px;background:var(--w08);color:var(--text-faint)}
+.vz-engine .vz-desc{font-size:10.5px;color:var(--text-faint);margin-top:5px;line-height:1.45}
+.vz-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-left:auto}
+.vz-dot.up{background:var(--good);box-shadow:0 0 7px var(--good)}
+.vz-dot.down{background:var(--danger)}
+.vz-dot.unknown{background:var(--text-faint)}
+.vz-state{font-size:10px;color:var(--text-faint);font-family:var(--mono)}
+
+/* sliders de calibração */
+.vz-slider{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
+.vz-slider .vz-sname{font-size:12.5px;color:var(--text);font-weight:600}
+.vz-slider .vz-sval{font-size:11.5px;color:var(--violet);font-family:var(--mono);font-variant-numeric:tabular-nums}
+.vz-slider input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--violet);height:4px;cursor:pointer}
+.vz-slider .vz-sdesc{grid-column:1/-1;font-size:10.5px;color:var(--text-faint);line-height:1.45}
+
+/* seletor genérico */
+.vz-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.vz-select{flex:1;min-width:140px;background:var(--input-bg);border:1px solid var(--line);color:var(--text);
+  border-radius:10px;padding:9px 11px;font-size:12.5px;font-family:inherit}
+.vz-select:focus{outline:none;border-color:var(--violet)}
+.vz-btn{display:inline-flex;align-items:center;gap:7px;background:var(--w06);border:1px solid var(--w08);
+  color:var(--text);border-radius:10px;padding:9px 14px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.16s}
+.vz-btn:hover{border-color:var(--violet);color:var(--violet)}
+.vz-btn.primary{background:var(--violet);border-color:var(--violet);color:#fff}
+.vz-btn.primary:hover{filter:brightness(1.1);color:#fff}
+.vz-btn:disabled{opacity:.45;cursor:default}
+.vz-btn svg.icon{width:14px;height:14px}
+
+/* amostras de voz */
+.vz-samples{display:flex;flex-direction:column;gap:6px}
+.vz-sample{display:flex;align-items:center;gap:10px;background:var(--w05);border:1px solid var(--w08);
+  border-radius:11px;padding:9px 12px}
+.vz-sample.on{border-color:var(--violet);background:var(--violet-dim)}
+.vz-sample .vz-sm-name{flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vz-sample .vz-sm-size{font-size:10.5px;color:var(--text-faint);font-family:var(--mono)}
+.vz-sample button{background:none;border:0;color:var(--text-faint);cursor:pointer;padding:3px;transition:.15s}
+.vz-sample button:hover{color:var(--danger)}
+.vz-empty{font-size:11.5px;color:var(--text-faint);padding:12px;text-align:center;
+  border:1px dashed var(--w10);border-radius:11px;line-height:1.5}
+
+.vz-foot{display:flex;align-items:center;gap:9px;padding:13px 20px;border-top:1px solid var(--w06);flex-wrap:wrap}
+.vz-msg{flex:1;min-width:120px;font-size:11.5px;line-height:1.45}
+.vz-msg.erro{color:var(--danger)}
+.vz-msg.ok{color:var(--good)}
+
+/* ===== PICKER DE MODELOS (logo + nome + custo por 1M) ===== */
+.route-chip{display:inline-flex;align-items:center;gap:7px;margin:2px 0 10px;
+  padding:5px 11px;border-radius:99px;background:var(--violet-dim);
+  border:1px solid rgba(139,92,246,.3);font-size:11px;color:var(--text-dim);
+  animation:rc-in .35s var(--ease-out)}
+.route-chip svg.icon{width:12px;height:12px;color:var(--violet)}
+.route-chip b{color:var(--violet);font-weight:700}
+.route-chip span{font-family:var(--mono);font-size:10.5px}
+@keyframes rc-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.pk-overlay{position:fixed;inset:0;z-index:140;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.62);backdrop-filter:blur(6px);opacity:0;visibility:hidden;
+  transition:opacity var(--t-mid) var(--ease-out),visibility var(--t-mid)}
+.pk-overlay.open{opacity:1;visibility:visible}
+.pk-sheet{width:min(560px,calc(100vw - 32px));max-height:min(78vh,720px);display:flex;flex-direction:column;
+  background:var(--glass-modal);backdrop-filter:blur(30px) saturate(160%);
+  -webkit-backdrop-filter:blur(30px) saturate(160%);
+  border:1px solid var(--w12);border-radius:var(--radius-lg);overflow:hidden;
+  box-shadow:0 32px 90px -20px rgba(0,0,0,.85);
+  transform:translateY(14px) scale(.98);transition:transform var(--t-mid) var(--ease-spring)}
+.pk-overlay.open .pk-sheet{transform:none}
+.pk-head{display:flex;align-items:center;gap:10px;padding:16px 18px 12px}
+.pk-head h3{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.pk-count{font-size:11px;color:var(--text-faint);font-family:var(--mono)}
+.pk-close{margin-left:auto;background:var(--w06);border:1px solid var(--w08);color:var(--text-dim);
+  width:28px;height:28px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.16s}
+.pk-close:hover{border-color:var(--violet);color:var(--violet)}
+.pk-search{margin:0 18px 10px;display:flex;align-items:center;gap:8px;padding:9px 12px;
+  background:var(--input-bg);border:1px solid var(--line);border-radius:11px;transition:border-color .18s}
+.pk-search:focus-within{border-color:var(--violet)}
+.pk-search svg.icon{width:15px;height:15px;color:var(--text-faint)}
+.pk-search input{flex:1;background:none;border:0;outline:none;color:var(--text);font-size:13.5px}
+.pk-search input::placeholder{color:var(--text-faint)}
+.pk-chips{display:flex;gap:6px;padding:0 18px 10px;flex-wrap:wrap}
+.pk-chip{background:var(--w05);border:1px solid var(--w08);color:var(--text-dim);
+  padding:5px 11px;border-radius:99px;font-size:11.5px;font-weight:600;cursor:pointer;transition:.16s;white-space:nowrap}
+.pk-chip:hover{border-color:var(--violet);color:var(--text)}
+.pk-chip.on{background:var(--violet-dim);border-color:var(--violet);color:var(--violet)}
+.pk-list{flex:1;min-height:0;overflow-y:auto;padding:2px 10px 14px;scrollbar-width:thin}
+.pk-list::-webkit-scrollbar{width:6px}
+.pk-list::-webkit-scrollbar-thumb{background:var(--w12);border-radius:99px}
+.pk-row{display:flex;align-items:center;gap:11px;padding:10px;border-radius:12px;cursor:pointer;
+  border:1px solid transparent;transition:background .15s,border-color .15s}
+.pk-row:hover{background:var(--w05)}
+.pk-row.sel{background:var(--violet-dim);border-color:rgba(139,92,246,.35)}
+.pk-badge{width:32px;height:32px;flex-shrink:0;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:800;color:#fff;letter-spacing:.02em;overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.pk-badge svg{width:19px;height:19px;display:block}
+.pk-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pk-name{font-size:13.5px;font-weight:650;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-meta{font-size:10.5px;color:var(--text-faint);font-family:var(--mono);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-price{font-size:11px;font-weight:600;color:var(--text-dim);font-variant-numeric:tabular-nums;
+  text-align:right;white-space:nowrap;flex-shrink:0}
+.pk-price .free{color:var(--good)}
+.pk-price small{display:block;font-size:9px;font-weight:500;color:var(--text-faint);letter-spacing:.04em}
+.pk-star{background:none;border:0;color:var(--text-faint);cursor:pointer;font-size:15px;
+  padding:2px 4px;flex-shrink:0;transition:.15s;line-height:1}
+.pk-star:hover{color:var(--amber)}
+.pk-star.on{color:var(--amber)}
+.pk-check{color:var(--violet);flex-shrink:0}
+.pk-empty{text-align:center;color:var(--text-faint);font-size:12.5px;padding:34px 20px;line-height:1.6}
+.pk-sep{font-size:9.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--text-faint);padding:14px 10px 6px}
+.pk-note{padding:8px 18px 0;font-size:10.5px;color:var(--text-faint);line-height:1.5;border-top:1px solid var(--w06)}
+
+.model-picker-btn{display:flex;align-items:center;gap:6px;background:var(--w05);border:1px solid var(--line);
+  color:var(--text);font-weight:600;font-size:13px;padding:8px 13px;border-radius:20px;cursor:pointer;transition:.18s}
+.model-picker-btn:hover{border-color:var(--violet)}
+.model-picker-btn .chev svg.icon{width:12px;height:12px;color:var(--text-dim)}
+.top-spacer{flex:1}
+.cost-badge{font-family:var(--mono);font-size:11.5px;color:var(--amber);background:rgba(255,180,84,.1);
+  border:1px solid rgba(255,180,84,.2);padding:6px 10px;border-radius:20px;white-space:nowrap}
+.icon-btn{background:var(--w06);border:1px solid var(--w06);color:var(--text);width:36px;height:36px;
+  border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.18s}
+.icon-btn:hover{border-color:var(--violet);color:var(--violet)}
+
+.chat-body{flex:1;overflow-y:auto;position:relative;display:flex;flex-direction:column}
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;padding:30px;text-align:center;position:relative;overflow:hidden}
+.empty-state.hide{display:none}
+.empty-orb{position:relative;z-index:1;width:74px;height:74px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#c9b6ff,var(--violet) 45%,#4c2a9e 78%,#1b0f3d);
+  box-shadow:0 8px 44px rgba(139,92,246,.55),inset -6px -8px 18px rgba(0,0,0,.5);
+  animation:orb-float 5.5s ease-in-out infinite}
+.empty-orb:after{content:"";position:absolute;inset:-26px;border-radius:50%;
+  background:radial-gradient(circle,rgba(139,92,246,.32),transparent 68%);filter:blur(12px);z-index:-1;
+  animation:orb-halo 4s ease-in-out infinite}
+@keyframes orb-float{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-9px) scale(1.03)}}
+@keyframes orb-halo{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.14)}}
+.empty-greeting{font-size:26px;font-weight:700;letter-spacing:-.02em}
+.empty-sub{font-size:13px;color:var(--text-dim);max-width:340px}
+.quickchips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.qchip{display:flex;align-items:center;gap:7px;background:var(--w05);border:1px solid var(--line);
+  color:var(--text-dim);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.18s}
+.qchip:hover{border-color:var(--violet);color:var(--text);transform:translateY(-2px)}
+.qchip svg.icon{width:14px;height:14px;color:var(--violet)}
+
+/* cards de sugestão — classe .sug-card verbatim do beta */
+.suggestions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;width:100%;max-width:660px}
+.sug-card{background:var(--glass-card);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border:1px solid var(--line);border-radius:14px;padding:13px 14px;cursor:pointer;text-align:left;transition:.2s}
+.sug-card:hover{border-color:var(--violet);transform:translateY(-2px)}
+.sug-card .si{color:var(--violet);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.sug-card .si svg.icon{width:19px;height:19px}
+.sug-card .stag{font-size:9.5px;font-weight:700;color:var(--text-faint);background:var(--w06);
+  border-radius:6px;padding:3px 7px;letter-spacing:.04em}
+.sug-card .st{font-size:13px;font-weight:700;margin-bottom:3px}
+.sug-card .sd{font-size:11.5px;color:var(--text-dim);line-height:1.4}
+
+/* mensagens */
+#chat-log{padding:22px 28px;display:flex;flex-direction:column;gap:16px}
+#chat-log:empty{display:none}
+.msg-row{display:flex;gap:10px;max-width:820px;margin:0 auto;width:100%;
+  animation:msg-in var(--t-slow) var(--ease-out) both}
+@keyframes msg-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.msg-row.user{flex-direction:row-reverse}
+.msg-av{width:30px;height:30px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:800;color:#fff}
+.msg-av.ai{background:linear-gradient(135deg,var(--violet),#5b3fc9);box-shadow:0 0 12px rgba(139,92,246,.3)}
+.msg-av.ai svg.icon{width:15px;height:15px}
+.msg-av.usr{background:var(--surface-2);color:var(--text)}
+.msg-body{flex:1;min-width:0;display:flex;flex-direction:column}
+.msg-row.user .msg-body{align-items:flex-end}
+.msg-sender{font-size:10px;font-weight:700;color:var(--text-faint);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.msg{max-width:88%;padding:12px 15px;border-radius:18px;font-size:14.5px;line-height:1.55;word-wrap:break-word}
+.msg.user{background:var(--violet);color:#fff;border-bottom-right-radius:5px}
+.msg.assistant{background:var(--glass-msg);backdrop-filter:blur(14px);border:1px solid var(--w06);border-bottom-left-radius:5px}
+.msg.assistant strong{color:var(--text)}
+.msg.assistant code{font-family:var(--mono);font-size:.9em;background:var(--w08);padding:1px 5px;border-radius:4px}
+.caret{display:inline-block;width:7px;height:15px;background:var(--violet);vertical-align:-2px;
+  margin-left:2px;animation:caret-blink .9s steps(1) infinite}
+@keyframes caret-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+.thinking-label{font-size:14px;font-weight:500;background:linear-gradient(90deg,var(--text-faint) 20%,var(--text) 50%,var(--text-faint) 80%);
+  background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-text-fill-color:transparent;animation:shimmer 1.8s linear infinite}
+@keyframes shimmer{0%{background-position:200% 0}to{background-position:-200% 0}}
+
+/* composer — conic gradient no focus, verbatim do beta */
+@property --vtz-angle{syntax:"<angle>";initial-value:0deg;inherits:false}
+.composer-wrap{padding:10px 28px 18px;flex-shrink:0}
+.composer-inner{max-width:820px;margin:0 auto}
+.composer{position:relative;display:flex;align-items:flex-end;gap:8px;background:var(--glass-card-strong);
+  backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+  border:1px solid var(--w08);border-radius:26px;padding:6px 6px 6px 14px;
+  transition:border-color .25s ease,box-shadow .3s ease}
+.composer:before{content:"";position:absolute;inset:-1.5px;border-radius:27px;padding:1.5px;
+  background:conic-gradient(from var(--vtz-angle),transparent 0deg,transparent 200deg,rgba(139,92,246,.35) 260deg,var(--violet) 300deg,#c4a6ff 330deg,var(--violet) 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
+  opacity:0;transition:opacity .35s ease;pointer-events:none}
+.composer:focus-within{border-color:transparent}
+.composer:focus-within:before{opacity:1;animation:vtz-rotate 3.2s linear infinite}
+@keyframes vtz-rotate{to{--vtz-angle:360deg}}
+.composer textarea{flex:1;resize:none;background:transparent;border:none;color:var(--text);font-size:15px;
+  max-height:130px;padding:9px 0;outline:none;line-height:1.45}
+.composer textarea::placeholder{color:var(--text-faint)}
+.round-btn{width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;flex-shrink:0;transition:.18s}
+.round-btn.plus,.round-btn.mic{background:var(--surface-2);color:var(--text-dim)}
+.round-btn.plus:hover,.round-btn.mic:hover{color:var(--violet)}
+.round-btn.send{background:var(--violet);color:#fff;box-shadow:0 4px 16px rgba(139,92,246,.4)}
+.round-btn:disabled{opacity:.35;cursor:default}
+.toolbar-row{display:flex;align-items:center;gap:8px;padding:0 4px 8px;font-size:11.5px;color:var(--text-dim);max-width:820px;margin:0 auto;width:100%}
+.tools-trigger{display:flex;align-items:center;gap:6px;background:var(--w05);border:1px solid var(--line);
+  color:var(--text-dim);padding:6px 12px;border-radius:20px;font-size:11.5px;cursor:pointer;font-weight:600;transition:.18s}
+.tools-trigger:hover{border-color:var(--violet);color:var(--text)}
+.tools-trigger svg.icon{width:14px;height:14px}
+.ctx-meter{margin-left:auto;font-size:10.5px;font-family:var(--mono);color:var(--text-faint)}
+
+/* =========================================================
+   COMPONENTE — FILECARD  (ref 3)
+   Design fixo. Só conteúdo é dinâmico: nome, ext, tag, tamanho,
+   label de status e progresso real.
+   ========================================================= */
+.filecard{position:relative;width:100%;max-width:470px;margin:4px 0;
+  background:linear-gradient(165deg,rgba(30,28,48,.86),rgba(46,38,96,.72));
+  border:1px solid var(--w10);border-radius:var(--radius-lg);padding:18px 18px 16px;
+  backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);
+  overflow:hidden;animation:fc-in var(--t-slow) var(--ease-spring) both}
+@keyframes fc-in{from{opacity:0;transform:translateY(18px) scale(.94)}to{opacity:1;transform:none}}
+.filecard.out{animation:fc-out var(--t-mid) var(--ease-inout) forwards}
+@keyframes fc-out{to{opacity:0;transform:translateY(-10px) scale(.96);margin-bottom:-90px}}
+/* halo inferior da referência */
+.filecard:after{content:"";position:absolute;left:50%;bottom:-72px;width:78%;height:120px;transform:translateX(-50%);
+  border-radius:50%;background:radial-gradient(ellipse,var(--fc-glow,rgba(124,92,255,.85)),transparent 66%);
+  filter:blur(26px);opacity:.75;pointer-events:none;transition:background var(--t-slow) var(--ease-inout);
+  animation:fc-glow 3.6s ease-in-out infinite}
+@keyframes fc-glow{0%,100%{opacity:.55;transform:translateX(-50%) scaleX(1)}50%{opacity:.9;transform:translateX(-50%) scaleX(1.08)}}
+.filecard.done:after{animation:none;opacity:.55}
+.fc-top{display:flex;align-items:flex-start;gap:16px;position:relative;z-index:1}
+.fc-thumb{position:relative;width:76px;height:92px;flex-shrink:0}
+/* folha de papel com canto dobrado */
+.fc-sheet{position:absolute;inset:0;border-radius:9px;
+  background:linear-gradient(150deg,rgba(255,255,255,.16),rgba(255,255,255,.05));
+  border:1px solid var(--w12);
+  -webkit-clip-path:polygon(0 0,68% 0,100% 22%,100% 100%,0 100%);
+  clip-path:polygon(0 0,68% 0,100% 22%,100% 100%,0 100%)}
+.fc-fold{position:absolute;top:0;right:0;width:24px;height:22px;
+  background:var(--fc-tint,rgba(139,92,246,.55));
+  -webkit-clip-path:polygon(0 0,100% 100%,0 100%);clip-path:polygon(0 0,100% 100%,0 100%);
+  border-radius:0 0 0 4px;transition:background var(--t-mid)}
+.fc-glyph{position:absolute;top:50%;left:50%;transform:translate(-50%,-58%);color:var(--fc-tint,var(--violet));opacity:.85}
+.fc-glyph svg.icon{width:26px;height:26px}
+.fc-tag{position:absolute;left:-12px;top:52%;transform:translateY(-50%);
+  background:rgba(10,10,16,.9);border:1px solid var(--fc-tint,rgba(139,92,246,.6));
+  color:var(--text);font-family:var(--mono);font-size:11px;font-weight:800;letter-spacing:.09em;
+  padding:5px 9px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.6);
+  transition:border-color var(--t-mid),color var(--t-mid);white-space:nowrap}
+.fc-meta{flex:1;min-width:0;padding-top:8px}
+.fc-name{font-size:19px;font-weight:700;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;margin-bottom:5px}
+.fc-size{font-size:14px;color:var(--text-dim);font-weight:500}
+.fc-close{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;
+  background:var(--w08);border:1px solid var(--w10);color:var(--text-dim);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;z-index:2;transition:.18s}
+.fc-close:hover{color:var(--text);border-color:var(--w15);background:var(--w12)}
+.fc-close svg.icon{width:15px;height:15px}
+.fc-progress{position:relative;z-index:1;margin-top:16px;background:rgba(0,0,0,.35);
+  border:1px solid var(--w08);border-radius:16px;padding:12px 16px 14px}
+.fc-prow{display:flex;align-items:center;gap:11px;margin-bottom:10px}
+.fc-spin{width:19px;height:19px;border-radius:50%;border:2.5px solid var(--w10);
+  border-top-color:#fff;animation:vid-spin .8s linear infinite;flex-shrink:0}
+@keyframes vid-spin{to{transform:rotate(360deg)}}
+.filecard.done .fc-spin{animation:none;border:none;width:19px;height:19px;
+  display:flex;align-items:center;justify-content:center;color:var(--good)}
+.fc-status{flex:1;font-size:14.5px;font-weight:600;color:var(--text)}
+.fc-pct{font-family:var(--mono);font-size:14.5px;font-weight:700;color:var(--text);
+  font-variant-numeric:tabular-nums}
+.fc-track{height:7px;background:var(--w10);border-radius:4px;overflow:hidden}
+.fc-bar{height:100%;width:0%;border-radius:4px;background:#fff;
+  box-shadow:0 0 14px rgba(255,255,255,.85),0 0 30px var(--fc-glow,rgba(124,92,255,.9));
+  transition:width .32s var(--ease-out),background var(--t-mid)}
+.filecard.done .fc-bar{background:var(--good);box-shadow:0 0 14px rgba(79,209,197,.7)}
+.fc-actions{position:relative;z-index:1;display:flex;gap:8px;margin-top:12px;
+  max-height:0;opacity:0;overflow:hidden;transition:max-height var(--t-mid) var(--ease-out),opacity var(--t-mid) var(--ease-out)}
+.filecard.done .fc-actions{max-height:60px;opacity:1}
+.fc-btn{display:flex;align-items:center;gap:7px;background:var(--w08);border:1px solid var(--w10);
+  color:var(--text);border-radius:11px;padding:9px 15px;font-size:12.5px;font-weight:700;cursor:pointer;transition:.18s}
+.fc-btn:hover{border-color:var(--violet);color:var(--violet)}
+.fc-btn.primary{background:var(--violet);border-color:var(--violet);color:#fff}
+.fc-btn.primary:hover{filter:brightness(1.12);color:#fff}
+.fc-btn svg.icon{width:14px;height:14px}
+
+/* =========================================================
+   COMPONENTE — STEPPER  (ref 2) — exclusivo do chat
+   ========================================================= */
+.stepper{width:100%;max-width:620px;margin:6px 0 2px;padding:22px 10px 6px;
+  animation:fc-in var(--t-slow) var(--ease-spring) both}
+.stepper.out{animation:fc-out var(--t-mid) var(--ease-inout) forwards}
+.stepper-track{display:flex;align-items:flex-start;justify-content:space-between;position:relative}
+.stp{display:flex;flex-direction:column;align-items:center;gap:9px;flex:1;position:relative;z-index:1}
+.stp-node{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:17px;font-weight:800;font-family:var(--mono);position:relative;flex-shrink:0;
+  background:rgba(20,20,26,.9);border:2px solid var(--w12);color:var(--text-faint);
+  transition:border-color var(--t-mid) var(--ease-out),color var(--t-mid) var(--ease-out),
+             box-shadow var(--t-mid) var(--ease-out),background var(--t-mid) var(--ease-out)}
+.stp-node svg{width:24px;height:24px}
+/* trilho de progresso entre nós */
+.stp-link{position:absolute;top:26px;left:50%;width:100%;height:3px;background:var(--w10);z-index:0;border-radius:2px}
+.stp:last-child .stp-link{display:none}
+.stp-link i{display:block;height:100%;width:0%;border-radius:2px;
+  background:linear-gradient(90deg,var(--violet),#a78bfa);
+  box-shadow:0 0 10px rgba(139,92,246,.7);
+  transition:width var(--t-slow) var(--ease-inout)}
+.stp-label{font-size:10.5px;color:var(--text-faint);font-weight:600;letter-spacing:.03em}
+.stp-title{font-size:12.5px;font-weight:700;color:var(--text-faint);text-align:center;max-width:120px;line-height:1.3;
+  transition:color var(--t-mid) var(--ease-out)}
+/* estado: ativo */
+.stp.active .stp-node{border-color:var(--violet);color:#fff;
+  background:radial-gradient(circle at 40% 32%,#a78bfa,var(--violet) 62%,#4c2a9e);
+  box-shadow:0 0 0 5px rgba(139,92,246,.16),0 0 26px rgba(139,92,246,.7)}
+.stp.active .stp-node:before{content:"";position:absolute;inset:-4px;border-radius:50%;
+  border:2px solid rgba(139,92,246,.55);animation:stp-ping 1.7s var(--ease-out) infinite}
+@keyframes stp-ping{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.5);opacity:0}}
+.stp.active .stp-title{color:var(--text)}
+.stp.active .stp-label{color:var(--violet)}
+/* estado: concluído — check desenha o traço, não aparece pronto */
+.stp.done .stp-node{border-color:var(--violet);background:rgba(139,92,246,.16);color:var(--violet);
+  box-shadow:0 0 16px rgba(139,92,246,.35)}
+.stp.done .stp-title{color:var(--text-dim)}
+.stp-check{stroke:var(--violet);stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:26;stroke-dashoffset:26}
+.stp.done .stp-check{animation:stp-draw .42s var(--ease-out) forwards}
+@keyframes stp-draw{to{stroke-dashoffset:0}}
+
+/* =========================================================
+   CENA 2 — JARVIS  (refs 6,7,5,4)
+   ========================================================= */
+#scene-jarvis{flex-direction:column;background:#000}
+#wave-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0;display:block}
+#particle-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block;pointer-events:none;
+  opacity:0;transition:opacity var(--t-slow) var(--ease-inout)}
+body[data-jstate="listening"] #particle-canvas,
+body[data-jstate="thinking"] #particle-canvas,
+body[data-jstate="delivering"] #particle-canvas{opacity:1}
+.j-veil{position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 45%,transparent 30%,rgba(0,0,0,.55) 78%)}
+
+.j-shell{position:relative;z-index:3;flex:1;display:flex;flex-direction:column;min-height:0}
+.j-top{display:flex;align-items:center;gap:12px;padding:16px 22px;flex-shrink:0}
+.j-back{display:flex;align-items:center;gap:8px;background:var(--w05);border:1px solid var(--line);
+  color:var(--text-dim);border-radius:999px;padding:8px 15px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.18s}
+.j-back:hover{border-color:var(--violet);color:var(--text)}
+.j-back svg.icon{width:14px;height:14px}
+.j-brand{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;font-weight:800;
+  letter-spacing:.24em;color:var(--text-dim)}
+.j-brand .dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);transition:background var(--t-mid),box-shadow var(--t-mid)}
+body[data-jstate="listening"] .j-brand .dot{background:var(--good);box-shadow:0 0 12px var(--good);animation:jd-pulse 1.1s ease-in-out infinite}
+body[data-jstate="thinking"] .j-brand .dot{background:var(--amber);box-shadow:0 0 12px var(--amber);animation:jd-pulse 1.1s ease-in-out infinite}
+body[data-jstate="delivering"] .j-brand .dot{background:var(--violet);box-shadow:0 0 14px var(--violet)}
+@keyframes jd-pulse{0%,100%{opacity:.45}50%{opacity:1}}
+.j-statechip{margin-left:auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;font-weight:700;
+  color:var(--text-faint);border:1px solid var(--line);border-radius:999px;padding:6px 13px;background:rgba(0,0,0,.4)}
+
+.j-stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;padding:0 26px;min-height:0}
+
+/* --- painel idle (ref 6) --- */
+.j-idle{width:100%;max-width:660px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;
+  transition:opacity var(--t-slow) var(--ease-inout),transform var(--t-slow) var(--ease-inout)}
+body:not([data-jstate="idle"]) .j-idle{opacity:0;transform:translateY(-26px) scale(.97);pointer-events:none}
+.j-badge{font-size:11px;font-weight:700;color:var(--text-dim);background:rgba(255,255,255,.06);
+  border:1px solid var(--w08);border-radius:999px;padding:6px 15px;backdrop-filter:blur(10px)}
+.j-title{font-size:36px;font-weight:600;letter-spacing:-.03em;line-height:1.15}
+.j-title em{font-style:normal;color:var(--violet)}
+.j-sub{font-size:13px;color:var(--text-faint)}
+.j-composer{width:100%;background:rgba(16,16,22,.55);border:1px solid var(--w08);border-radius:20px;
+  backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);
+  padding:14px 16px 10px;text-align:left;margin-top:6px;transition:border-color .25s ease}
+.j-composer:focus-within{border-color:rgba(139,92,246,.55);box-shadow:0 0 34px rgba(139,92,246,.16)}
+.j-purpose{display:inline-flex;align-items:center;gap:6px;background:var(--w06);border:1px solid var(--w08);
+  border-radius:9px;padding:5px 11px;font-size:11.5px;color:var(--text-dim);font-weight:600;cursor:pointer;transition:.18s}
+.j-purpose:hover{border-color:var(--violet);color:var(--text)}
+.j-purpose svg.icon{width:12px;height:12px}
+.j-input{width:100%;background:transparent;border:none;color:var(--text);font-size:15px;line-height:1.5;
+  resize:none;outline:none;margin-top:12px;min-height:52px;max-height:120px}
+.j-input::placeholder{color:var(--text-faint)}
+.j-crow{display:flex;align-items:center;gap:10px;margin-top:8px}
+.j-mini{width:32px;height:32px;border-radius:9px;background:transparent;border:1px solid transparent;
+  color:var(--text-faint);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.18s}
+.j-mini:hover{color:var(--violet);border-color:var(--w10)}
+.j-mini svg.icon{width:16px;height:16px}
+.j-go{margin-left:auto;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);
+  border:1px solid var(--w12);color:var(--text);border-radius:11px;padding:9px 18px;font-size:13px;
+  font-weight:700;cursor:pointer;transition:.2s}
+.j-go:hover{background:var(--violet);border-color:var(--violet);color:#fff;box-shadow:0 6px 24px rgba(139,92,246,.45)}
+.j-go svg.icon{width:15px;height:15px}
+.j-chips{display:flex;gap:9px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+.j-chip{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.05);border:1px solid var(--w08);
+  color:var(--text-dim);border-radius:11px;padding:8px 15px;font-size:12.5px;font-weight:600;cursor:pointer;
+  backdrop-filter:blur(10px);transition:.18s}
+.j-chip:hover{border-color:var(--violet);color:var(--text);transform:translateY(-2px)}
+.j-chip svg.icon{width:14px;height:14px;color:var(--violet)}
+/* botão de mic grande — dispara escutando */
+.j-mic{margin-top:8px;width:64px;height:64px;border-radius:50%;cursor:pointer;position:relative;
+  background:radial-gradient(circle at 38% 32%,#a78bfa,var(--violet) 60%,#3f1f8c);border:none;color:#fff;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 10px 40px rgba(139,92,246,.5);transition:.2s}
+.j-mic:hover{transform:scale(1.07)}
+.j-mic svg.icon{width:26px;height:26px}
+.j-mic:before{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid rgba(139,92,246,.6);
+  animation:stp-ping 2.4s var(--ease-out) infinite}
+.j-hint{font-size:11px;color:var(--text-faint);font-family:var(--mono);letter-spacing:.05em}
+
+/* --- legenda de estado (escutando / pensando) --- */
+.j-caption{position:absolute;left:50%;bottom:12%;transform:translateX(-50%);z-index:4;text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:12px;pointer-events:none;
+  opacity:0;transition:opacity var(--t-slow) var(--ease-inout),transform var(--t-slow) var(--ease-inout)}
+body[data-jstate="listening"] .j-caption,body[data-jstate="thinking"] .j-caption{opacity:1;pointer-events:auto}
+body[data-jstate="delivering"] .j-caption{opacity:0;transform:translateX(-50%) translateY(20px)}
+.j-cap-text{font-size:19px;font-weight:600;letter-spacing:-.01em;max-width:560px;line-height:1.4}
+.j-cap-sub{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;color:var(--text-faint);text-transform:uppercase}
+/* medidor de voz — reage ao áudio real */
+.j-vu{display:flex;align-items:flex-end;gap:4px;height:26px}
+.j-vu i{width:3px;background:var(--good);border-radius:2px;height:4px;opacity:.65;
+  box-shadow:0 0 8px rgba(79,209,197,.6);transition:height 70ms linear}
+.j-stop{pointer-events:auto;display:flex;align-items:center;gap:8px;background:rgba(255,107,107,.12);
+  border:1px solid rgba(255,107,107,.45);color:var(--danger);border-radius:999px;padding:8px 17px;
+  font-size:12px;font-weight:700;cursor:pointer;transition:.18s}
+.j-stop:hover{background:var(--danger);color:#fff}
+.j-stop svg.icon{width:13px;height:13px}
+
+/* --- painel de entrega (ref 4): conteúdo à ESQUERDA, esfera à direita --- */
+.j-deliver{position:absolute;left:0;top:0;bottom:0;width:min(52%,660px);z-index:4;
+  display:flex;flex-direction:column;justify-content:center;gap:14px;padding:28px 26px 28px 40px;
+  overflow-y:auto;opacity:0;transform:translateX(-46px);pointer-events:none;
+  transition:opacity var(--t-slow) var(--ease-out),transform var(--t-slow) var(--ease-out)}
+body[data-jstate="delivering"] .j-deliver{opacity:1;transform:none;pointer-events:auto}
+.j-dl-head{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.2em;color:var(--good);text-transform:uppercase;font-weight:700}
+.j-dl-head svg.icon{width:14px;height:14px}
+.j-dl-query{font-size:12.5px;color:var(--text-faint);font-style:italic;
+  border-left:2px solid var(--w12);padding-left:11px;line-height:1.5}
+.j-dl-answer{font-size:15px;line-height:1.65;color:var(--text);max-width:560px}
+.j-dl-answer strong{color:#fff}
+.j-dl-answer code{font-family:var(--mono);font-size:.88em;background:var(--w08);padding:2px 6px;border-radius:5px;color:var(--violet)}
+.j-dl-steps{display:flex;flex-direction:column;gap:7px;margin-top:2px}
+.j-dl-step{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;color:var(--text-dim);line-height:1.5}
+.j-dl-step b{flex-shrink:0;width:19px;height:19px;border-radius:50%;background:var(--violet-dim);
+  color:var(--violet);font-family:var(--mono);font-size:10px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;margin-top:1px}
+.j-dl-files{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.j-dl-files .filecard{max-width:100%}
+.j-dl-actions{display:flex;gap:8px;margin-top:6px}
+/* stagger dos filhos: chega em cascata, junto do deslocamento da esfera */
+body[data-jstate="delivering"] .j-deliver>*{animation:dl-in var(--t-slow) var(--ease-out) both}
+@keyframes dl-in{from{opacity:0;transform:translateX(-22px)}to{opacity:1;transform:none}}
+body[data-jstate="delivering"] .j-deliver>*:nth-child(1){animation-delay:.10s}
+body[data-jstate="delivering"] .j-deliver>*:nth-child(2){animation-delay:.17s}
+body[data-jstate="delivering"] .j-deliver>*:nth-child(3){animation-delay:.24s}
+body[data-jstate="delivering"] .j-deliver>*:nth-child(4){animation-delay:.31s}
+body[data-jstate="delivering"] .j-deliver>*:nth-child(5){animation-delay:.38s}
+body[data-jstate="delivering"] .j-deliver>*:nth-child(6){animation-delay:.45s}
+
+@media(max-width:900px){
+  .sidebar{display:none}
+  .suggestions{grid-template-columns:1fr}
+  #chat-log,.composer-wrap{padding-left:16px;padding-right:16px}
+  .j-deliver{width:100%;background:linear-gradient(90deg,rgba(0,0,0,.88),rgba(0,0,0,.5));padding:24px 20px}
+  .j-title{font-size:27px}
+}
+@media(prefers-reduced-motion:reduce){
+  .liquid-bg .blob,.empty-orb,.jarvis-entry .je-head{animation:none}
+}
+</style>
+</head>
+<body data-scene="chat" data-jstate="idle">
+
+<div class="liquid-bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+
+<div class="stage">
+
+  <!-- ============ CENA 1 — CHAT (ref 1) ============ -->
+  <section class="scene on" id="scene-chat">
+    <aside class="sidebar">
+      <div class="sidebar-header">VTZ<span>·</span>PANEL</div>
+      <button class="new-chat-btn" id="new-chat-btn">+ &nbsp;Nova conversa</button>
+
+      <div class="side-group-label">Recursos</div>
+      <nav class="side-nav">
+        <button class="side-nav-item active" data-nav="chat"><i data-ico="chat"></i>Chat</button>
+        <button class="side-nav-item" data-nav="library"><i data-ico="library"></i>Biblioteca</button>
+        <button class="side-nav-item" data-nav="archived"><i data-ico="archive"></i>Arquivadas</button>
+      </nav>
+
+      <div class="side-group-label">Workspaces</div>
+      <nav class="side-nav">
+        <button class="side-nav-item" data-nav="ws"><i data-ico="folder"></i>Incubadora</button>
+        <button class="side-nav-item" data-nav="ws"><i data-ico="folder"></i>VTZ OS</button>
+        <button class="side-nav-item" data-nav="ws"><i data-ico="folder"></i>FPS Boost</button>
+      </nav>
+
+      <div class="side-spacer"></div>
+
+      <!-- item 4 do brief: acesso ao JARVIS no canto inferior esquerdo -->
+      <div class="jarvis-entry" id="jarvis-entry">
+        <div class="je-head"><i data-ico="bot"></i></div>
+        <div class="je-label">J.A.R.V.I.S.</div>
+        <div class="je-sub">voz · wake word</div>
+      </div>
+    </aside>
+
+    <div class="chat-col">
+      <header class="topbar">
+        <button class="model-picker-btn" id="model-btn">
+          <span id="model-badge-slot"></span>
+          <span class="name" id="model-name">RouteLLM</span><span class="chev"><i data-ico="chevronDown"></i></span>
+        </button>
+        <div class="top-spacer"></div>
+        <div class="cost-badge" id="cost-badge">$0.0000</div>
+        <button class="icon-btn" id="btn-config" title="Configuração de voz"><i data-ico="settings"></i></button>
+        <button class="icon-btn" title="Exportar"><i data-ico="download"></i></button>
+      </header>
+
+      <div class="chat-body" id="chat-body">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-orb"></div>
+          <div class="empty-greeting">Pronto pra criar alguma coisa?</div>
+          <div class="empty-sub">Chat multi-modelo via OpenRouter — gera arquivo, executa tarefa e entrega pronto.</div>
+
+          <div class="quickchips">
+            <button class="qchip" data-fill="Gera uma imagem conceito da esfera de partículas do JARVIS"><i data-ico="image"></i>Criar imagem</button>
+            <button class="qchip" data-fill="Brainstorm de features pro VTZ OS"><i data-ico="bulb"></i>Brainstorm</button>
+            <button class="qchip" data-fill="Monta um plano de execução em 5 fases"><i data-ico="map"></i>Fazer um plano</button>
+          </div>
+
+          <div class="suggestions" id="suggestions">
+            <div class="sug-card" data-fill="Gera o relatório da incubadora em PDF com as 26 empresas mapeadas">
+              <div class="si"><i data-ico="file"></i><span class="stag">PDF · DOCX</span></div>
+              <div class="st">Gerador de Arquivo</div>
+              <div class="sd">Relatório, planilha ou deck pronto pra baixar.</div>
+            </div>
+            <div class="sug-card" data-fill="Monta uma apresentação de 8 slides sobre o ecossistema VTz">
+              <div class="si"><i data-ico="slides"></i><span class="stag">PPTX</span></div>
+              <div class="st">Apresentação IA</div>
+              <div class="sd">Ideia vira deck estruturado em segundos.</div>
+            </div>
+            <div class="sug-card" data-fill="Escreve um script .bat de otimização de FPS reversível">
+              <div class="si"><i data-ico="code"></i><span class="stag">PY · BAT · REG</span></div>
+              <div class="st">Dev Assistant</div>
+              <div class="sd">Código limpo, pronto pra produção.</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="chat-log"></div>
+      </div>
+
+      <div class="composer-wrap">
+        <div class="composer-inner">
+          <div class="toolbar-row">
+            <button class="tools-trigger" id="tools-trigger"><i data-ico="tools"></i>Ferramentas</button>
+            <span class="ctx-meter" id="ctx-meter">0 / 200k tokens</span>
+          </div>
+          <div class="composer">
+            <textarea id="chat-input" rows="1" placeholder="Pergunte qualquer coisa…"></textarea>
+            <button class="round-btn plus" title="Anexar"><i data-ico="plus"></i></button>
+            <button class="round-btn mic" id="chat-mic" title="Ditar"><i data-ico="mic"></i></button>
+            <button class="round-btn send" id="send-btn" title="Enviar"><i data-ico="arrowUp"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CENA 2 — JARVIS (refs 6,7,5,4) ============ -->
+  <section class="scene" id="scene-jarvis">
+    <canvas id="wave-canvas"></canvas>
+    <canvas id="particle-canvas"></canvas>
+    <div class="j-veil"></div>
+
+    <div class="j-shell">
+      <div class="j-top">
+        <button class="j-back" id="j-back"><i data-ico="arrowLeft"></i>Voltar ao chat</button>
+        <div class="j-brand"><span class="dot"></span>J.A.R.V.I.S.</div>
+        <div class="j-statechip" id="j-statechip">IDLE</div>
+      </div>
+
+      <div class="j-stage">
+        <!-- idle (ref 6) -->
+        <div class="j-idle" id="j-idle">
+          <div class="j-badge">VTZ OS · agente local</div>
+          <div class="j-title">Qual é a sua próxima <em>grande ideia</em>?</div>
+          <div class="j-sub">Diga "VTz" ou toque no microfone para falar</div>
+
+          <div class="j-composer">
+            <button class="j-purpose">Objetivo<i data-ico="chevronDown"></i></button>
+            <textarea class="j-input" id="j-input" rows="2" placeholder="Ex.: monta a planilha de eventos de julho e salva no desktop"></textarea>
+            <div class="j-crow">
+              <button class="j-mini" title="Anexar"><i data-ico="clip"></i></button>
+              <button class="j-mini" title="Comandos"><i data-ico="cmd"></i></button>
+              <button class="j-go" id="j-go">Executar<i data-ico="sparkle"></i></button>
+            </div>
+          </div>
+
+          <div class="j-chips">
+            <button class="j-chip" data-jfill="pesquisa os eventos de agosto e monta um xlsx"><i data-ico="search"></i>Pesquisa web</button>
+            <button class="j-chip" data-jfill="lê a pasta Downloads e organiza por tipo"><i data-ico="folder"></i>Arquivos do PC</button>
+            <button class="j-chip" data-jfill="gera um .reg reversível pra desligar o HAGS"><i data-ico="cpu"></i>Otimizar PC</button>
+            <button class="j-chip" data-jfill="resume meus e-mails de hoje"><i data-ico="mail"></i>Conectores</button>
+          </div>
+
+          <button class="j-mic" id="j-mic" title="Falar"><i data-ico="mic"></i></button>
+          <div class="j-hint">ou pressione <b>ESPAÇO</b></div>
+        </div>
+
+        <!-- legenda escutando/pensando (refs 7 e 5) -->
+        <div class="j-caption" id="j-caption">
+          <div class="j-vu" id="j-vu"></div>
+          <div class="j-cap-text" id="j-cap-text">Ouvindo…</div>
+          <div class="j-cap-sub" id="j-cap-sub">escutando</div>
+          <button class="j-stop" id="j-stop"><i data-ico="square"></i>Parar</button>
+        </div>
+
+        <!-- entrega (ref 4): conteúdo à esquerda, esfera desloca pra direita -->
+        <div class="j-deliver" id="j-deliver"></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ===================== CONFIGURAÇÃO DE VOZ (Seção 14) ===================== -->
+<div class="vz-overlay" id="vz-overlay" aria-hidden="true">
+  <div class="vz-sheet" role="dialog" aria-label="Configuração de voz">
+    <div class="vz-head">
+      <div>
+        <h3>Voz do JARVIS</h3>
+        <div class="vz-sub" id="vz-agent">—</div>
+      </div>
+      <button class="vz-close" id="vz-close" title="Fechar (Esc)"><i data-ico="x"></i></button>
+    </div>
+
+    <div class="vz-body" id="vz-body">
+      <div class="vz-sec">
+        <div class="vz-lbl">Motor</div>
+        <div class="vz-engines" id="vz-engines"></div>
+        <div class="vz-hint" id="vz-engine-hint"></div>
+      </div>
+
+      <div class="vz-sec" id="vz-voice-sec">
+        <div class="vz-lbl">Voz</div>
+        <div class="vz-row">
+          <select class="vz-select" id="vz-voice"></select>
+        </div>
+        <div class="vz-hint" id="vz-voice-hint"></div>
+      </div>
+
+      <div class="vz-sec" id="vz-samples-sec">
+        <div class="vz-lbl">Minhas vozes (clonagem)</div>
+        <div class="vz-samples" id="vz-samples"></div>
+        <div class="vz-row">
+          <input type="file" id="vz-file" accept="audio/*" hidden>
+          <button class="vz-btn" id="vz-upload"><i data-ico="plus"></i>Subir amostra de voz</button>
+        </div>
+        <div class="vz-hint">
+          Alguns segundos de fala limpa bastam. O arquivo vai direto pro seu PC —
+          não fica guardado no servidor.
+        </div>
+      </div>
+
+      <div class="vz-sec" id="vz-calib"></div>
+
+      <div class="vz-sec">
+        <div class="vz-lbl">Reconhecimento de fala (whisper.cpp)</div>
+        <div class="vz-row">
+          <select class="vz-select" id="vz-stt-model"></select>
+        </div>
+        <div class="vz-hint" id="vz-stt-hint"></div>
+      </div>
+    </div>
+
+    <div class="vz-foot">
+      <button class="vz-btn" id="vz-test"><i data-ico="play"></i>Testar</button>
+      <div class="vz-msg" id="vz-msg"></div>
+      <button class="vz-btn primary" id="vz-save"><i data-ico="check"></i>Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PICKER DE MODELOS ===================== -->
+<div class="pk-overlay" id="pk-overlay" aria-hidden="true">
+  <div class="pk-sheet" role="dialog" aria-label="Selecionar modelo">
+    <div class="pk-head">
+      <h3>Selecionar modelo</h3>
+      <span class="pk-count" id="pk-count"></span>
+      <button class="pk-close" id="pk-close" title="Fechar (Esc)"><i data-ico="x"></i></button>
+    </div>
+    <label class="pk-search">
+      <i data-ico="search"></i>
+      <input id="pk-search" type="text" placeholder="Buscar modelo ou provedor…" autocomplete="off">
+    </label>
+    <div class="pk-chips" id="pk-chips"></div>
+    <div class="pk-list" id="pk-list"></div>
+    <div class="pk-note" id="pk-note"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   VTz LLM — Estados Visuais  ·  FRONTEND ONLY
+   Tokens e convenções extraídos de victorold12/VTz-painel
+   ================================================================ */
+
+/* ---------- 1. ÍCONES (mesma convenção do beta: 24px, stroke 2) ---------- */
+const SW = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const ICONS = {
+  chat:`<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/>`,
+  library:`<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>`,
+  archive:`<rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/>`,
+  folder:`<path d="M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z"/>`,
+  bot:`<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1.4"/><path d="M9 13.5h.01M15 13.5h.01"/><path d="M9.5 17h5"/>`,
+  chevronDown:`<path d="m6 9 6 6 6-6"/>`,
+  settings:`<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H2a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 7.9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 2.7-1.1V2a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H22a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>`,
+  download:`<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>`,
+  image:`<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>`,
+  bulb:`<path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.1 14a5 5 0 1 0-6.2 0 3.3 3.3 0 0 1 1.1 2h4a3.3 3.3 0 0 1 1.1-2z"/>`,
+  map:`<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>`,
+  file:`<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>`,
+  slides:`<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M12 17v4M8 21h8"/>`,
+  code:`<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>`,
+  tools:`<path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.8 2.8 0 0 1-4-4z"/><path d="m17.6 3.5 2.9 2.9"/>`,
+  plus:`<path d="M12 5v14M5 12h14"/>`,
+  mic:`<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10a7 7 0 0 1-14 0"/><path d="M12 17v5"/>`,
+  arrowUp:`<path d="M12 19V5"/><path d="m5 12 7-7 7 7"/>`,
+  arrowLeft:`<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>`,
+  clip:`<path d="M21.4 11.1 12.3 20a5 5 0 0 1-7-7l9-9a3.3 3.3 0 0 1 4.7 4.7l-9 9a1.7 1.7 0 0 1-2.4-2.4l8.3-8.3"/>`,
+  cmd:`<path d="M15 6a3 3 0 1 1 3 3h-3zM9 6a3 3 0 1 0-3 3h3zM15 18a3 3 0 1 0 3-3h-3zM9 18a3 3 0 1 1-3-3h3z"/><rect x="9" y="9" width="6" height="6"/>`,
+  sparkle:`<path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><path d="m6.4 6.4 2.8 2.8M14.8 14.8l2.8 2.8M17.6 6.4l-2.8 2.8M9.2 14.8l-2.8 2.8"/>`,
+  search:`<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>`,
+  cpu:`<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>`,
+  mail:`<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>`,
+  square:`<rect x="6" y="6" width="12" height="12" rx="2"/>`,
+  check:`<path d="m5 13 4 4L19 7"/>`,
+  x:`<path d="M18 6 6 18M6 6l12 12"/>`,
+  copy:`<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>`,
+  refresh:`<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>`,
+  play:`<path d="m7 4 12 8-12 8z"/>`,
+  sheet:`<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>`,
+  terminal:`<path d="m5 8 4 4-4 4"/><path d="M13 16h6"/>`,
+  film:`<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 4v16M17 4v16M2 12h20"/>`,
+  music:`<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>`,
+  box:`<path d="m21 8-9-5-9 5v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v9"/>`,
+  chip:`<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9z"/>`
+};
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function ico(name, cls){
+  return `<svg class="icon ${cls||''}" ${SW}>${ICONS[name]||ICONS.file}</svg>`;
+}
+// hidrata todos os <i data-ico>
+function hydrateIcons(root){
+  (root||document).querySelectorAll('i[data-ico]').forEach(el=>{
+    el.outerHTML = ico(el.dataset.ico);
+  });
+}
+
+/* ---------- 2. REGISTRO DE TIPOS DE ARQUIVO ----------
+   Todo tipo que o backend puder gerar. Ext desconhecida cai no default
+   e usa a própria extensão como tag — nunca quebra.               */
+const KINDS = [
+  {g:'doc',   ext:['pdf'],                                   tag:'PDF',   tint:'#ff6b6b', glyph:'file'},
+  {g:'doc',   ext:['docx','doc','odt','rtf'],                 tag:'DOCX',  tint:'#8b5cf6', glyph:'file'},
+  {g:'doc',   ext:['txt','md','log'],                         tag:'TEXT',  tint:'#9a9aa5', glyph:'file'},
+  {g:'sheet', ext:['xlsx','xls','csv','ods','tsv'],           tag:'SHEET', tint:'#4fd1c5', glyph:'sheet'},
+  {g:'slide', ext:['pptx','ppt','odp'],                       tag:'SLIDE', tint:'#ffb454', glyph:'slides'},
+  {g:'code',  ext:['py','js','ts','jsx','tsx','json','html','css','xml','yml','yaml','sql','c','cpp','cs','java','go','rs','php','rb','lua','ipynb'], tag:'CODE', tint:'#a78bfa', glyph:'code'},
+  {g:'script',ext:['bat','cmd','ps1','reg','vbs','sh','zsh'], tag:'SCRIPT',tint:'#ff9d6b', glyph:'terminal'},
+  {g:'image', ext:['png','jpg','jpeg','gif','webp','svg','bmp','ico','avif','tiff'], tag:'IMG', tint:'#f472b6', glyph:'image'},
+  {g:'video', ext:['mp4','mov','avi','mkv','webm','m4v'],     tag:'VIDEO', tint:'#60a5fa', glyph:'film'},
+  {g:'audio', ext:['mp3','wav','flac','ogg','m4a','aac'],     tag:'AUDIO', tint:'#34d399', glyph:'music'},
+  {g:'zip',   ext:['zip','rar','7z','tar','gz','xz'],         tag:'ZIP',   tint:'#fbbf24', glyph:'box'},
+  {g:'bin',   ext:['exe','msi','dll','iso','apk','bin'],      tag:'BIN',   tint:'#fb923c', glyph:'chip'}
+];
+const KIND_MAP = (()=>{ const m={}; KINDS.forEach(k=>k.ext.forEach(e=>m[e]=k)); return m; })();
+function kindOf(ext){
+  const e = String(ext||'').replace(/^\./,'').toLowerCase();
+  return KIND_MAP[e] || {g:'other', tag:(e||'FILE').toUpperCase().slice(0,6), tint:'#9a9aa5', glyph:'file'};
+}
+function hexA(hex,a){
+  const n=parseInt(hex.slice(1),16);
+  return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;
+}
+function fmtSize(bytes){
+  if(bytes==null) return '—';
+  if(bytes < 1024) return bytes+' B';
+  if(bytes < 1048576) return (bytes/1024).toFixed(2)+' KB';
+  if(bytes < 1073741824) return (bytes/1048576).toFixed(2)+' MB';
+  return (bytes/1073741824).toFixed(2)+' GB';
+}
+
+/* ---------- 3. STATE MACHINE ----------
+   Nós do JARVIS + estados do chat, independentes.
+   Transições disparadas por EVENTO, nunca por tempo fixo.        */
+const JARVIS_GRAPH = {
+  idle:       ['listening'],
+  listening:  ['thinking','idle'],
+  thinking:   ['delivering','idle'],
+  delivering: ['idle','listening']
+};
+class FSM {
+  constructor(graph, initial){
+    this.graph = graph; this.state = initial; this.listeners = [];
+  }
+  can(next){ return (this.graph[this.state]||[]).includes(next); }
+  go(next, payload){
+    if(next === this.state) return false;
+    if(!this.can(next)){
+      // salto não previsto (ex.: dev console) — permite, mas passa por idle
+      console.warn(`[FSM] salto ${this.state} → ${next} fora do grafo`);
+    }
+    const prev = this.state;
+    this.state = next;
+    this.listeners.forEach(fn => fn(next, prev, payload));
+    return true;
+  }
+  on(fn){ this.listeners.push(fn); return this; }
+}
+const jfsm = new FSM(JARVIS_GRAPH, 'idle');
+
+/* ---------- 4. INTERFACE DRIVER ----------
+   ESTE é o contrato do backend. Quando o VTZ OS real existir,
+   ele implementa estes 5 métodos e NADA na UI muda.              */
+class Driver {
+  startListening(){ throw 'not implemented'; }
+  stopListening(){ throw 'not implemented'; }
+  submit(text){ throw 'not implemented'; }
+  cancel(){ throw 'not implemented'; }
+  // saídas que o driver EMITE para a UI:
+  //   onAudioLevel(level 0..1)
+  //   onTranscript(text, isFinal)
+  //   onStep({index, label, status:'active'|'done'})
+  //   onFileProgress({id, name, ext, size, status, progress 0..100})
+  //   onResult({query, answer, steps[], files[]})
+  //   onError(msg)
+}
+
+/* ================================================================
+   5. MOTOR DE PARTÍCULAS — UM buffer, TRÊS alvos, morph contínuo.
+   Radial(ref 7) · Vórtice(ref 5) · Esfera(ref 4) não são três
+   animações: são três posições do MESMO sistema. A transição entre
+   estados é interpolação de peso, então nunca existe corte seco.
+   ================================================================ */
+const VS = `
+attribute vec3 aRad, aVor, aSph;
+attribute vec3 aMisc;               // x=seed  y=sizeMul  z=ringFlag
+uniform vec3  uW;                   // pesos: radial, vortex, sphere
+uniform float uTime, uAudio, uAspect, uOffsetX, uScale, uPix;
+varying float vDepth, vAlpha;
+
+vec3 rotY(vec3 p, float a){
+  float c = cos(a), s = sin(a);
+  return vec3(c*p.x + s*p.z, p.y, -s*p.x + c*p.z);
+}
+
+void main(){
+  float seed = aMisc.x;
+
+  /* --- alvo 1: padrão radial de pontos (escutando) --- */
+  vec3 pr  = aRad;
+  float ra = atan(pr.y, pr.x);
+  float rr = length(pr.xy);
+  float a2 = ra + uTime * 0.16 + rr * 0.42;
+  float pulse = 1.0 + uAudio * 0.34 * sin(rr * 8.0 - uTime * 5.0);
+  float rr2 = rr * pulse;
+  pr = vec3(cos(a2) * rr2, sin(a2) * rr2, sin(rr * 5.0 - uTime * 1.7) * 0.05);
+
+  /* --- alvo 2: vórtice cilíndrico (pensando) --- */
+  vec3 pv  = aVor;
+  float vr = length(pv.xz);
+  float va = atan(pv.z, pv.x);
+  float y  = pv.y;
+  if(aMisc.z < 0.5){                        // partícula de fluxo
+    float f = fract((y * 0.5 + 0.5) - uTime * 0.17 + seed * 0.37);
+    y = f * 2.0 - 1.0;
+    vr *= 0.82 + 0.34 * (1.0 - abs(y));     // estrangula no meio (ampulheta)
+  }
+  va += uTime * (0.62 + 0.3 * (1.0 - abs(y))) + y * 0.75;
+  pv = vec3(cos(va) * vr, y, sin(va) * vr);
+
+  /* --- alvo 3: esfera halftone na mão (entregando) --- */
+  vec3 ps = rotY(aSph, uTime * 0.22);
+  ps *= 1.0 + sin(uTime * 1.5 + seed * 6.283) * 0.022;
+  ps += vec3(sin(uTime*1.1 + seed*19.0),
+             cos(uTime*0.9 + seed*23.0),
+             sin(uTime*1.3 + seed*13.0)) * 0.013;
+
+  /* --- morph: a interpolação É o handoff --- */
+  vec3 p = pr * uW.x + pv * uW.y + ps * uW.z;
+  p *= uScale;
+  p.x += uOffsetX;
+
+  float z = p.z + 3.30;
+  vec2 proj = p.xy * (2.35 / z);
+  proj.x /= uAspect;
+
+  vDepth  = clamp((3.30 - p.z) / 2.4, 0.0, 1.0);
+  vAlpha  = 0.26 + 0.60 * vDepth;
+  gl_Position  = vec4(proj, 0.0, 1.0);
+  gl_PointSize = aMisc.y * uPix * (2.30 / z) * (1.0 + uAudio * 0.45);
+}`;
+
+const FS = `
+precision mediump float;
+uniform vec3 uColA, uColB;
+uniform float uAlpha;
+varying float vDepth, vAlpha;
+void main(){
+  float d = length(gl_PointCoord - vec2(0.5));
+  if(d > 0.5) discard;
+  float a = smoothstep(0.5, 0.26, d);
+  vec3 col = mix(uColB, uColA, vDepth * vDepth);
+  gl_FragColor = vec4(col, a * vAlpha * uAlpha);
+}`;
+
+class ParticleEngine {
+  constructor(canvas){
+    this.cv = canvas;
+    this.gl = canvas.getContext('webgl', {alpha:true, antialias:false, premultipliedAlpha:false});
+    this.ok = !!this.gl;
+    if(!this.ok){ console.warn('WebGL indisponível'); return; }
+    // Densidade alta por decisão de brief (fidelidade > otimização).
+    // Único corte: renderer POR SOFTWARE (SwiftShader/llvmpipe), onde 24k pontos
+    // derrubam pra ~1fps. Não é fallback pra GPU fraca — é pra ausência de GPU.
+    let soft = false;
+    try{
+      const dbg = this.gl.getExtension('WEBGL_debug_renderer_info');
+      const r = dbg ? String(this.gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
+      soft = /swiftshader|llvmpipe|software|basic render/i.test(r);
+    }catch(e){}
+    this.N = soft ? 3500 : (window.innerWidth < 900 ? 9000 : 24000);
+    if(soft) console.warn('[VTz] renderer por software detectado — densidade reduzida');
+    this.W = {r:0, v:0, s:0};          // pesos atuais
+    this.T = {r:0, v:0, s:0};          // pesos alvo
+    this.audio = 0; this.audioT = 0;
+    this.offX = 0; this.offXT = 0;
+    this.scale = 1; this.scaleT = 1;
+    this.alpha = 0; this.alphaT = 0;
+    this.t0 = performance.now();
+    this._build();
+    this._resize();
+    addEventListener('resize', ()=>this._resize());
+    this._loop = this._loop.bind(this);
+    requestAnimationFrame(this._loop);
+  }
+
+  _compile(type, src){
+    const gl = this.gl, sh = gl.createShader(type);
+    gl.shaderSource(sh, src); gl.compileShader(sh);
+    if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(sh);
+    return sh;
+  }
+
+  _build(){
+    const gl = this.gl, N = this.N;
+    const prog = gl.createProgram();
+    gl.attachShader(prog, this._compile(gl.VERTEX_SHADER, VS));
+    gl.attachShader(prog, this._compile(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(prog);
+    if(!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw gl.getProgramInfoLog(prog);
+    gl.useProgram(prog); this.prog = prog;
+
+    const rad = new Float32Array(N*3),
+          vor = new Float32Array(N*3),
+          sph = new Float32Array(N*3),
+          msc = new Float32Array(N*3);
+    const TAU = Math.PI*2, GOLD = Math.PI*(3-Math.sqrt(5));
+    const RINGS = 46, PER = Math.floor(N/RINGS);
+
+    for(let i=0;i<N;i++){
+      const i3 = i*3, rnd = Math.random();
+
+      /* alvo 1 — radial: anéis concêntricos com twist, furo no centro */
+      const ring = Math.floor(i/PER), k = i % PER;
+      const rr = 0.30 + 0.72 * (ring/RINGS);
+      const ra = (k/PER)*TAU + ring*0.135;
+      rad[i3]   = Math.cos(ra)*rr;
+      rad[i3+1] = Math.sin(ra)*rr;
+      rad[i3+2] = 0;
+
+      /* alvo 2 — vórtice: 22% formam os dois anéis brilhantes, resto flui */
+      const isRing = rnd < 0.22;
+      const va = Math.random()*TAU;
+      if(isRing){
+        const top = Math.random() < 0.5 ? 1 : -1;
+        const vr = 0.96 + (Math.random()-0.5)*0.035;
+        vor[i3]   = Math.cos(va)*vr;
+        vor[i3+1] = top * (0.94 + Math.random()*0.05);
+        vor[i3+2] = Math.sin(va)*vr;
+      } else {
+        const wall = Math.random() < 0.72;
+        const vr = wall ? 0.86 + Math.random()*0.20 : Math.random()*0.16;
+        vor[i3]   = Math.cos(va)*vr;
+        vor[i3+1] = Math.random()*2 - 1;
+        vor[i3+2] = Math.sin(va)*vr;
+      }
+
+      /* alvo 3 — esfera (distribuição fibonacci = halftone regular) */
+      const yy = 1 - (i/(N-1))*2;
+      const rp = Math.sqrt(Math.max(0, 1-yy*yy));
+      const th = GOLD * i;
+      const R  = 0.72 * (0.90 + Math.random()*0.13);
+      sph[i3]   = Math.cos(th)*rp*R;
+      sph[i3+1] = yy*R;
+      sph[i3+2] = Math.sin(th)*rp*R;
+
+      msc[i3]   = Math.random();                     // seed
+      msc[i3+1] = 0.42 + Math.random()*0.78;         // sizeMul
+      msc[i3+2] = isRing ? 1 : 0;                    // ringFlag
+    }
+
+    const bind = (name, data)=>{
+      const b = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, b);
+      gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, name);
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
+    };
+    bind('aRad', rad); bind('aVor', vor); bind('aSph', sph); bind('aMisc', msc);
+
+    this.u = {};
+    ['uW','uTime','uAudio','uAspect','uOffsetX','uScale','uPix','uColA','uColB','uAlpha']
+      .forEach(n => this.u[n] = gl.getUniformLocation(prog, n));
+
+    gl.disable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);   // aditivo: partícula empilha luz
+  }
+
+  _resize(){
+    const dpr = Math.min(devicePixelRatio||1, 2);
+    const w = this.cv.clientWidth||innerWidth, h = this.cv.clientHeight||innerHeight;
+    this.cv.width = w*dpr; this.cv.height = h*dpr;
+    this.gl.viewport(0,0,this.cv.width,this.cv.height);
+    this.aspect = w/h; this.dpr = dpr;
+  }
+
+  /* API — chamada pela state machine, não pela UI */
+  setTarget({r=0,v=0,s=0, offX=0, scale=1, alpha=1}){
+    this.T = {r,v,s}; this.offXT = offX; this.scaleT = scale; this.alphaT = alpha;
+  }
+  setAudio(level){ this.audioT = Math.max(0, Math.min(1, level)); }
+
+  _loop(now){
+    requestAnimationFrame(this._loop);
+    const gl = this.gl, dt = 1/60;
+    const k = 1 - Math.pow(0.002, dt);        // suavização exponencial
+    this.W.r += (this.T.r - this.W.r)*k*1.7;
+    this.W.v += (this.T.v - this.W.v)*k*1.7;
+    this.W.s += (this.T.s - this.W.s)*k*1.7;
+    this.offX  += (this.offXT  - this.offX )*k*1.5;
+    this.scale += (this.scaleT - this.scale)*k*1.5;
+    this.alpha += (this.alphaT - this.alpha)*k*2.2;
+    this.audio += (this.audioT - this.audio)*0.18;
+
+    gl.clearColor(0,0,0,0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    if(this.alpha < 0.01) return;
+
+    const u = this.u;
+    gl.uniform3f(u.uW, this.W.r, this.W.v, this.W.s);
+    gl.uniform1f(u.uTime, (now - this.t0)/1000);
+    gl.uniform1f(u.uAudio, this.audio);
+    gl.uniform1f(u.uAspect, this.aspect);
+    gl.uniform1f(u.uOffsetX, this.offX);
+    gl.uniform1f(u.uScale, this.scale);
+    gl.uniform1f(u.uPix, 1.05*this.dpr);
+    gl.uniform3f(u.uColA, 1.0, 0.99, 1.0);          // núcleo: branco
+    gl.uniform3f(u.uColB, 0.545, 0.361, 0.965);     // fundo: --violet #8b5cf6
+    gl.uniform1f(u.uAlpha, this.alpha);
+    gl.drawArrays(gl.POINTS, 0, this.N);
+  }
+}
+
+/* ================================================================
+   6. WAVEFIELD — ondas orgânicas do menu JARVIS (ref 6)
+   Shader em loop contínuo. Não é imagem, não é GIF.
+   ================================================================ */
+const WFS = `
+precision mediump float;
+uniform vec2 uRes; uniform float uTime;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+float noise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), u.x),
+             mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
+}
+float fbm(vec2 p){
+  float v = 0.0, a = 0.5;
+  for(int i=0;i<5;i++){ v += a*noise(p); p *= 2.03; a *= 0.5; }
+  return v;
+}
+void main(){
+  vec2 uv = gl_FragCoord.xy / uRes.xy;
+  vec2 p  = vec2(uv.x*1.7, uv.y);
+  float t = uTime*0.045;
+  // domain warping: dá o aspecto de fumaça/tecido da referência
+  vec2 q = vec2(fbm(p*2.4 + t), fbm(p*2.4 + vec2(3.1,1.7) - t));
+  vec2 r = vec2(fbm(p*2.9 + q*1.9 + t*1.4), fbm(p*2.9 + q*1.9 + vec2(8.3,2.8)));
+  float n = fbm(p*2.2 + r*1.35);
+  float veil = pow(smoothstep(0.28, 0.92, n), 1.7);
+  vec3 col = mix(vec3(0.006,0.006,0.010), vec3(0.085,0.082,0.105), veil);
+  col += vec3(0.545,0.361,0.965) * pow(veil, 5.0) * 0.30;   // veios violeta
+  col += vec3(0.310,0.820,0.771) * pow(veil, 9.0) * 0.10;   // fio teal (--good)
+  float vig = 1.0 - 0.62*length(uv - 0.5);
+  gl_FragColor = vec4(col*vig, 1.0);
+}`;
+
+class WaveField {
+  constructor(canvas){
+    this.cv = canvas;
+    const gl = this.gl = canvas.getContext('webgl', {antialias:false});
+    if(!gl){ canvas.style.background = '#050508'; return; }
+    const mk=(t,s)=>{const sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compileShader(sh);
+      if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(sh);return sh;};
+    const p = gl.createProgram();
+    gl.attachShader(p, mk(gl.VERTEX_SHADER,'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}'));
+    gl.attachShader(p, mk(gl.FRAGMENT_SHADER, WFS));
+    gl.linkProgram(p); gl.useProgram(p);
+    const b = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,3,-1,-1,3]), gl.STATIC_DRAW);
+    const la = gl.getAttribLocation(p,'a');
+    gl.enableVertexAttribArray(la); gl.vertexAttribPointer(la,2,gl.FLOAT,false,0,0);
+    this.uRes = gl.getUniformLocation(p,'uRes');
+    this.uTime = gl.getUniformLocation(p,'uTime');
+    this.t0 = performance.now();
+    this._resize(); addEventListener('resize',()=>this._resize());
+    const loop = (now)=>{ requestAnimationFrame(loop);
+      if(document.body.dataset.scene !== 'jarvis') return;   // não queima GPU no chat
+      gl.uniform2f(this.uRes, this.cv.width, this.cv.height);
+      gl.uniform1f(this.uTime, (now-this.t0)/1000);
+      gl.drawArrays(gl.TRIANGLES,0,3);
+    };
+    requestAnimationFrame(loop);
+  }
+  _resize(){
+    const dpr = Math.min(devicePixelRatio||1, 1.5);
+    this.cv.width  = (this.cv.clientWidth ||innerWidth )*dpr;
+    this.cv.height = (this.cv.clientHeight||innerHeight)*dpr;
+    this.gl.viewport(0,0,this.cv.width,this.cv.height);
+  }
+}
+
+/* ================================================================
+   7. COMPONENTE FILECARD (ref 3)
+   Design fixo. Nome, extensão, tag, tamanho, label e progresso
+   vêm SEMPRE do driver — nada hardcoded, nada travado em 74%.
+   ================================================================ */
+class FileCard {
+  constructor(mount, data){
+    this.k = kindOf(data.ext);
+    this.el = document.createElement('div');
+    this.el.className = 'filecard';
+    this.el.style.setProperty('--fc-tint', this.k.tint);
+    this.el.style.setProperty('--fc-glow', hexA(this.k.tint, .85));
+    this.el.innerHTML = `
+      <button class="fc-close" title="Fechar">${ico('x')}</button>
+      <div class="fc-top">
+        <div class="fc-thumb">
+          <div class="fc-sheet"></div><div class="fc-fold"></div>
+          <div class="fc-glyph">${ico(this.k.glyph)}</div>
+          <div class="fc-tag">${this.k.tag}</div>
+        </div>
+        <div class="fc-meta">
+          <div class="fc-name"></div>
+          <div class="fc-size"></div>
+        </div>
+      </div>
+      <div class="fc-progress">
+        <div class="fc-prow">
+          <div class="fc-spin"></div>
+          <div class="fc-status"></div>
+          <div class="fc-pct">0%</div>
+        </div>
+        <div class="fc-track"><div class="fc-bar"></div></div>
+      </div>
+      <div class="fc-actions">
+        <button class="fc-btn primary">${ico('download')}Baixar</button>
+        <button class="fc-btn">${ico('copy')}Copiar caminho</button>
+      </div>`;
+    this.$ = q => this.el.querySelector(q);
+    this.el.querySelector('.fc-close').onclick = ()=> this.dismiss();
+    mount.appendChild(this.el);
+    this.update(data);
+  }
+  update(d){
+    if(d.name != null || d.ext != null){
+      this._name = d.name ?? this._name ?? 'arquivo';
+      this._ext  = (d.ext ?? this._ext ?? '').replace(/^\./,'');
+      this.$('.fc-name').textContent = this._ext ? `${this._name}.${this._ext}` : this._name;
+      const k = kindOf(this._ext);
+      if(k.tag !== this.k.tag){
+        this.k = k;
+        this.el.style.setProperty('--fc-tint', k.tint);
+        this.el.style.setProperty('--fc-glow', hexA(k.tint,.85));
+        this.$('.fc-tag').textContent = k.tag;
+        this.$('.fc-glyph').innerHTML = ico(k.glyph);
+      }
+    }
+    if(d.size != null) this.$('.fc-size').textContent = fmtSize(d.size);
+    if(d.status != null) this.$('.fc-status').textContent = d.status;
+    if(d.progress != null){
+      const p = Math.max(0, Math.min(100, d.progress));
+      this.$('.fc-bar').style.width = p + '%';
+      this.$('.fc-pct').textContent = Math.round(p) + '%';
+      if(p >= 100 && !this.el.classList.contains('done')){
+        this.el.classList.add('done');
+        this.$('.fc-spin').innerHTML = ico('check');
+        if(d.status == null) this.$('.fc-status').textContent = 'Concluído';
+      }
+    }
+    return this;
+  }
+  dismiss(){
+    this.el.classList.add('out');
+    setTimeout(()=> this.el.remove(), 340);
+  }
+}
+
+/* ================================================================
+   8. COMPONENTE STEPPER (ref 2) — exclusivo do chat
+   Rótulos dinâmicos. Check desenha o traço, não aparece pronto.
+   ================================================================ */
+class Stepper {
+  constructor(mount, labels){
+    this.labels = labels;
+    this.el = document.createElement('div');
+    this.el.className = 'stepper';
+    this.el.innerHTML = `<div class="stepper-track">` + labels.map((L,i)=>`
+      <div class="stp" data-i="${i}">
+        <div class="stp-link"><i></i></div>
+        <div class="stp-node">
+          <span class="stp-num">${i+1}</span>
+          <svg class="stp-ck" ${SW} style="display:none"><path class="stp-check" d="m5 13 4 4L19 7"/></svg>
+        </div>
+        <div class="stp-label">Etapa ${i+1}</div>
+        <div class="stp-title">${L}</div>
+      </div>`).join('') + `</div>`;
+    mount.appendChild(this.el);
+    this.nodes = [...this.el.querySelectorAll('.stp')];
+  }
+  set(index, status){
+    this.nodes.forEach((n,i)=>{
+      n.classList.remove('active');
+      if(i < index || (i === index && status === 'done')){
+        if(!n.classList.contains('done')){
+          n.classList.add('done');
+          n.querySelector('.stp-num').style.display = 'none';
+          n.querySelector('.stp-ck').style.display  = 'block';
+        }
+        const bar = n.querySelector('.stp-link i'); if(bar) bar.style.width = '100%';
+      } else if(i === index){
+        n.classList.add('active');
+      }
+    });
+    return this;
+  }
+  setLabel(i, text){ const n=this.nodes[i]; if(n) n.querySelector('.stp-title').textContent = text; }
+  finish(){ this.set(this.labels.length-1, 'done'); return this; }
+  dismiss(){ this.el.classList.add('out'); setTimeout(()=>this.el.remove(), 340); }
+}
+
+/* ================================================================
+   9. BACKEND DRIVER — implementa a interface Driver contra o VTz OS real.
+   Regra desta camada: NADA aqui inventa conteúdo. Etapa, arquivo,
+   progresso e resposta só existem se o backend disser que existem.
+   Sem backend configurado → erro honesto, nunca resposta fabricada.
+   ================================================================ */
+/* Seleção padrão de modelo. Fica aqui (e não no picker) porque o driver lê
+   isto antes do picker existir — uma constante só, sem duas verdades. */
+const MODEL_DEFAULT = '__router__';
+
+const API = {
+  get base(){ return (localStorage.getItem('vtz_backend_url') || '').replace(/\/+$/,''); },
+  get token(){ return localStorage.getItem('vtz_backend_token') || ''; },
+  /* Modelo escolhido. As entradas de roteamento (__router__ etc.) não são ids
+     reais — nesse caso não manda `model` e sim `route`, e quem escolhe é o
+     backend. Mandar "__router__" como id daria 400 no OpenRouter. */
+  /* Sem nada salvo, o padrão é RouteLLM — o mesmo que o picker mostra no botão.
+     Se divergisse, o botão diria "RouteLLM" e o backend não receberia a dica. */
+  get model(){
+    const v = localStorage.getItem('vtz_model') || MODEL_DEFAULT;
+    return v.startsWith('__') ? '' : v;
+  },
+  get route(){
+    const v = localStorage.getItem('vtz_model') || MODEL_DEFAULT;
+    return {'__router__':'auto', '__router_free__':'free', '__fusion__':'fusion'}[v] || '';
+  },
+  get agentId(){ return localStorage.getItem('vtz_agent_id') || ''; },
+  headers(extra){
+    const h = Object.assign({'Content-Type':'application/json'}, extra||{});
+    if(this.token) h['X-Backend-Token'] = this.token;
+    return h;
+  }
+};
+
+/* Detecção de silêncio (VAD) — é ISTO que fecha a escuta.
+   Sem timer fixo: a transição listening→thinking nasce de um evento real. */
+const VAD = { startMs:600, silenceMs:1100, threshold:0.055 };
+
+class BackendDriver extends Driver {
+  constructor(){
+    super();
+    this.h = {}; this.stream = null; this.ctx = null; this.abort = null;
+    this._live = false; this._t0 = 0; this._quietSince = 0; this._spoke = false;
+  }
+  on(evt, fn){ (this.h[evt] = this.h[evt] || []).push(fn); return this; }
+  emit(evt, ...a){ (this.h[evt]||[]).forEach(f => f(...a)); }
+
+  /* ---------- ÁUDIO REAL ---------- */
+  async startListening(){
+    if(!navigator.mediaDevices?.getUserMedia){
+      this.emit('error','Este navegador não expõe microfone.');
+      return false;
+    }
+    try{
+      this.stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    }catch(e){
+      this.emit('error','Microfone negado — libere o acesso para falar com o JARVIS.');
+      return false;
+    }
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const src = ctx.createMediaStreamSource(this.stream);
+    const an  = ctx.createAnalyser(); an.fftSize = 512; an.smoothingTimeConstant = 0.75;
+    src.connect(an);
+    const buf = new Uint8Array(an.frequencyBinCount);
+    this.ctx = ctx; this._live = true;
+    this._t0 = performance.now(); this._quietSince = 0; this._spoke = false;
+
+    // STT real, se o navegador tiver. O transcript vem do reconhecimento, não de texto fixo.
+    this._startSTT();
+
+    const tick = ()=>{
+      if(!this._live) return;
+      an.getByteFrequencyData(buf);
+      let s = 0; for(let i=0;i<buf.length;i++) s += buf[i];
+      const lvl = Math.min(1, (s/buf.length/128) * 1.6);
+      this.emit('audio', lvl);
+
+      const now = performance.now();
+      if(now - this._t0 > VAD.startMs){
+        if(lvl > VAD.threshold){ this._spoke = true; this._quietSince = 0; }
+        else if(this._spoke){
+          if(!this._quietSince) this._quietSince = now;
+          else if(now - this._quietSince > VAD.silenceMs){
+            this.emit('speechEnd');           // ← evento real fecha a escuta
+            return;
+          }
+        }
+      }
+      requestAnimationFrame(tick);
+    };
+    tick();
+    return true;
+  }
+  _startSTT(){
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!SR) return;
+    try{
+      const r = new SR();
+      r.lang = 'pt-BR'; r.continuous = true; r.interimResults = true;
+      r.onresult = ev =>{
+        let txt = '', done = false;
+        for(let i = ev.resultIndex; i < ev.results.length; i++){
+          txt += ev.results[i][0].transcript;
+          if(ev.results[i].isFinal) done = true;
+        }
+        this.emit('transcript', txt.trim(), done);
+      };
+      r.onerror = ()=>{};
+      r.start(); this.rec = r;
+    }catch(e){ /* STT indisponível: a escuta segue só com o nível de áudio */ }
+  }
+  stopListening(){
+    this._live = false;
+    this.emit('audio', 0);
+    if(this.rec){ try{ this.rec.stop(); }catch(e){} this.rec = null; }
+    if(this.stream){ this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
+    if(this.ctx){ this.ctx.close().catch(()=>{}); this.ctx = null; }
+  }
+
+  /* ---------- PIPELINE REAL ---------- */
+  async submit(text, opts={}){
+    if(!API.base){
+      this.emit('error','Backend não configurado. Defina a URL do VTz OS em Configuração para executar de verdade.');
+      return;
+    }
+    this.abort = new AbortController();
+    const body = {
+      messages:[{role:'user', content:text}],
+      stream:true
+    };
+    if(API.model) body.model = API.model;
+    if(API.route) body.route = API.route;             // roteamento automático (RouteLLM)
+    if(API.agentId) body.agent_id = API.agentId;     // habilita ações de PC via Agente Local
+
+    try{
+      const r = await fetch(API.base + '/api/agent', {
+        method:'POST', headers: API.headers(), body: JSON.stringify(body),
+        signal: this.abort.signal
+      });
+      if(!r.ok){
+        this.emit('error', `Backend respondeu ${r.status}. ${r.status===401?'Token inválido.':''}`);
+        return;
+      }
+      await this._consume(r, text, opts);
+    }catch(e){
+      if(e.name !== 'AbortError') this.emit('error','Falha ao falar com o backend: ' + e.message);
+    }
+  }
+
+  /* Lê o stream do backend e traduz os eventos DELE nos eventos da UI.
+     Cada `step`, `file` e `token` abaixo veio do servidor — nada é inventado. */
+  async _consume(res, query, opts){
+    const reader = res.body?.getReader();
+    if(!reader){                                     // resposta não-stream: usa como veio
+      const j = await res.json().catch(()=>null);
+      this.emit('result', {query, answer:(j?.content ?? j?.answer ?? ''), files:[]});
+      return;
+    }
+    const dec = new TextDecoder();
+    let bufr = '', answer = '', stepsAnnounced = false, finished = false;
+    const files = [];
+
+    const handle = ev =>{
+      switch(ev.type){
+        case 'plan':                                  // orquestrador anunciou as etapas
+          if(Array.isArray(ev.steps) && ev.steps.length && opts.withSteps !== false){
+            stepsAnnounced = true;
+            this.emit('stepsBegin', ev.steps.map(s => s.label ?? String(s)));
+          }
+          break;
+        case 'step':
+          this.emit('step', {index:ev.index, label:ev.label, status:ev.status || 'active'});
+          break;
+        case 'tool':                                  // ferramenta em execução vira etapa viva
+          if(!stepsAnnounced) this.emit('step', {index:ev.index ?? 0, label:ev.label || ev.name, status:'active'});
+          break;
+        case 'file_begin':
+          files.push(ev.id);
+          this.emit('fileBegin', {id:ev.id, name:ev.name, ext:ev.ext, size:ev.size,
+                                  status:ev.status || 'Iniciando…', progress:ev.progress ?? 0});
+          break;
+        case 'file_progress':
+          this.emit('fileProgress', {id:ev.id, progress:ev.progress, status:ev.status, path:ev.path});
+          break;
+        case 'token':
+        case 'delta':
+          answer += ev.text ?? ev.content ?? '';
+          this.emit('token', ev.text ?? ev.content ?? '');
+          break;
+        case 'route':                                 // RouteLLM decidiu (ou não deu)
+          this.emit('route', ev);
+          break;
+        case 'usage':
+          this.emit('usage', ev);                     // tokens/custo reais
+          break;
+        case 'error':
+          this.emit('error', ev.message || 'Erro no backend.');
+          break;
+        case 'done':
+          finished = true;
+          this.emit('result', {query, answer: ev.answer ?? answer, files, steps: ev.steps, meta: ev.meta});
+          break;
+      }
+    };
+
+    while(true){
+      const {value, done} = await reader.read();
+      if(done) break;
+      bufr += dec.decode(value, {stream:true});
+      const lines = bufr.split('\n');
+      bufr = lines.pop();
+      for(const line of lines){
+        const s = line.trim();
+        if(!s) continue;
+        const payload = s.startsWith('data:') ? s.slice(5).trim() : s;   // aceita SSE e NDJSON
+        if(!payload || payload === '[DONE]') continue;
+        try{ handle(JSON.parse(payload)); }
+        catch(e){ answer += payload; this.emit('token', payload); }      // stream de texto puro
+      }
+    }
+    // fim do stream sem 'done' explícito: entrega o que o servidor mandou.
+    // Se o 'done' já veio, NÃO reemite — senão sobrescreveria os passos que ele trouxe.
+    if(!finished && (answer || files.length)) this.emit('result', {query, answer, files});
+  }
+
+  cancel(){
+    if(this.abort){ this.abort.abort(); this.abort = null; }
+    this.stopListening();
+  }
+}
+const driver = new BackendDriver();
+
+/* ================================================================
+   10. WIRING — orquestrador único de cena + estado.
+   Todo timing/easing mora aqui ou nos tokens. Nunca espalhado.
+   ================================================================ */
+hydrateIcons();
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const body = document.body;
+
+const engine = new ParticleEngine($('#particle-canvas'));
+new WaveField($('#wave-canvas'));
+
+/* --- presets do motor por estado. É AQUI que a continuidade nasce:
+   trocar de estado só muda o alvo; o motor interpola sozinho. --- */
+const POSE = {
+  idle:       {r:.35, v:.10, s:.05, offX:0,    scale:0.90, alpha:0   },
+  listening:  {r:1,   v:0,   s:0,   offX:0,    scale:0.78, alpha:1   },
+  thinking:   {r:0,   v:1,   s:0,   offX:0,    scale:0.74, alpha:1   },
+  delivering: {r:0,   v:0,   s:1,   offX:0.80, scale:0.66, alpha:1   }
+};
+const CAPTION = {
+  listening: {text:'Ouvindo…',            sub:'escutando'},
+  thinking:  {text:'Processando pedido…', sub:'pensando'},
+};
+
+function setScene(name){
+  if(body.dataset.scene === name) return;
+  body.dataset.scene = name;
+  $('#scene-chat').classList.toggle('on', name === 'chat');
+  $('#scene-jarvis').classList.toggle('on', name === 'jarvis');
+  if(name === 'chat'){ jfsm.go('idle'); driver.cancel(); resetPipe(); chatBusy = false; }
+}
+
+jfsm.on((next, prev)=>{
+  body.dataset.jstate = next;
+  engine.setTarget(POSE[next]);
+  $('#j-statechip').textContent = next.toUpperCase();
+  const cap = CAPTION[next];
+  if(cap){ $('#j-cap-text').textContent = cap.text; $('#j-cap-sub').textContent = cap.sub; }
+  if(next !== 'listening') driver.stopListening();
+  if(next === 'idle'){ $('#j-deliver').innerHTML = ''; engine.setAudio(0); }
+});
+
+/* --- VU meter reage ao áudio real (ou simulado) --- */
+const VU_N = 22;
+$('#j-vu').innerHTML = Array.from({length:VU_N}, ()=>'<i></i>').join('');
+const vuBars = $$('#j-vu i');
+driver.on('audio', lvl => {
+  engine.setAudio(lvl);
+  vuBars.forEach((b,i)=>{
+    const d = Math.abs(i - (VU_N-1)/2) / ((VU_N-1)/2);
+    const h = 4 + lvl * 24 * (1 - d*0.68) * (0.72 + Math.random()*0.5);
+    b.style.height  = h.toFixed(1)+'px';
+    b.style.opacity = (0.45 + lvl*0.55).toFixed(2);
+  });
+});
+
+/* ================================================================
+   11. FLUXO DO CHAT
+   ================================================================ */
+const chatLog = $('#chat-log'), chatBody = $('#chat-body'), input = $('#chat-input');
+let chatBusy = false, chatCards = {};
+
+/* limpa só o pipeline; 'audio' é global (VU meter) e nunca é zerado aqui */
+const PIPE = ['stepsBegin','step','fileBegin','fileProgress','result','token','route'];
+function resetPipe(){ PIPE.forEach(e => driver.h[e] = []); }
+
+function scrollDown(){ chatBody.scrollTop = chatBody.scrollHeight; }
+function addMsg(role, html){
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + role;
+  row.innerHTML = `
+    <div class="msg-av ${role==='user'?'usr':'ai'}">${role==='user'?'VH':ico('bot')}</div>
+    <div class="msg-body">
+      <div class="msg-sender">${role==='user'?'Você':'VTz'}</div>
+      <div class="msg ${role==='user'?'user':'assistant'}">${html}</div>
+    </div>`;
+  chatLog.appendChild(row); scrollDown();
+  return row.querySelector('.msg');
+}
+/* Erro tem UM caminho só: o pedido em andamento trata; sem pedido, quem trata é a cena.
+   Assim resetPipe() nunca deixa um erro sem dono. */
+let activeReq = null;
+driver.on('error', msg =>{
+  if(activeReq){ const f = activeReq; activeReq = null; f(msg); return; }
+  if(body.dataset.scene === 'jarvis'){
+    $('#j-cap-text').textContent = msg;
+    $('#j-cap-sub').textContent  = 'erro';
+    jfsm.go('idle');
+  }
+});
+
+function sendChat(text){
+  text = (text || input.value).trim();
+  if(!text || chatBusy) return;
+  chatBusy = true;
+  $('#empty-state').classList.add('hide');
+  input.value = ''; input.style.height = 'auto';
+  addMsg('user', text.replace(/</g,'&lt;'));
+
+  const holder = document.createElement('div');
+  holder.className = 'msg-row'; holder.style.maxWidth = '820px';
+  holder.innerHTML = `<div class="msg-av ai">${ico('bot')}</div>
+    <div class="msg-body"><div class="stage-mount"></div></div>`;
+  chatLog.appendChild(holder);
+  const mount = holder.querySelector('.stage-mount');
+  scrollDown();
+
+  let stepper = null, bubble = null, streamed = '';
+  resetPipe();
+  driver.on('stepsBegin', labels => { stepper = new Stepper(mount, labels); scrollDown(); });
+  driver.on('step', s => stepper && stepper.set(s.index, s.status));
+  driver.on('fileBegin', d => { chatCards[d.id] = new FileCard(mount, d); scrollDown(); });
+  driver.on('fileProgress', d => chatCards[d.id] && chatCards[d.id].update(d));
+
+  /* Texto aparece conforme o backend envia — o cursor é o stream real, não animação falsa. */
+  /* Qual modelo o roteador escolheu — some ficar sem saber quem respondeu. */
+  driver.on('route', ev =>{
+    const alvo = ev.model ? modelLabel(ev.model)
+               : ev.models ? ev.models.map(modelLabel).join(' + ')
+               : (ev.note || 'modelo padrão');
+    const chip = document.createElement('div');
+    chip.className = 'route-chip';
+    chip.innerHTML = `${ico('sparkle')}<b>${ev.mode === 'fusion' ? 'Fusion' :
+      ev.mode === 'free' ? 'RouteLLM Free' : 'RouteLLM'}</b>
+      <span>${esc(alvo)}</span>`;
+    mount.appendChild(chip); scrollDown();
+  });
+
+  const asHtml = t => t.replace(/</g,'&lt;').replace(/\n/g,'<br>');
+  driver.on('token', chunk =>{
+    if(!bubble) bubble = addMsg('assistant', '');
+    streamed += chunk;
+    bubble.innerHTML = asHtml(streamed) + '<span class="caret"></span>';
+    scrollDown();
+  });
+  driver.on('result', r =>{
+    if(stepper) stepper.finish();
+    if(!bubble) bubble = addMsg('assistant', '');
+    bubble.innerHTML = asHtml(r.answer || streamed);
+    chatBusy = false; activeReq = null; scrollDown(); resetPipe();
+  });
+  activeReq = msg =>{
+    if(stepper) stepper.dismiss();
+    if(!bubble) bubble = addMsg('assistant', '');
+    bubble.innerHTML = `<span style="color:var(--danger)">${msg}</span>`;
+    chatBusy = false; scrollDown(); resetPipe();
+  };
+  driver.submit(text);
+}
+
+/* Contexto e custo: só se o backend mandar `usage`. Nada estimado no cliente. */
+let ctxTokens = 0, ctxCost = 0;
+driver.on('usage', u =>{
+  if(typeof u.total_tokens === 'number') ctxTokens = u.total_tokens;
+  else if(typeof u.tokens === 'number')  ctxTokens += u.tokens;
+  if(typeof u.cost === 'number') ctxCost = u.cost;
+  const limit = u.context_limit || 200000;
+  $('#ctx-meter').textContent  = `${(ctxTokens/1000).toFixed(1)}k / ${(limit/1000)|0}k tokens`;
+  $('#cost-badge').textContent = '$' + ctxCost.toFixed(4);
+});
+
+$('#send-btn').onclick = ()=> sendChat();
+input.addEventListener('keydown', e=>{
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }
+});
+input.addEventListener('input', ()=>{
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 130) + 'px';
+});
+/* Sugestão só PREENCHE o campo. Quem envia é você. */
+$$('[data-fill]').forEach(el => el.onclick = ()=>{
+  input.value = el.dataset.fill;
+  input.dispatchEvent(new Event('input'));
+  input.focus();
+});
+$('#new-chat-btn').onclick = ()=>{
+  chatLog.innerHTML=''; chatCards={}; chatBusy=false; ctxTokens=0;
+  $('#empty-state').classList.remove('hide');
+  $('#ctx-meter').textContent='0 / 200k tokens'; $('#cost-badge').textContent='$0.0000';
+};
+$$('.side-nav-item').forEach(b => b.onclick = ()=>{
+  $$('.side-nav-item').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+});
+$('#chat-mic').onclick = ()=>{ setScene('jarvis'); setTimeout(startListening, 380); };
+
+/* ================================================================
+   12. FLUXO DO JARVIS
+   ================================================================ */
+const jDeliver = $('#j-deliver'), jInput = $('#j-input');
+let jCards = {}, jQuery = '';
+
+function startListening(text){
+  jQuery = text || '';
+  jfsm.go('listening');
+  driver.startListening();   // quem fecha a escuta é o VAD (evento speechEnd), não um timer
+}
+
+/* O que você falou vira a pergunta — transcrição real do reconhecimento de voz. */
+driver.on('transcript', (txt, final)=>{
+  if(txt) jQuery = txt;
+  $('#j-cap-sub').textContent = txt ? txt.slice(-64) : 'escutando';
+});
+
+/* Fim de fala detectado no áudio: só avança se houver o que processar. */
+driver.on('speechEnd', ()=>{
+  if(jfsm.state !== 'listening') return;
+  driver.stopListening();
+  const q = (jQuery || '').trim();
+  if(!q){ jfsm.go('idle'); return; }   // ninguém falou nada → volta pro idle, sem inventar tarefa
+  runThinking(q);
+});
+
+function runThinking(text){
+  const q = (text || jQuery || jInput.value.trim() || '').trim();
+  if(!q) return;                        // sem pedido real, nada roda
+  jQuery = q;
+  driver.stopListening();
+  jfsm.go('thinking');
+  jCards = {};
+  const byId = {};                       // indexado por id — nunca duplica
+  resetPipe();
+
+  // no JARVIS não existe stepper (regra do brief) — a etapa vira legenda
+  driver.on('step', s => {
+    if(s.status === 'active') $('#j-cap-text').textContent = s.label + '…';
+  });
+  driver.on('fileBegin',    d => byId[d.id] = Object.assign({}, d));
+  driver.on('fileProgress', d => { if(byId[d.id]) Object.assign(byId[d.id], d); });
+  driver.on('result',       r =>{ activeReq = null; deliver(r, Object.values(byId)); });
+  activeReq = msg =>{
+    $('#j-cap-text').textContent = msg;
+    $('#j-cap-sub').textContent  = 'erro';
+    jfsm.go('idle');
+  };
+  driver.submit(q);
+}
+function deliver(r, files){
+  jDeliver.innerHTML = `
+    <div class="j-dl-head">${ico('check')}Entregue</div>
+    <div class="j-dl-query">"${(r.query||'').replace(/</g,'&lt;')}"</div>
+    <div class="j-dl-answer">${r.answer}</div>
+    ${/* instruções/passos só aparecem se o backend mandar — nada fixo aqui */''}
+    ${(r.steps && r.steps.length) ? `<div class="j-dl-steps">${
+        r.steps.map((s,i) => `<div class="j-dl-step"><b>${i+1}</b>${
+          typeof s === 'string' ? s : (s.label ?? '')
+        }</div>`).join('')
+      }</div>` : ''}
+    <div class="j-dl-files" id="j-dl-files"></div>
+    <div class="j-dl-actions">
+      <button class="fc-btn primary" id="j-again">${ico('refresh')}Nova tarefa</button>
+      <button class="fc-btn" id="j-tochat">${ico('chat')}Ver no chat</button>
+    </div>`;
+  const mount = $('#j-dl-files');
+  // reusa o MESMO componente da seção 2 — construído uma vez, usado nos dois contextos
+  files.forEach(f => { if(f.name) jCards[f.id] = new FileCard(mount, {...f, progress:100, status:'Concluído'}); });
+  jfsm.go('delivering');
+  $('#j-again').onclick  = ()=> jfsm.go('idle');
+  $('#j-tochat').onclick = ()=>{ setScene('chat'); sendChat(jQuery); };
+}
+
+$('#jarvis-entry').onclick = ()=> setScene('jarvis');
+$('#j-back').onclick  = ()=> setScene('chat');
+$('#j-mic').onclick   = ()=> startListening();
+/* Parar: encerra a escuta. Só segue pro "pensando" se algo foi realmente dito. */
+$('#j-stop').onclick  = ()=>{
+  if(jfsm.state === 'listening'){
+    driver.stopListening();
+    const q = (jQuery || '').trim();
+    if(q) runThinking(q); else jfsm.go('idle');
+  } else {
+    driver.cancel(); jfsm.go('idle');
+  }
+};
+$('#j-go').onclick    = ()=> runThinking(jInput.value.trim());
+/* Chip só PREENCHE o campo. Quem executa é você, no Executar ou no Enter. */
+$$('[data-jfill]').forEach(el => el.onclick = ()=>{ jInput.value = el.dataset.jfill; jInput.focus(); });
+jInput.addEventListener('keydown', e=>{
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); runThinking(jInput.value.trim()); }
+});
+addEventListener('keydown', e=>{
+  if(body.dataset.scene !== 'jarvis') return;
+  if(e.target.matches('textarea,input')) return;
+  if(e.code === 'Space'){ e.preventDefault(); jfsm.state === 'idle' ? startListening() : jfsm.go('idle'); }
+  if(e.key === 'Escape') setScene('chat');
+});
+
+
+/* ================================================================
+   14. PICKER DE MODELOS — logo do provedor, nome e custo por 1M.
+   Preço vem do catálogo do OpenRouter (fonte da verdade). Quando o
+   catálogo ao vivo não carrega (offline, CSP de preview), cai no
+   snapshot abaixo — que é rede de segurança, não fonte de verdade.
+   ================================================================ */
+
+/* Marcas desenhadas inline: funcionam offline e dentro do preview, onde
+   requisição a host externo é bloqueada. Cor da marca + glifo simples;
+   quem não tem glifo próprio usa monograma. */
+const PROVIDER = {
+  'openai':            {label:'AI', color:'#10a37f', glyph:'rosette'},
+  'anthropic':         {label:'AN', color:'#d97757', glyph:'burst'},
+  'google':            {label:'GG', color:'#1a73e8', glyph:'quad'},
+  'deepseek':          {label:'DS', color:'#4d6bfe', glyph:null},
+  'meta-llama':        {label:'ML', color:'#0668e1', glyph:'loop'},
+  'mistralai':         {label:'MI', color:'#ff7000', glyph:'bars'},
+  'x-ai':              {label:'XA', color:'#1a1a1a', glyph:'ex'},
+  'qwen':              {label:'QW', color:'#6236ff', glyph:null},
+  'z-ai':              {label:'ZA', color:'#7c5cff', glyph:null},
+  'bytedance':         {label:'BD', color:'#1c1c22', glyph:null},
+  'bytedance-seed':    {label:'BD', color:'#1c1c22', glyph:null},
+  'black-forest-labs': {label:'BF', color:'#26262e', glyph:null},
+  'microsoft':         {label:'MS', color:'#0078d4', glyph:'quad'},
+  'perplexity':        {label:'PX', color:'#20b8cd', glyph:null},
+  'cohere':            {label:'CO', color:'#39594d', glyph:null},
+  'minimax':           {label:'MM', color:'#ff3366', glyph:null},
+  'moonshotai':        {label:'MO', color:'#16162a', glyph:null},
+  'nvidia':            {label:'NV', color:'#76b900', glyph:null},
+  'amazon':            {label:'AZ', color:'#ff9900', glyph:null},
+  'ai21':              {label:'A21',color:'#e8433a', glyph:null},
+  'nousresearch':      {label:'NO', color:'#2f3640', glyph:null},
+  'cognitivecomputations':{label:'CC', color:'#4a4a55', glyph:null},
+};
+
+const GLYPH = {
+  rosette:`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linejoin="round">
+    <path d="M12 3.2 19 7.2v9.6L12 20.8 5 16.8V7.2z"/><path d="M12 8.4 15.4 10.3v3.4L12 15.6 8.6 13.7v-3.4z"/></svg>`,
+  burst:`<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2.6 14 9.4l6.8 2-6.8 2L12 20.2l-2-6.8-6.8-2 6.8-2z"/></svg>`,
+  quad:`<svg viewBox="0 0 24 24"><rect x="3.4" y="3.4" width="7.4" height="7.4" rx="1.2" fill="#fff" opacity=".95"/>
+    <rect x="13.2" y="3.4" width="7.4" height="7.4" rx="1.2" fill="#fff" opacity=".62"/>
+    <rect x="3.4" y="13.2" width="7.4" height="7.4" rx="1.2" fill="#fff" opacity=".62"/>
+    <rect x="13.2" y="13.2" width="7.4" height="7.4" rx="1.2" fill="#fff" opacity=".9"/></svg>`,
+  loop:`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round">
+    <path d="M4 12c0-2.6 1.5-4.4 3.4-4.4 2.6 0 4 3.6 4.6 4.4.6.8 2 4.4 4.6 4.4 1.9 0 3.4-1.8 3.4-4.4S18.5 7.6 16.6 7.6c-2.6 0-4 3.6-4.6 4.4-.6.8-2 4.4-4.6 4.4C5.5 16.4 4 14.6 4 12z"/></svg>`,
+  bars:`<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="3.4" fill="#fff" opacity=".95"/>
+    <rect x="3" y="10.3" width="18" height="3.4" fill="#fff" opacity=".68"/>
+    <rect x="3" y="16.6" width="18" height="3.4" fill="#fff" opacity=".9"/></svg>`,
+  ex:`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round">
+    <path d="M5 5l14 14M19 5L5 19"/></svg>`,
+};
+
+function providerOf(id){
+  const p = (String(id).split('/')[0] || '?').toLowerCase();
+  return PROVIDER[p] || {label:p.slice(0,2).toUpperCase(), color:'#4a4a55', glyph:null};
+}
+function badgeHTML(id){
+  const pv = providerOf(id);
+  const inner = pv.glyph ? GLYPH[pv.glyph] : esc(pv.label);
+  return `<span class="pk-badge" style="background:${pv.color}">${inner}</span>`;
+}
+
+/* Entradas especiais: roteamento automático. Ficam no topo da lista. */
+const ROUTERS = [
+  {id:'__router__',      name:'RouteLLM',      desc:'escolhe a melhor IA para cada tarefa'},
+  {id:'__router_free__', name:'RouteLLM Free', desc:'escolhe só entre modelos grátis'},
+  {id:'__fusion__',      name:'Fusion',        desc:'2 IAs em paralelo, fundidas na melhor resposta'},
+];
+const IS_ROUTER = id => ROUTERS.some(r => r.id === id);
+
+/* Snapshot de preços (pesquisado, mesmo do site). Substituído pelo
+   catálogo ao vivo assim que ele carrega. */
+const MODEL_SNAPSHOT = [
+  {"id":"openai/gpt-5.5","name":"GPT-5.5","pricing":{"prompt":"0.000005","completion":"0.00003"},"context_length":400000},
+  {"id":"openai/gpt-5.4","name":"GPT-5.4","pricing":{"prompt":"0.0000025","completion":"0.000015"},"context_length":400000},
+  {"id":"openai/gpt-4.1","name":"GPT-4.1","pricing":{"prompt":"0.000002","completion":"0.000008"},"context_length":1047576},
+  {"id":"openai/gpt-4.1-mini","name":"GPT-4.1 Mini","pricing":{"prompt":"0.0000004","completion":"0.0000016"},"context_length":1047576},
+  {"id":"openai/gpt-4.1-nano","name":"GPT-4.1 Nano","pricing":{"prompt":"0.0000001","completion":"0.0000004"},"context_length":1047576},
+  {"id":"openai/o4-mini","name":"o4-mini","pricing":{"prompt":"0.0000011","completion":"0.0000044"},"context_length":200000},
+  {"id":"openai/o3-mini","name":"o3-mini","pricing":{"prompt":"0.0000011","completion":"0.0000044"},"context_length":200000},
+  {"id":"openai/gpt-3.5-turbo","name":"GPT-3.5 Turbo","pricing":{"prompt":"0.000001","completion":"0.000002"},"context_length":16385},
+  {"id":"openai/gpt-image-1","name":"GPT Image 1","pricing":{"prompt":"0.00001","completion":"0.00001"},"context_length":4096,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"openai/gpt-image-1-mini","name":"GPT Image 1 Mini","pricing":{"prompt":"0.0000025","completion":"0.0000025"},"context_length":4096,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"openai/gpt-image-2","name":"GPT Image 2","pricing":{"prompt":"0.000008","completion":"0.000008"},"context_length":4096,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"anthropic/claude-opus-4.8","name":"Claude Opus 4.8","pricing":{"prompt":"0.000005","completion":"0.000025"},"context_length":200000},
+  {"id":"anthropic/claude-sonnet-5","name":"Claude Sonnet 5","pricing":{"prompt":"0.000002","completion":"0.00001"},"context_length":200000},
+  {"id":"anthropic/claude-sonnet-4.6","name":"Claude Sonnet 4.6","pricing":{"prompt":"0.000003","completion":"0.000015"},"context_length":200000},
+  {"id":"anthropic/claude-haiku-4.5","name":"Claude Haiku 4.5","pricing":{"prompt":"0.000001","completion":"0.000005"},"context_length":200000},
+  {"id":"anthropic/claude-haiku-3.5","name":"Claude Haiku 3.5","pricing":{"prompt":"0.0000008","completion":"0.000004"},"context_length":200000},
+  {"id":"anthropic/claude-haiku-3","name":"Claude Haiku 3","pricing":{"prompt":"0.00000025","completion":"0.00000125"},"context_length":200000},
+  {"id":"anthropic/claude-fable-5","name":"Claude Fable 5","pricing":{"prompt":"0.00001","completion":"0.00005"},"context_length":128000},
+  {"id":"anthropic/claude-3.5-sonnet","name":"Claude 3.5 Sonnet","pricing":{"prompt":"0.000003","completion":"0.000015"},"context_length":128000},
+  {"id":"google/gemini-3.1-pro","name":"Gemini 3.1 Pro","pricing":{"prompt":"0.000002","completion":"0.000012"},"context_length":1048576},
+  {"id":"google/gemini-3.5-flash","name":"Gemini 3.5 Flash","pricing":{"prompt":"0.0000015","completion":"0.000009"},"context_length":1048576},
+  {"id":"google/gemini-3.1-flash-lite","name":"Gemini 3.1 Flash Lite","pricing":{"prompt":"0.00000025","completion":"0.0000015"},"context_length":1048576},
+  {"id":"google/gemini-2.5-flash","name":"Gemini 2.5 Flash","pricing":{"prompt":"0.0000003","completion":"0.0000012"},"context_length":1048576},
+  {"id":"google/gemini-2.5-flash-image","name":"Nano Banana (Gemini 2.5 Flash Image)","pricing":{"prompt":"0.0000003","completion":"0.0000012"},"context_length":1048576,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"google/gemini-3.1-flash-image-preview","name":"Nano Banana 2 (Gemini 3.1 Flash Image)","pricing":{"prompt":"0.0000003","completion":"0.0000012"},"context_length":1048576,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"google/gemini-3.1-flash-lite-image","name":"Nano Banana 2 Lite (Gemini 3.1 Flash Lite Image)","pricing":{"prompt":"0.0000002","completion":"0.0000008"},"context_length":1048576,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"google/gemini-3-pro-image","name":"Nano Banana Pro (Gemini 3 Pro Image)","pricing":{"prompt":"0.000002","completion":"0.000012"},"context_length":1048576,"architecture":{"output_modalities":["image","text"]}},
+  {"id":"deepseek/deepseek-v4-flash","name":"DeepSeek V4 Flash","pricing":{"prompt":"0.00000014","completion":"0.00000028"},"context_length":164000},
+  {"id":"deepseek/deepseek-r1","name":"DeepSeek R1","pricing":{"prompt":"0.0000006","completion":"0.0000024"},"context_length":164000},
+  {"id":"deepseek/deepseek-r1:free","name":"DeepSeek R1 (free)","pricing":{"prompt":"0","completion":"0"},"context_length":164000},
+  {"id":"meta-llama/llama-3.3-70b-instruct","name":"Llama 3.3 70B","pricing":{"prompt":"0.00000013","completion":"0.0000004"},"context_length":131072},
+  {"id":"meta-llama/llama-3.3-70b-instruct:free","name":"Llama 3.3 70B (free)","pricing":{"prompt":"0","completion":"0"},"context_length":131072},
+  {"id":"x-ai/grok-4.3","name":"Grok 4.3","pricing":{"prompt":"0.00000125","completion":"0.0000025"},"context_length":256000},
+  {"id":"qwen/qwen3.7-max","name":"Qwen3.7 Max","pricing":{"prompt":"0.0000025","completion":"0.0000075"},"context_length":262144},
+  {"id":"z-ai/glm-5.2","name":"GLM-5.2","pricing":{"prompt":"0.0000014","completion":"0.0000044"},"context_length":200000},
+  {"id":"z-ai/glm-4.7-flash","name":"GLM-4.7 Flash (free)","pricing":{"prompt":"0","completion":"0"},"context_length":200000},
+  {"id":"minimax/minimax-m3","name":"MiniMax M3","pricing":{"prompt":"0.0000006","completion":"0.0000024"},"context_length":1000000},
+  {"id":"black-forest-labs/flux.2-pro","name":"FLUX.2 Pro","pricing":{"prompt":"0","completion":"0"},"context_length":128000,"architecture":{"output_modalities":["image"]}},
+  {"id":"bytedance-seed/seedream-4.5","name":"Seedream 4.5","pricing":{"prompt":"0","completion":"0"},"context_length":128000,"architecture":{"output_modalities":["image"]}},
+  {"id":"x-ai/grok-imagine-image-quality","name":"Grok Imagine Image Quality","pricing":{"prompt":"0","completion":"0"},"context_length":256000,"architecture":{"output_modalities":["image"]}}];
+
+const pk = {
+  models: MODEL_SNAPSHOT.slice(),
+  live: false,
+  filter: null,                 // null | 'free' | 'cheap' | 'context' | 'fav'
+  query: '',
+  favs: JSON.parse(localStorage.getItem('vtz_favorites') || '[]'),
+  sel: localStorage.getItem('vtz_model') || MODEL_DEFAULT,
+};
+
+const perM = m => (parseFloat(m.pricing?.prompt || 0) + parseFloat(m.pricing?.completion || 0)) * 1e6;
+
+/* "quanto custa 1 milhão de tokens": entrada / saída, em dólar — que é a
+   moeda em que o OpenRouter cobra. Sem conversão embutida pra não fingir
+   precisão numa cotação que muda todo dia. */
+function priceHTML(m){
+  const inM  = parseFloat(m.pricing?.prompt || 0) * 1e6;
+  const outM = parseFloat(m.pricing?.completion || 0) * 1e6;
+  if (!inM && !outM) return `<span class="free">Grátis</span><small>1M tokens</small>`;
+  const fmt = v => v >= 100 ? '$' + Math.round(v) : v >= 1 ? '$' + v.toFixed(2) : '$' + v.toFixed(3);
+  return `${fmt(inM)} / ${fmt(outM)}<small>entrada / saída · 1M</small>`;
+}
+function ctxLabel(m){
+  const c = m.context_length || 0;
+  if (!c) return '';
+  return c >= 1e6 ? (c / 1e6).toFixed(c % 1e6 ? 1 : 0) + 'M ctx'
+       : c >= 1e3 ? Math.round(c / 1e3) + 'k ctx' : c + ' ctx';
+}
+
+function modelLabel(id){
+  const r = ROUTERS.find(x => x.id === id);
+  if (r) return r.name;
+  const m = pk.models.find(x => x.id === id);
+  return m ? (m.name || m.id) : id;
+}
+function paintModelButton(){
+  $('#model-name').textContent = modelLabel(pk.sel);
+  $('#model-badge-slot').innerHTML = IS_ROUTER(pk.sel)
+    ? `<span class="pk-badge" style="background:var(--violet);width:20px;height:20px">${ico('sparkle')}</span>`
+    : badgeHTML(pk.sel);
+  const b = $('#model-badge-slot .pk-badge');
+  if (b && !IS_ROUTER(pk.sel)){ b.style.width = '20px'; b.style.height = '20px'; b.style.borderRadius = '6px'; }
+}
+
+const PK_CHIPS = [
+  {key:null,       label:'Todos'},
+  {key:'fav',      label:'★ Favoritos'},
+  {key:'free',     label:'Grátis'},
+  {key:'cheap',    label:'Custo ↓'},
+  {key:'context',  label:'Contexto ↑'},
+];
+
+function renderChips(){
+  $('#pk-chips').innerHTML = PK_CHIPS.map(c =>
+    `<button class="pk-chip${pk.filter === c.key ? ' on' : ''}" data-k="${c.key ?? ''}">${c.label}</button>`
+  ).join('');
+  $$('#pk-chips .pk-chip').forEach(b => b.onclick = ()=>{
+    const k = b.dataset.k || null;
+    pk.filter = (pk.filter === k) ? null : k;
+    renderChips(); renderList();
+  });
+}
+
+function renderList(){
+  const q = pk.query.trim().toLowerCase();
+  let list = pk.models.slice();
+
+  if (pk.filter === 'free')    list = list.filter(m => perM(m) === 0);
+  if (pk.filter === 'fav')     list = list.filter(m => pk.favs.includes(m.id));
+  if (pk.filter === 'cheap')   list.sort((a,b) => perM(a) - perM(b));
+  if (pk.filter === 'context') list.sort((a,b) => (b.context_length||0) - (a.context_length||0));
+  if (q) list = list.filter(m =>
+    m.id.toLowerCase().includes(q) || (m.name||'').toLowerCase().includes(q));
+
+  // favoritos primeiro quando não há ordenação escolhida
+  if (!pk.filter || pk.filter === 'free'){
+    list.sort((a,b) => (pk.favs.includes(b.id)?1:0) - (pk.favs.includes(a.id)?1:0));
+  }
+
+  const routers = (pk.filter === 'fav' || pk.filter === 'free') ? []
+    : ROUTERS.filter(r => !q || r.name.toLowerCase().includes(q) || r.desc.includes(q));
+
+  const el = $('#pk-list');
+  $('#pk-count').textContent = `${list.length} modelo${list.length === 1 ? '' : 's'}`;
+
+  if (!routers.length && !list.length){
+    el.innerHTML = `<div class="pk-empty">${
+      pk.filter === 'fav' ? 'Nenhum favorito ainda.<br>Toque na estrela de um modelo pra fixar aqui.'
+                          : 'Nenhum modelo encontrado.'}</div>`;
+    return;
+  }
+
+  const row = (item, isRouter) => {
+    const sel = item.id === pk.sel;
+    const badge = isRouter
+      ? `<span class="pk-badge" style="background:var(--violet)">${ico('sparkle')}</span>`
+      : badgeHTML(item.id);
+    return `<div class="pk-row${sel ? ' sel' : ''}" data-id="${esc(item.id)}">
+      ${badge}
+      <div class="pk-info">
+        <span class="pk-name">${esc(item.name || item.id)}</span>
+        <span class="pk-meta">${isRouter ? esc(item.desc) : esc(item.id) + (ctxLabel(item) ? ' · ' + ctxLabel(item) : '')}</span>
+      </div>
+      ${isRouter ? '' : `<span class="pk-price">${priceHTML(item)}</span>`}
+      ${isRouter ? '' : `<button class="pk-star${pk.favs.includes(item.id) ? ' on' : ''}" data-fav="${esc(item.id)}" title="Favoritar">${pk.favs.includes(item.id) ? '★' : '☆'}</button>`}
+      ${sel ? `<span class="pk-check">${ico('check')}</span>` : ''}
+    </div>`;
+  };
+
+  el.innerHTML =
+    (routers.length ? `<div class="pk-sep">Automático</div>` + routers.map(r => row(r, true)).join('') : '') +
+    (list.length ? `<div class="pk-sep">Modelos${pk.live ? '' : ' · catálogo local'}</div>` + list.map(m => row(m, false)).join('') : '');
+
+  $$('#pk-list .pk-row').forEach(r => r.onclick = e =>{
+    if (e.target.closest('.pk-star')) return;
+    pk.sel = r.dataset.id;
+    localStorage.setItem('vtz_model', pk.sel);
+    paintModelButton(); closePicker();
+  });
+  $$('#pk-list .pk-star').forEach(s => s.onclick = e =>{
+    e.stopPropagation();
+    const id = s.dataset.fav;
+    pk.favs = pk.favs.includes(id) ? pk.favs.filter(x => x !== id) : [...pk.favs, id];
+    localStorage.setItem('vtz_favorites', JSON.stringify(pk.favs));
+    renderList();
+  });
+}
+
+function openPicker(){
+  $('#pk-overlay').classList.add('open');
+  $('#pk-overlay').setAttribute('aria-hidden','false');
+  $('#pk-search').value = pk.query = '';
+  renderChips(); renderList();
+  loadCatalog();
+  setTimeout(()=> $('#pk-search').focus(), 120);
+}
+function closePicker(){
+  $('#pk-overlay').classList.remove('open');
+  $('#pk-overlay').setAttribute('aria-hidden','true');
+}
+
+/* Catálogo ao vivo: prefere o backend (que já tem a chave), cai no OpenRouter
+   público. Falha silenciosa — o snapshot cobre. */
+let carregando = false;
+async function loadCatalog(){
+  if (pk.live || carregando) return;      // já tem catálogo bom: não repete
+  carregando = true;
+  $('#pk-note').textContent = 'Carregando catálogo…';
+
+  // 1º o backend (fonte única, com cache e a chave do usuário); 2º o OpenRouter
+  // público, que serve quando o painel roda sem backend configurado.
+  const fontes = [];
+  if (API.base) fontes.push({url: API.base + '/api/models', proprio: true});
+  fontes.push({url: 'https://openrouter.ai/api/v1/models', proprio: false});
+
+  for (const {url, proprio} of fontes){
+    try{
+      const r = await fetch(url, {headers: proprio ? API.headers() : {}});
+      if (!r.ok) continue;
+      const j = await r.json();
+      const arr = j.data || j.models || [];
+      if (!Array.isArray(arr) || !arr.length) continue;
+
+      pk.models = arr.filter(m => m.id).map(m => ({
+        id:m.id, name:m.name || m.id, pricing:m.pricing || {},
+        context_length:m.context_length, architecture:m.architecture,
+      }));
+      pk.live = true;
+      // o backend informa se entregou cache velho — repassa o aviso, não esconde
+      $('#pk-note').textContent = j.warning
+        ? `${pk.models.length} modelos · ${j.warning}`
+        : `${pk.models.length} modelos do catálogo ao vivo · preço por 1M tokens.`;
+      renderList();
+      carregando = false;
+      return;
+    }catch(e){ /* tenta a próxima fonte */ }
+  }
+
+  // nenhuma fonte respondeu: segue com o snapshot, dizendo que é snapshot.
+  // `carregando` volta a false pra tentar de novo na próxima abertura.
+  carregando = false;
+  $('#pk-note').textContent =
+    `Catálogo local (${pk.models.length} modelos) — sem acesso ao OpenRouter agora. `
+    + 'Os preços são de um snapshot e podem ter mudado.';
+}
+
+$('#model-btn').onclick = openPicker;
+$('#pk-close').onclick  = closePicker;
+$('#pk-overlay').onclick = e =>{ if (e.target.id === 'pk-overlay') closePicker(); };
+$('#pk-search').addEventListener('input', e =>{ pk.query = e.target.value; renderList(); });
+document.addEventListener('keydown', e =>{
+  if (e.key === 'Escape' && $('#pk-overlay').classList.contains('open')) closePicker();
+});
+paintModelButton();
+
+
+/* ================================================================
+   15. CONFIGURAÇÃO DE VOZ (Seção 14 do prompt mestre)
+   Chatterbox principal (clona voz), Kokoro fallback (vozes prontas),
+   navegador como último recurso. Tudo mora no PC: esta aba só conversa
+   com o Agente Local através do backend, porque o agente nunca abre
+   porta (Seção 8).
+   ================================================================ */
+const MOTORES = [
+  {id:'chatterbox', nome:'Chatterbox', tag:'principal',
+   desc:'Clona a sua voz a partir de uma amostra. Roda local.'},
+  {id:'kokoro', nome:'Kokoro', tag:'fallback',
+   desc:'Vozes prontas, mais leve. Usado se o Chatterbox não estiver de pé.'},
+  {id:'navegador', nome:'Navegador', tag:'sem instalar',
+   desc:'Voz do próprio sistema, pelo navegador. Sempre funciona, soa mais robótica.'},
+];
+
+/* Vozes prontas do Kokoro em português. Só entram quando o motor é Kokoro. */
+const VOZES_KOKORO = [
+  {id:'pf_dora', nome:'Dora (feminina, PT-BR)'},
+  {id:'pm_alex', nome:'Alex (masculina, PT-BR)'},
+  {id:'pm_santa', nome:'Santa (masculina, PT-BR)'},
+];
+
+/* Descrição de cada controle — o usuário precisa saber o que está mexendo. */
+const CALIB = {
+  exaggeration:{nome:'Expressividade', desc:'Quanta emoção o Chatterbox coloca na fala. Baixo soa mais neutro.'},
+  cfg_weight:{nome:'Fidelidade à referência', desc:'Quanto ele segue a amostra de voz. Menor deixa a fala mais solta e rápida.'},
+  temperature:{nome:'Variação', desc:'Quanto a entonação muda entre falas iguais.'},
+  speed:{nome:'Velocidade', desc:'Ritmo da fala (Kokoro).'},
+};
+const CALIB_POR_MOTOR = {
+  chatterbox:['exaggeration','cfg_weight','temperature'],
+  kokoro:['speed'],
+  navegador:[],
+};
+
+const vz = {
+  aberto:false, carregando:false,
+  agentId:null,
+  cfg:null, ranges:null, engines:null, samples:[], stt:null, sttModels:[],
+  pend:{},                 // mudanças ainda não salvas
+};
+
+function vzMsg(texto, tipo){
+  const el = $('#vz-msg');
+  el.textContent = texto || '';
+  el.className = 'vz-msg' + (tipo ? ' ' + tipo : '');
+}
+
+async function vzApi(metodo, caminho, corpo){
+  if(!API.base) throw new Error('Backend não configurado.');
+  if(!vz.agentId) throw new Error('Nenhum Agente Local pareado.');
+  const r = await fetch(`${API.base}/api/voice/${encodeURIComponent(vz.agentId)}${caminho}`, {
+    method: metodo,
+    headers: API.headers(),
+    body: corpo === undefined ? undefined : JSON.stringify(corpo),
+  });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.detail || `Backend respondeu ${r.status}`);
+  return j;
+}
+
+/* valor atual de um campo: o pendente, senão o salvo */
+const vzVal = k => (vz.pend[k] !== undefined ? vz.pend[k] : vz.cfg?.[k]);
+
+function vzRenderMotores(){
+  const atual = vzVal('engine');
+  $('#vz-engines').innerHTML = MOTORES.map(m =>{
+    const est = vz.engines?.[m.id];
+    // 'navegador' não é servidor: não faz sentido dizer que está fora do ar
+    const dot = m.id === 'navegador' ? 'up'
+              : est ? (est.up ? 'up' : 'down') : 'unknown';
+    const estado = m.id === 'navegador' ? 'disponível'
+                 : est ? (est.up ? 'no ar' : (est.reason || 'fora do ar')) : '—';
+    return `<button class="vz-engine${m.id===atual?' on':''}" data-eng="${m.id}">
+      <div class="vz-en-top">
+        <span class="vz-name">${m.nome}</span>
+        <span class="vz-tag">${m.tag}</span>
+        <span class="vz-dot ${dot}"></span>
+      </div>
+      <div class="vz-desc">${m.desc}</div>
+      <div class="vz-state">${esc(estado)}</div>
+    </button>`;
+  }).join('');
+
+  $$('#vz-engines .vz-engine').forEach(b => b.onclick = ()=>{
+    vz.pend.engine = b.dataset.eng;
+    vzRenderTudo();
+    vzMsg('Motor alterado — clique em Salvar pra aplicar.');
+  });
+
+  const escolhido = vz.engines?.[atual];
+  $('#vz-engine-hint').textContent =
+    atual === 'navegador'
+      ? 'A fala sai pelo navegador. Nada pra instalar, mas a voz não é clonada.'
+      : escolhido && !escolhido.up
+        ? `O ${atual} não está rodando agora. Se você falar, o JARVIS tenta o outro motor automaticamente.`
+        : '';
+}
+
+function vzRenderVoz(){
+  const motor = vzVal('engine');
+  const sec = $('#vz-voice-sec'), amostras = $('#vz-samples-sec');
+  if(motor === 'navegador'){
+    sec.style.display = 'none'; amostras.style.display = 'none';
+    return;
+  }
+  sec.style.display = ''; 
+  amostras.style.display = motor === 'chatterbox' ? '' : 'none';
+
+  const atual = vzVal('voice');
+  const opcoes = motor === 'kokoro'
+    ? VOZES_KOKORO.map(v => ({id:v.id, nome:v.nome}))
+    : vz.samples.map(s => ({id:s.name, nome:s.name}));
+
+  $('#vz-voice').innerHTML =
+    `<option value="">${motor === 'chatterbox' ? 'Voz padrão do modelo' : 'Padrão'}</option>` +
+    opcoes.map(o => `<option value="${esc(o.id)}"${o.id===atual?' selected':''}>${esc(o.nome)}</option>`).join('');
+
+  $('#vz-voice-hint').textContent = motor === 'chatterbox'
+    ? (vz.samples.length ? 'Escolha uma das suas vozes clonadas.'
+       : 'Sem amostra ainda — suba um áudio abaixo pra clonar a sua voz.')
+    : 'Vozes prontas do Kokoro (não clona).';
+
+  $('#vz-voice').onchange = e =>{
+    vz.pend.voice = e.target.value || null;
+    vzMsg('Voz alterada — clique em Salvar.');
+  };
+}
+
+function vzRenderAmostras(){
+  const el = $('#vz-samples');
+  const atual = vzVal('voice');
+  if(!vz.samples.length){
+    el.innerHTML = `<div class="vz-empty">Nenhuma amostra ainda.<br>
+      Suba alguns segundos da sua voz pra o JARVIS falar com ela.</div>`;
+    return;
+  }
+  const kb = n => n >= 1048576 ? (n/1048576).toFixed(1)+' MB' : Math.round(n/1024)+' KB';
+  el.innerHTML = vz.samples.map(s => `
+    <div class="vz-sample${s.name===atual?' on':''}">
+      <span class="vz-sm-name">${esc(s.name)}</span>
+      <span class="vz-sm-size">${kb(s.size||0)}</span>
+      <button data-del="${esc(s.name)}" title="Apagar">${ico('x')}</button>
+    </div>`).join('');
+
+  $$('#vz-samples [data-del]').forEach(b => b.onclick = async ()=>{
+    const nome = b.dataset.del;
+    try{
+      vzMsg('Apagando…');
+      await vzApi('DELETE', `/sample/${encodeURIComponent(nome)}`);
+      await vzCarregar();
+      vzMsg('Amostra apagada.', 'ok');
+    }catch(e){ vzMsg(e.message, 'erro'); }
+  });
+}
+
+function vzRenderCalib(){
+  const motor = vzVal('engine');
+  const campos = CALIB_POR_MOTOR[motor] || [];
+  const el = $('#vz-calib');
+  if(!campos.length){ el.innerHTML = ''; return; }
+
+  el.innerHTML = `<div class="vz-lbl">Calibração</div>` + campos.map(k =>{
+    const faixa = vz.ranges?.[k] || {min:0, max:1};
+    const valor = vzVal(k) ?? faixa.min;
+    const passo = (faixa.max - faixa.min) / 100;
+    return `<div class="vz-slider">
+      <span class="vz-sname">${CALIB[k].nome}</span>
+      <span class="vz-sval" id="vz-v-${k}">${Number(valor).toFixed(2)}</span>
+      <input type="range" id="vz-r-${k}" min="${faixa.min}" max="${faixa.max}"
+             step="${passo}" value="${valor}">
+      <span class="vz-sdesc">${CALIB[k].desc}</span>
+    </div>`;
+  }).join('');
+
+  campos.forEach(k =>{
+    const r = $('#vz-r-'+k);
+    r.oninput = ()=>{
+      vz.pend[k] = parseFloat(r.value);
+      $('#vz-v-'+k).textContent = vz.pend[k].toFixed(2);
+    };
+  });
+}
+
+function vzRenderStt(){
+  const sel = $('#vz-stt-model');
+  const atual = vz.stt?.model;
+  sel.innerHTML = (vz.sttModels.length ? vz.sttModels : ['tiny','base','small','medium','large-v3'])
+    .map(m =>{
+      const nota = m === 'base' ? ' — padrão, leve'
+                 : m === 'tiny' ? ' — mais rápido, menos preciso'
+                 : m.startsWith('large') ? ' — mais preciso, muita RAM' : '';
+      return `<option value="${m}"${m===atual?' selected':''}>${m}${nota}</option>`;
+    }).join('');
+  sel.onchange = e =>{ vz.pend._stt_model = e.target.value; vzMsg('Modelo alterado — clique em Salvar.'); };
+
+  $('#vz-stt-hint').textContent = vz.stt?.model_present
+    ? `Modelo pronto em ${vz.stt.model_path}`
+    : (vz.stt?.hint || 'Modelo do whisper ainda não baixado.');
+}
+
+function vzRenderTudo(){
+  vzRenderMotores(); vzRenderVoz(); vzRenderAmostras(); vzRenderCalib(); vzRenderStt();
+  hydrateIcons();
+}
+
+async function vzCarregar(){
+  vz.carregando = true;
+  try{
+    const j = await vzApi('GET', '/status');
+    if(j.ok === false) throw new Error(j.reason || j.error || 'o agente não respondeu');
+    vz.cfg = j.config || {};
+    vz.ranges = j.ranges || {};
+    vz.engines = j.engines || {};
+    vz.samples = j.samples || [];
+    vz.stt = j.stt || {};
+    vz.sttModels = j.stt_models || [];
+    vz.pend = {};
+    vzRenderTudo();
+    vzMsg('');
+  }finally{ vz.carregando = false; }
+}
+
+async function vzAbrir(){
+  vz.agentId = API.agentId;
+  $('#vz-overlay').classList.add('open');
+  $('#vz-overlay').setAttribute('aria-hidden','false');
+  $('#vz-agent').textContent = vz.agentId ? `Agente ${vz.agentId}` : 'nenhum agente pareado';
+
+  if(!API.base || !vz.agentId){
+    // sem backend/agente esta aba não tem o que configurar — dizer isso é melhor
+    // que mostrar controles que não fazem nada
+    $('#vz-body').innerHTML = `<div class="vz-empty">
+      A voz do JARVIS roda no seu PC, pelo Agente Local.<br><br>
+      ${!API.base ? 'Configure a URL do backend' : 'Pareie o Agente Local'} pra ajustar
+      motor, voz e calibração aqui.</div>`;
+    return;
+  }
+  try{ await vzCarregar(); }
+  catch(e){
+    $('#vz-body').innerHTML = `<div class="vz-empty">Não consegui falar com o Agente Local.<br><br>
+      <span style="color:var(--danger)">${esc(e.message)}</span></div>`;
+  }
+}
+function vzFechar(){
+  $('#vz-overlay').classList.remove('open');
+  $('#vz-overlay').setAttribute('aria-hidden','true');
+}
+
+/* ---- subir amostra ---- */
+$('#vz-upload').onclick = ()=> $('#vz-file').click();
+$('#vz-file').onchange = async e =>{
+  const f = e.target.files?.[0];
+  e.target.value = '';
+  if(!f) return;
+  if(f.size > 8*1024*1024){ vzMsg('Arquivo maior que 8 MB.', 'erro'); return; }
+  try{
+    vzMsg('Enviando…');
+    const buf = await f.arrayBuffer();
+    // base64 em pedaços: String.fromCharCode com o array inteiro estoura a pilha
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    for(let i=0;i<bytes.length;i+=8192){
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i+8192));
+    }
+    const j = await vzApi('POST', '/sample', {name:f.name, data_base64: btoa(bin)});
+    if(j.ok === false) throw new Error(j.error || 'o agente recusou');
+    await vzCarregar();
+    vzMsg(`"${j.saved?.name || f.name}" salva no seu PC.`, 'ok');
+  }catch(err){ vzMsg(err.message, 'erro'); }
+};
+
+/* ---- testar (ouvir antes de salvar) ---- */
+$('#vz-test').onclick = async ()=>{
+  const btn = $('#vz-test');
+  btn.disabled = true;
+  try{
+    vzMsg('Gerando áudio…');
+    const overrides = {...vz.pend};
+    delete overrides._stt_model;
+    const j = await vzApi('POST', '/speak', {
+      text:'Olá, senhor. Sistemas operando normalmente.', overrides});
+
+    if(j.ok === false){
+      if(j.delegate === 'browser' && window.speechSynthesis){
+        const u = new SpeechSynthesisUtterance('Olá, senhor. Sistemas operando normalmente.');
+        u.lang = 'pt-BR'; speechSynthesis.speak(u);
+        vzMsg('Falando pelo navegador.', 'ok');
+      }else{
+        vzMsg(j.reason || 'não consegui gerar o áudio', 'erro');
+      }
+      return;
+    }
+    const bin = atob(j.audio_base64);
+    const arr = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([arr], {type:j.mime || 'audio/wav'}));
+    const a = new Audio(url);
+    a.onended = ()=> URL.revokeObjectURL(url);
+    try{
+      await a.play();
+    }catch(err){
+      // o motor respondeu, mas o áudio não toca. Erro cru do navegador aqui é
+      // ("no supported source was found") inútil — diz o que de fato houve.
+      URL.revokeObjectURL(url);
+      vzMsg(`O ${j.engine} devolveu ${j.bytes || arr.length} bytes, mas o navegador `
+            + `não conseguiu tocar (formato ${j.mime || 'desconhecido'}).`, 'erro');
+      return;
+    }
+    vzMsg(j.fallback ? `Tocando — foi o ${j.engine} (fallback).` : `Tocando (${j.engine}).`, 'ok');
+  }catch(err){ vzMsg(err.message, 'erro'); }
+  finally{ btn.disabled = false; }
+};
+
+/* ---- salvar ---- */
+$('#vz-save').onclick = async ()=>{
+  const btn = $('#vz-save');
+  btn.disabled = true;
+  try{
+    const {_stt_model, ...voz} = vz.pend;
+    if(!Object.keys(voz).length && !_stt_model){ vzMsg('Nada mudou.'); return; }
+    vzMsg('Salvando…');
+    if(Object.keys(voz).length) await vzApi('PUT', '/config', voz);
+    if(_stt_model) await vzApi('PUT', '/stt', {model:_stt_model});
+    await vzCarregar();
+    vzMsg('Salvo no seu PC.', 'ok');
+  }catch(err){ vzMsg(err.message, 'erro'); }
+  finally{ btn.disabled = false; }
+};
+
+$('#vz-close').onclick = vzFechar;
+$('#vz-overlay').onclick = e =>{ if(e.target.id === 'vz-overlay') vzFechar(); };
+document.addEventListener('keydown', e =>{
+  if(e.key === 'Escape' && $('#vz-overlay').classList.contains('open')) vzFechar();
+});
+$('#btn-config').onclick = vzAbrir;
+
+/* estado inicial */
+engine.setTarget(POSE.idle);
+console.log('%cVTz LLM','color:#8b5cf6;font-weight:700', 'backend: ' + (API.base || 'não configurado'));
+</script>
+</body>
+</html>

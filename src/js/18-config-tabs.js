@@ -12,6 +12,7 @@ function setupConfigNav(){
     { cat:'dados',     label:'Dados & Backup', icon:'folder' },
     { cat:'backend',   label:'Backend VTz OS', icon:'cpu' },
     { cat:'agente',    label:'Agente Local',   icon:'monitor' },
+    { cat:'voz',       label:'Voz',            icon:'mic' },
     { section:'Personalizar' },
     { cat:'skills',    label:'Habilidades',    icon:'zap' },
     { cat:'conectores',label:'Conectores',     icon:'globe' },
@@ -21,8 +22,13 @@ function setupConfigNav(){
   const show = (cat) => {
     groups.forEach(g => { g.hidden = g.dataset.cat !== cat; });
     nav.querySelectorAll('.cfg-nav-item').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
-    if (cat === 'dados') updateStorageMeter();
+    if (cat === 'dados'){
+      updateStorageMeter();
+      renderConvSync();
+      renderAutoBackup();   // sem isto o quadro do backup abria vazio
+    }
     if (cat === 'agente'){ refreshAgentsList(); refreshAuditList(); }
+    if (cat === 'voz') refreshVoiceConfig();
   };
   nav.innerHTML = '';
   cats.forEach(c => {

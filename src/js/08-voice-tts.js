@@ -1,23 +1,118 @@
-/* Voz — lê a resposta em voz alta (TTS nativo do navegador). Clicar de novo para. */
+/* ---------- Voz (TTS nativo do navegador) ----------
+   speakText é o núcleo: limpa markdown, escolhe a voz PT-BR (ou a escolhida nas
+   configs) e fala. speakMessage é o botão manual "ler resposta". O Modo Voz
+   (JARVIS) reusa speakText pra cumprimentar, falar respostas sozinho e o loop
+   mãos-livres. A voz local mais humana (Kokoro/Chatterbox) é upgrade futuro via
+   Agente Local — mesma interface, só troca o motor. */
+
+/* Escolhe a voz: a que o usuário fixou nas configs, senão a melhor PT-BR. */
+function pickVoice(){
+  const synth = window.speechSynthesis;
+  if (!synth) return null;
+  const voices = synth.getVoices();
+  if (!voices.length) return null;
+  if (state.voiceName){
+    const chosen = voices.find(v => v.name === state.voiceName);
+    if (chosen) return chosen;
+  }
+  return voices.find(v => /pt[-_]?BR/i.test(v.lang)) || voices.find(v => /^pt/i.test(v.lang)) || voices[0];
+}
+
+/* Fala um texto qualquer. onEnd dispara ao terminar (usado no mãos-livres). */
+function speakText(rawText, { onEnd } = {}){
+  const synth = window.speechSynthesis;
+  if (!synth){ return false; }
+  let text = contentToText(rawText).replace(/```[\s\S]*?```/g, '. bloco de código omitido. ');
+  text = stripMd(text).replace(/[|#>*_`~]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4500);
+  if (!text){ if (onEnd) onEnd(); return false; }
+  synth.cancel(); // não empilha falas
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'pt-BR'; u.rate = 1.05; u.pitch = 1;
+  const v = pickVoice();
+  if (v) u.voice = v;
+  u.onend = () => { speakMessage._on = false; if (onEnd) onEnd(); };
+  u.onerror = () => { speakMessage._on = false; if (onEnd) onEnd(); };
+  speakMessage._on = true;
+  synth.speak(u);
+  return true;
+}
+
+/* Botão manual "ouvir resposta" — clicar de novo para. */
 function speakMessage(raw, btnEl){
   const synth = window.speechSynthesis;
   if (!synth){ toast('Voz não suportada neste navegador.', 'warn'); return; }
-  if (synth.speaking || synth.pending){
-    synth.cancel();
-    if (speakMessage._on){ speakMessage._on = false; return; }  // clicou no mesmo: só para
+  if ((synth.speaking || synth.pending) && speakMessage._on){
+    synth.cancel(); speakMessage._on = false; return; // clicou de novo: só para
   }
-  let text = contentToText(raw).replace(/```[\s\S]*?```/g, '. bloco de código omitido. ');
-  text = stripMd(text).replace(/[|#>*_`~]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4500);
-  if (!text) return;
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'pt-BR'; u.rate = 1.06; u.pitch = 1;
-  const voices = synth.getVoices();
-  const pt = voices.find(v => /pt[-_]?BR/i.test(v.lang)) || voices.find(v => /^pt/i.test(v.lang));
-  if (pt) u.voice = pt;
-  u.onend = () => { speakMessage._on = false; };
-  speakMessage._on = true;
-  synth.speak(u);
-  toast('Lendo a resposta…');
+  if (speakText(raw)) toast('Lendo a resposta…');
+}
+
+/* Cumprimento falado ao abrir (uma vez por sessão). */
+function speakGreeting(){
+  if (!state.voiceMode || !state.voiceGreeting) return;
+  if (speakGreeting._done) return;
+  speakGreeting._done = true;
+  const hour = new Date().getHours();
+  const saudacao = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+  // fala num tempinho pra dar tempo das vozes carregarem
+  setTimeout(() => speakText(`${saudacao}, senhor. Como posso ajudar?`), 700);
+}
+
+/* Chamado quando uma resposta termina (afterAssistantDone). Fala sozinho e, no
+   modo mãos-livres, volta a escutar quando termina de falar. */
+function maybeAutoSpeak(conv){
+  if (!state.voiceMode || !state.voiceAutoSpeak || !conv) return;
+  const last = [...conv.messages].reverse().find(m => m.role === 'assistant' && !m._local);
+  if (!last) return;
+  speakText(last.content, {
+    onEnd: () => { if (state.voiceMode && state.voiceHandsfree) startHandsfreeListen(); },
+  });
+}
+
+/* Popular o seletor de voz (as vozes carregam async no Chrome). */
+function populateVoicePicker(){
+  const sel = document.getElementById('voice-picker');
+  if (!sel || !window.speechSynthesis) return;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return;
+  // prioriza PT-BR no topo
+  const pt = voices.filter(v => /^pt/i.test(v.lang));
+  const rest = voices.filter(v => !/^pt/i.test(v.lang));
+  const ordered = [...pt, ...rest];
+  sel.innerHTML = '<option value="">Automática (melhor PT-BR)</option>' +
+    ordered.map(v => `<option value="${esc(v.name)}">${esc(v.name)} — ${esc(v.lang)}</option>`).join('');
+  sel.value = state.voiceName || '';
+}
+
+function setupVoiceConfig(){
+  const modeT = document.getElementById('voice-mode-toggle');
+  const greetT = document.getElementById('voice-greeting-toggle');
+  const autoT = document.getElementById('voice-autospeak-toggle');
+  const hfT = document.getElementById('voice-handsfree-toggle');
+  const picker = document.getElementById('voice-picker');
+  const testBtn = document.getElementById('voice-test-btn');
+  if (!modeT) return;
+
+  modeT.checked = state.voiceMode;
+  greetT.checked = state.voiceGreeting;
+  autoT.checked = state.voiceAutoSpeak;
+  hfT.checked = state.voiceHandsfree;
+
+  modeT.onchange = () => {
+    state.voiceMode = modeT.checked;
+    localStorage.setItem('vtz_voice_mode', state.voiceMode ? '1' : '0');
+    toast(state.voiceMode ? 'Modo Voz ligado.' : 'Modo Voz desligado.');
+    if (state.voiceMode){ speakGreeting._done = false; speakGreeting(); }
+    else { window.speechSynthesis?.cancel(); }
+  };
+  greetT.onchange = () => { state.voiceGreeting = greetT.checked; localStorage.setItem('vtz_voice_greeting', greetT.checked ? '1' : '0'); };
+  autoT.onchange = () => { state.voiceAutoSpeak = autoT.checked; localStorage.setItem('vtz_voice_autospeak', autoT.checked ? '1' : '0'); };
+  hfT.onchange = () => { state.voiceHandsfree = hfT.checked; localStorage.setItem('vtz_voice_handsfree', hfT.checked ? '1' : '0'); };
+
+  populateVoicePicker();
+  if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = populateVoicePicker;
+  picker.onchange = () => { state.voiceName = picker.value; localStorage.setItem('vtz_voice_name', state.voiceName); };
+  testBtn.onclick = () => speakText('Olá senhor. Voz de teste do JARVIS funcionando.');
 }
 
 /* ---------- Comparar modelos lado a lado (Model Council) ---------- */

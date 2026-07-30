@@ -3,19 +3,70 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>VTz LLM</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCc+CjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0nZycgeDE9JzAnIHkxPScwJyB4Mj0nMScgeTI9JzEnPgo8c3RvcCBvZmZzZXQ9JzAnIHN0b3AtY29sb3I9JyM4YjVjZjYnLz48c3RvcCBvZmZzZXQ9JzEnIHN0b3AtY29sb3I9JyM1YjNmYzknLz4KPC9saW5lYXJHcmFkaWVudD48L2RlZnM+CjxyZWN0IHdpZHRoPScyNCcgaGVpZ2h0PScyNCcgcng9JzYnIGZpbGw9J3VybCgjZyknLz4KPHBhdGggZD0nTTEyIDJsMS45IDUuOEwyMCAxMGwtNi4xIDIuMkwxMiAxOGwtMS45LTUuOEw0IDEwbDYuMS0yLjJ6JyBmaWxsPScjZmZmJy8+Cjwvc3ZnPgo=">
-<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCc+CjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0nZycgeDE9JzAnIHkxPScwJyB4Mj0nMScgeTI9JzEnPgo8c3RvcCBvZmZzZXQ9JzAnIHN0b3AtY29sb3I9JyM4YjVjZjYnLz48c3RvcCBvZmZzZXQ9JzEnIHN0b3AtY29sb3I9JyM1YjNmYzknLz4KPC9saW5lYXJHcmFkaWVudD48L2RlZnM+CjxyZWN0IHdpZHRoPScyNCcgaGVpZ2h0PScyNCcgcng9JzYnIGZpbGw9J3VybCgjZyknLz4KPHBhdGggZD0nTTEyIDJsMS45IDUuOEwyMCAxMGwtNi4xIDIuMkwxMiAxOGwtMS45LTUuOEw0IDEwbDYuMS0yLjJ6JyBmaWxsPScjZmZmJy8+Cjwvc3ZnPgo=">
+<!--
+  Política de conteúdo. O que ela realmente compra: a resposta de um modelo vira
+  HTML nesta página, e mesmo com o DOMPurify no caminho (safeRenderMarkdown), um
+  furo no sanitizador viraria código rodando com acesso ao localStorage — onde
+  mora a chave do OpenRouter. Com script-src fechado, um <script> injetado não
+  carrega, porque não existe origem de script fora daqui.
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.11/purify.min.js"></script>
+  Dá pra ser estrito porque o app não tem nada disso: script inline (0),
+  onclick= no HTML (0), eval/new Function (0). Se algum dia precisar de um,
+  prefira mover pro src/js a afrouxar esta linha.
+
+  connect-src fica em https: aberto de propósito, não por desleixo: a URL do
+  Backend VTz OS é escolhida por quem usa (Render, VPS, localhost), e fechar
+  numa lista quebraria a função principal. worker-src blob: é exigência do
+  xlsx/html2canvas.
+
+  frame-src e form-action liberam o domínio do Firebase porque o login com Google
+  monta um iframe em <projeto>.firebaseapp.com pra receber o resultado — mesmo
+  usando popup. Com 'self' puro o login quebrava calado: o console dizia
+  "Refused to frame", a janela do Google abria e nada acontecia depois.
+
+  ATENÇÃO: esse domínio é o mesmo authDomain de FIREBASE_CONFIG
+  (src/js/12-menus.js). Trocar o projeto do Firebase exige mudar NOS DOIS —
+  o CI cobra que eles batam.
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' https://www.gstatic.com;
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: blob: https:;
+  media-src 'self' data: blob:;
+  font-src 'self' data:;
+  connect-src 'self' https: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* wss:;
+  worker-src 'self' blob:;
+  frame-src 'self' blob: https://vtz-life-47067.firebaseapp.com https://accounts.google.com;
+  object-src 'none';
+  base-uri 'none';
+  form-action 'self' https://vtz-life-47067.firebaseapp.com https://accounts.google.com;
+">
+<title>VTz LLM</title>
+<!--
+  Instalação no celular/desktop. O manifest é o que faz o navegador oferecer
+  "adicionar à tela de início"; sem ele o painel é só uma aba. theme-color pinta
+  a barra do sistema no Android pra a janela não ter uma faixa branca em cima de
+  um app escuro.
+
+  O apple-touch-icon precisa ser PNG: o iOS ignora SVG aqui e cai num quadrado
+  branco com um screenshot da página dentro.
+-->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#8b5cf6">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCc+CjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0nZycgeDE9JzAnIHkxPScwJyB4Mj0nMScgeTI9JzEnPgo8c3RvcCBvZmZzZXQ9JzAnIHN0b3AtY29sb3I9JyM4YjVjZjYnLz48c3RvcCBvZmZzZXQ9JzEnIHN0b3AtY29sb3I9JyM1YjNmYzknLz4KPC9saW5lYXJHcmFkaWVudD48L2RlZnM+CjxyZWN0IHdpZHRoPScyNCcgaGVpZ2h0PScyNCcgcng9JzYnIGZpbGw9J3VybCgjZyknLz4KPHBhdGggZD0nTTEyIDJsMS45IDUuOEwyMCAxMGwtNi4xIDIuMkwxMiAxOGwtMS45LTUuOEw0IDEwbDYuMS0yLjJ6JyBmaWxsPScjZmZmJy8+Cjwvc3ZnPgo=">
+<link rel="apple-touch-icon" sizes="192x192" href="icons/icone-192.png">
+
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/purify.min.js"></script>
 <!-- Geração de arquivos binários no navegador (sem backend, todos open source) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/docx.umd.min.js"></script>
+<script src="vendor/pptxgen.bundle.js"></script>
 <!-- Rasteriza mirrors HTML pro loop de QA visual (skills de pdf/docx/pptx/dashboard-html) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="vendor/html2canvas.min.js"></script>
+<script src="vendor/qrcode.min.js"></script>
 <!-- Firebase (login opcional + sync na nuvem) — SDK compat via CDN -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -207,6 +258,16 @@
       <nav class="cfg-nav" id="cfg-nav"></nav>
       <div class="cfg-content">
       <div class="cfg-group" data-cat="conexao">
+        <h3>Aparência</h3>
+        <p class="hint" style="margin-bottom:6px;">Base do tema</p>
+        <div class="tema-base">
+          <button id="tema-escuro">Escuro</button>
+          <button id="tema-claro">Claro</button>
+        </div>
+        <p class="hint" style="margin:14px 0 0;">Cor de destaque — vale nas duas bases. Cada tom tem uma versão escurecida pro tema claro, senão ícone e link ficariam ilegíveis.</p>
+        <div class="tema-grid" id="tema-grid"></div>
+      </div>
+      <div class="cfg-group" data-cat="conexao">
         <h3>OpenRouter API Key</h3>
         <input type="password" id="api-key-input" placeholder="sk-or-v1-...">
         <button class="primary" id="save-key-btn">Salvar</button>
@@ -229,6 +290,13 @@
         <select id="router-balanced-select"></select>
         <label class="hint">Potente (código / análise longa)</label>
         <select id="router-power-select"></select>
+        <label class="hint" style="display:block; margin:14px 0 4px;">Quando o roteador escolhe sozinho, o que ele deve priorizar</label>
+        <select id="router-vies-select" style="max-width:260px;">
+          <option value="economia">Economia — grátis sempre que der</option>
+          <option value="equilibrio">Equilíbrio — barato no trivial, bom no resto</option>
+          <option value="qualidade">Qualidade — a melhor resposta, tenho crédito</option>
+        </select>
+        <p class="hint" id="router-vies-msg" style="margin-top:8px;"></p>
       </div>
       <div class="cfg-group" data-cat="custo">
         <h3>Custo</h3>
@@ -251,6 +319,27 @@
         <button id="global-prompt-reset" style="margin-top:8px;">Restaurar padrão</button>
       </div>
       <div class="cfg-group" data-cat="respostas">
+        <h3>Modo Voz (JARVIS)</h3>
+        <p class="hint" style="margin-bottom:10px;">O JARVIS te cumprimenta ao abrir, fala as respostas em voz alta sozinho, e o botão de microfone vira mãos-livres (você fala, ele escuta, responde e fala de volta). Usa a voz do próprio sistema/navegador — grátis e sem instalar nada. (A voz local mais humana — Kokoro/Chatterbox — é um upgrade planejado que roda pelo Agente Local.)</p>
+        <label class="toggle" style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12.5px; cursor:pointer;">
+          <input type="checkbox" id="voice-mode-toggle"> Ativar Modo Voz
+        </label>
+        <label class="toggle" style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12.5px; cursor:pointer;">
+          <input type="checkbox" id="voice-greeting-toggle" checked> Cumprimentar por voz ao abrir ("Olá senhor")
+        </label>
+        <label class="toggle" style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12.5px; cursor:pointer;">
+          <input type="checkbox" id="voice-autospeak-toggle" checked> Falar as respostas automaticamente
+        </label>
+        <label class="toggle" style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12.5px; cursor:pointer;">
+          <input type="checkbox" id="voice-handsfree-toggle" checked> Mãos-livres: após falar a resposta, voltar a escutar
+        </label>
+        <div style="margin-top:8px;">
+          <label style="font-size:11.5px; color:var(--text-dim);">Voz</label>
+          <select id="voice-picker" style="width:100%; margin-top:4px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:8px 10px; font-size:12.5px;"></select>
+        </div>
+        <button id="voice-test-btn" style="margin-top:8px;">Testar voz</button>
+      </div>
+      <div class="cfg-group" data-cat="respostas">
         <h3>Memória (o que a IA lembra de você)</h3>
         <p class="hint" style="margin-bottom:10px;">Um <b>grafo de conhecimento</b> sobre você (entidades + relações), injetado de forma resumida em TODA conversa — nome, objetivos, preferências, contexto. Evita duplicar e contradizer fatos antigos (ex.: mudou de cidade, ele corrige em vez de acumular).</p>
         <textarea id="memory-input" placeholder="Ex.:&#10;Me chamo Victor Hugo, moro em Maricá-RJ.&#10;Treino à noite, foco em físico atlético.&#10;Jogo Fortnite, Valorant e EA FC.&#10;Prefiro respostas diretas em pt-BR." style="width:100%; min-height:120px; background:var(--input-bg); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:12.5px; line-height:1.6; resize:vertical;"></textarea>
@@ -261,6 +350,21 @@
         <button id="update-memory-btn" style="margin-top:6px;">Atualizar memória agora</button>
         <p class="hint" style="margin-top:8px;">A memória automática usa um modelo barato pra destilar entidades e relações (fração de centavo por atualização) e roda em 2º plano a cada poucas mensagens. Você pode editar/apagar qualquer linha acima — ao salvar à mão elas viram fatos simples, e a memória automática reconstrói as relações depois.</p>
       </div>
+      <div class="cfg-group" data-cat="respostas">
+        <h3>Memória no servidor (grafo, diário e busca)</h3>
+        <p class="hint" style="margin-bottom:10px;">Estas três ações rodam no Backend VTz OS, não no navegador. <b>Extrair</b> lê a conversa aberta e funde os fatos duráveis no grafo. <b>Resumo diário</b> mostra o que cada dia consolidou. A <b>busca</b> diz se comparou vetores (semântica, acha sinônimo) ou termos (léxica) — se não houver provedor de embeddings configurado, ela avisa em vez de fingir.</p>
+        <button class="primary" id="mem-extrair">Extrair fatos desta conversa</button>
+        <button id="mem-diario-btn">Ver resumo diário</button>
+        <button id="mem-reindex">Reindexar busca</button>
+        <p class="hint" id="mem-acao-msg" style="margin-top:8px;"></p>
+        <div id="mem-diario" class="mem-diario"></div>
+        <label class="hint" style="display:block; margin:14px 0 4px;">Buscar na memória</label>
+        <div class="mem-busca-row">
+          <input type="text" id="mem-busca" placeholder="ex.: onde eu moro">
+          <button id="mem-busca-btn">Buscar</button>
+        </div>
+        <div id="mem-busca-res" class="mem-busca-res"></div>
+      </div>
       <div class="cfg-group" data-cat="backend">
         <h3>Backend VTz OS (opcional)</h3>
         <p class="hint" style="margin-bottom:10px;">URL do servidor (repo <b>servidor</b>). Se você rodar o backend na sua máquina, o site <b>detecta sozinho</b> em <code>localhost:8000</code> — só preencha aqui se usar outra URL (ex.: backend publicado na nuvem). Com ele ligado: busca com imagem da fonte, pesquisa profunda no servidor e conectores.</p>
@@ -269,6 +373,11 @@
         <input type="password" id="backend-token-input" placeholder="cole o mesmo valor de BACKEND_TOKEN" style="font-family:var(--mono);">
         <button class="primary" id="backend-test-btn" style="margin-top:8px;">Testar backend</button>
         <pre id="backend-status" style="display:none; margin-top:10px; background:var(--input-bg); border:1px solid var(--line); border-radius:10px; padding:11px; font-size:11px; line-height:1.6; white-space:pre-wrap; word-break:break-word;"></pre>
+      </div>
+      <div class="cfg-group" data-cat="backend">
+        <h3>Manter o servidor acordado</h3>
+        <p class="hint" style="margin-bottom:10px;">Servidor de plano grátis <b>hiberna</b> depois de uns 15 minutos parado, e a primeira mensagem depois disso espera o container subir — meio minuto olhando pra tela. Com o painel aberto ele é cutucado de tempos em tempos, e não hiberna enquanto você está usando. <b>Isso não cobre o primeiro acesso do dia:</b> pra o servidor nunca dormir é preciso um cutucador de fora (cron-job.org, UptimeRobot) batendo em <code>/api/health</code> — está explicado no README do repo <b>servidor</b>.</p>
+        <p class="hint" id="acorda-estado">—</p>
       </div>
       <div class="cfg-group" data-cat="agente">
         <h3>Agente Local</h3>
@@ -292,8 +401,60 @@
 
         <h4 style="margin:22px 0 8px;">Atividade recente</h4>
         <p class="hint" style="margin-bottom:8px;">O que o JARVIS fez no seu PC — cada linha mostra a camada de risco (tier), a decisão e o resultado.</p>
-        <button id="audit-refresh-btn">Atualizar atividade</button>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button id="audit-refresh-btn">Atualizar atividade</button>
+          <button id="audit-verify-btn" class="secondary">Verificar integridade</button>
+          <span id="audit-verify-status" class="hint" style="margin:0;"></span>
+        </div>
         <div id="audit-list" style="margin-top:10px;"></div>
+      </div>
+      <div class="cfg-group" data-cat="voz">
+        <h3>Voz do JARVIS</h3>
+        <p class="hint" style="margin-bottom:12px;">A voz roda no <b>seu PC</b>, pelo Agente Local: <b>Chatterbox</b> clona a sua voz a partir de uma amostra, <b>Kokoro</b> tem vozes prontas e é o fallback, e o <b>navegador</b> sempre funciona. Nada de áudio é guardado no servidor.</p>
+
+        <p class="hint" id="voz-indisponivel" hidden></p>
+
+        <div id="voz-body" hidden>
+          <h4 style="margin:18px 0 8px;">Motor</h4>
+          <div id="voz-engines" class="voz-engines"></div>
+          <p class="hint" id="voz-engine-hint" style="margin-top:8px;"></p>
+
+          <div id="voz-voice-sec">
+            <h4 style="margin:22px 0 8px;">Voz</h4>
+            <select id="voz-voice" style="width:100%; max-width:420px;"></select>
+            <p class="hint" id="voz-voice-hint" style="margin-top:8px;"></p>
+          </div>
+
+          <div id="voz-samples-sec">
+            <h4 style="margin:22px 0 8px;">Minhas vozes (clonagem)</h4>
+            <div id="voz-samples" class="voz-samples"></div>
+            <input type="file" id="voz-file" accept="audio/*" hidden>
+            <button id="voz-upload" style="margin-top:10px;">Subir amostra de voz</button>
+            <p class="hint" style="margin-top:8px;">Alguns segundos de fala limpa bastam. O arquivo vai direto pro seu PC — não fica guardado no servidor.</p>
+          </div>
+
+          <div id="voz-calib"></div>
+
+          <h4 style="margin:22px 0 8px;">Reconhecimento de fala (whisper.cpp)</h4>
+          <select id="voz-stt-model" style="width:100%; max-width:420px;"></select>
+          <p class="hint" id="voz-stt-hint" style="margin-top:8px;"></p>
+
+          <h4 style="margin:22px 0 8px;">Escuta contínua — "Ei, JARVIS"</h4>
+          <p class="hint" style="margin-bottom:10px;">Com isto ligado o Agente Local grava trechos curtos do microfone sem parar, passa cada um pelo whisper e só age quando ouve o nome. <b>Não é um detector de wake word dedicado</b>: é reconhecimento de fala rodando o tempo todo, e gasta CPU como tal — o número abaixo é a estimativa real.</p>
+          <div class="voz-escuta" id="voz-escuta"></div>
+          <div class="voz-escuta-row">
+            <label class="hint">Tamanho do trecho (s)</label>
+            <input type="number" id="voz-chunk" min="2" max="15" step="1" style="width:90px;">
+            <button id="voz-escuta-toggle">Ligar escuta</button>
+          </div>
+          <p class="hint" id="voz-escuta-msg" style="margin-top:8px;"></p>
+
+          <div style="display:flex; gap:8px; align-items:center; margin-top:22px; flex-wrap:wrap;">
+            <button id="voz-test">Testar</button>
+            <button class="primary" id="voz-save">Salvar</button>
+            <span class="hint voz-msg" id="voz-msg" style="margin:0;"></span>
+          </div>
+        </div>
       </div>
       <div class="cfg-group" data-cat="conexao">
         <h3>Diagnóstico</h3>
@@ -330,6 +491,52 @@
         <button class="primary" id="export-backup-btn">Exportar tudo (.json)</button>
         <button id="import-backup-btn">Importar backup</button>
         <input type="file" id="import-backup-file" accept="application/json" style="display:none;">
+      </div>
+      <div class="cfg-group" data-cat="dados">
+        <h3>Backup do servidor (Backend VTz OS)</h3>
+        <p class="hint" style="margin-bottom:10px;">Coisa diferente do backup acima: aqui vai o que mora no <b>banco do servidor</b> — a memória em grafo, a camada diária e a lista de dispositivos pareados. O token de pareamento <b>não</b> vai no arquivo, e restaurar <b>não</b> repareia dispositivo nem recria auditoria (pareamento é decisão presencial; auditoria é registro deste banco).</p>
+        <button class="primary" id="srv-backup-export">Baixar backup do servidor</button>
+        <button id="srv-backup-import">Restaurar no servidor</button>
+        <input type="file" id="srv-backup-file" accept="application/json" style="display:none;">
+        <label class="hint" style="display:block; margin:10px 0 4px;">Como restaurar</label>
+        <select id="srv-backup-mode">
+          <option value="merge">Juntar com o que já está lá (padrão)</option>
+          <option value="replace">Substituir tudo pelo arquivo</option>
+        </select>
+        <p class="hint" id="srv-backup-msg" style="margin-top:8px;"></p>
+      </div>
+      <div class="cfg-group" data-cat="dados">
+        <h3>Abrir no celular</h3>
+        <p class="hint" style="margin-bottom:10px;">O painel é uma página web e o seu PC pareado obedece comandos vindos do backend — então o celular não precisa de aplicativo nenhum: precisa abrir <b>esta mesma página</b>, apontada pro <b>mesmo backend</b>. O QR só evita você digitar endereço e token numa tela de toque.</p>
+        <button id="qr-celular-btn">Mostrar QR</button>
+        <div id="qr-celular" class="qr-celular"></div>
+      </div>
+      <div class="cfg-group" data-cat="dados">
+        <h3>Meus documentos</h3>
+        <p class="hint" style="margin-bottom:10px;">Diferente do <b>Conhecimento do projeto</b>, que é colado inteiro no prompt a cada mensagem: aqui o documento é quebrado em pedaços no servidor, e só os pedaços que interessam à pergunta chegam ao modelo. Um manual de 80 páginas cabe; e você paga pelo que usa. O modelo consulta sozinho quando a pergunta pede — <b>peça pra ele citar a fonte</b>.</p>
+        <button class="primary" id="docs-add-btn">Indexar arquivo</button>
+        <button id="docs-reindex-btn">Reindexar tudo</button>
+        <input type="file" id="docs-file" accept=".txt,.md,.csv,.json,.log,.xml,.yml,.yaml,.html,.js,.ts,.py,.css,text/*" multiple style="display:none;">
+        <p class="hint" id="docs-msg" style="margin-top:8px;"></p>
+        <div id="docs-lista" style="margin-top:10px;"></div>
+      </div>
+      <div class="cfg-group" data-cat="dados">
+        <h3>Instalar como aplicativo</h3>
+        <p class="hint" style="margin-bottom:10px;">Instalado, o painel abre em janela própria (sem barra de endereço), ganha ícone na tela de início e <b>continua abrindo sem internet</b> — as conversas já moram no navegador, então offline você lê tudo e escreve normalmente; só a resposta do modelo precisa de rede.</p>
+        <button id="pwa-instalar-btn">Instalar</button>
+        <p class="hint" id="pwa-estado" style="margin-top:8px;">—</p>
+      </div>
+      <div class="cfg-group" data-cat="dados">
+        <h3>Conversas em todos os aparelhos</h3>
+        <p class="hint" style="margin-bottom:10px;">A conversa continua sendo escrita <b>aqui, no navegador</b> — o app funciona sem servidor. Com o Backend VTz OS ligado, ela também é espelhada lá, e aí aparece no outro aparelho e sobrevive a limpar o cache. <b>Regra de conflito:</b> se a mesma conversa foi mexida em dois lugares, vale a versão editada por último — inteira. Mensagem nunca é mesclada, porque juntar as duas metades daria uma conversa que nunca aconteceu.</p>
+        <button id="conv-sync-btn">Sincronizar agora</button>
+        <p class="hint" id="conv-sync-estado" style="margin-top:8px;">—</p>
+      </div>
+      <div class="cfg-group" data-cat="dados">
+        <h3>Backup automático do servidor</h3>
+        <div id="auto-backup" class="auto-backup"></div>
+        <button id="auto-backup-btn" style="margin-top:10px;">Tirar snapshot agora</button>
+        <p class="hint" id="auto-backup-msg" style="margin-top:8px;"></p>
       </div>
       <div class="cfg-group" data-cat="dados">
         <h3>Ambiente</h3>
@@ -395,8 +602,21 @@
      </div><!-- /cfg-shell -->
     </section>
     <section id="analytics-view" class="view">
+      <h3 class="ana-titulo">Neste navegador</h3>
       <div class="metrics-grid" id="metrics-grid"></div>
       <p class="analytics-note">Todos os números acima são reais, calculados do teu uso neste navegador (conversas salvas + contador de custo). Não há dados simulados.</p>
+
+      <div class="ana-sep"></div>
+      <div class="ana-head">
+        <h3 class="ana-titulo">No servidor — ações executadas no PC</h3>
+        <select id="ana-dias" class="ana-sel" title="Janela de tempo">
+          <option value="1">últimas 24h</option>
+          <option value="7">últimos 7 dias</option>
+          <option value="30">últimos 30 dias</option>
+          <option value="90">últimos 90 dias</option>
+        </select>
+      </div>
+      <div id="srv-metrics"></div>
     </section>
   </main>
 </div>
@@ -454,6 +674,12 @@
   </div>
   <div class="projects-bar" id="projects-bar"></div>
   <div class="history-list" id="history-list"></div>
+  <!-- Acesso ao JARVIS (Seção 6): canto inferior esquerdo, acima da conta -->
+  <div class="jarvis-entry" id="jarvis-entry" role="button" tabindex="0" title="Abrir o JARVIS (voz)">
+    <div class="je-head"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><circle cx="9" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.2" fill="currentColor" stroke="none"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1" fill="currentColor" stroke="none"/></svg></div>
+    <div class="je-label">J.A.R.V.I.S.</div>
+    <div class="je-sub">voz · wake word</div>
+  </div>
   <div class="account-wrap">
     <div class="account-menu" id="account-menu"></div>
     <button class="sidebar-footer" id="account-btn" aria-label="Conta e configurações">
@@ -599,6 +825,59 @@
     </div>
   </div>
 </div>
+
+<!-- ===================== CENA JARVIS (Seção 6) =====================
+     Overlay em cima do painel: esfera de partículas, ondas orgânicas e os
+     4 estados (idle / escutando / pensando / entrega). Os canvas só ganham
+     contexto WebGL quando a cena abre (ver jarvisMonta em 31-jarvis.js). -->
+<section class="jarvis-overlay" id="jarvis-overlay" aria-hidden="true">
+  <canvas id="wave-canvas"></canvas>
+  <canvas id="particle-canvas"></canvas>
+  <div class="j-veil"></div>
+
+  <div class="j-shell">
+    <div class="j-top">
+      <button class="j-back" id="j-back"><i data-ico="arrowLeft"></i>Voltar ao painel</button>
+      <div class="j-brand"><span class="dot"></span>J.A.R.V.I.S.</div>
+      <div class="j-sub-agent" id="j-agent">—</div>
+      <div class="j-statechip" id="j-statechip">IDLE</div>
+    </div>
+
+    <div class="j-stage">
+      <div class="j-idle" id="j-idle">
+        <div class="j-badge">VTZ OS · agente local</div>
+        <div class="j-title">Qual é a sua próxima <em>grande ideia</em>?</div>
+        <div class="j-sub">Toque no microfone para falar — ou escreva abaixo</div>
+
+        <div class="j-composer">
+          <textarea class="j-input" id="j-input" rows="2" placeholder="Ex.: monta a planilha de eventos de julho e salva no desktop"></textarea>
+          <div class="j-crow">
+            <button class="j-go" id="j-go">Executar<i data-ico="sparkle"></i></button>
+          </div>
+        </div>
+
+        <div class="j-chips">
+          <button class="j-chip" data-jfill="pesquisa os eventos de agosto e monta um xlsx"><i data-ico="search"></i>Pesquisa web</button>
+          <button class="j-chip" data-jfill="lê a pasta Downloads e organiza por tipo"><i data-ico="folder"></i>Arquivos do PC</button>
+          <button class="j-chip" data-jfill="gera um .reg reversível pra desligar o HAGS"><i data-ico="cpu"></i>Otimizar PC</button>
+          <button class="j-chip" data-jfill="resume meus e-mails de hoje"><i data-ico="mail"></i>Conectores</button>
+        </div>
+
+        <button class="j-mic" id="j-mic" title="Falar"><i data-ico="mic"></i></button>
+        <div class="j-hint">ou pressione <b>ESPAÇO</b></div>
+      </div>
+
+      <div class="j-caption" id="j-caption">
+        <div class="j-vu" id="j-vu"></div>
+        <div class="j-cap-text" id="j-cap-text">Ouvindo…</div>
+        <div class="j-cap-sub" id="j-cap-sub">escutando</div>
+        <button class="j-stop" id="j-stop"><i data-ico="square"></i>Parar</button>
+      </div>
+
+      <div class="j-deliver" id="j-deliver"></div>
+    </div>
+  </div>
+</section>
 
 <script src="app.js"></script>
 </body>

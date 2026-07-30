@@ -54,7 +54,63 @@ async function buildCss() {
   console.log(`style.css: ${bytes(original.length)} -> ${bytes(result.outputFiles[0].contents.length)}`);
 }
 
+/* As bibliotecas de terceiros ficam em vendor/, copiadas do node_modules com a
+   versão travada no package.json. Antes vinham de cdnjs em tempo de execução, o
+   que dava dois problemas num app DESKTOP: sem internet (ou com firewall
+   corporativo) a página não renderizava, e sem SRI um CDN comprometido rodaria
+   código com acesso ao localStorage — onde mora a chave do OpenRouter.
+
+   Copiar em vez de referenciar node_modules/ direto porque o site é servido
+   estático: node_modules não vai pro ar, vendor/ vai. */
+const VENDOR = [
+  ['marked/marked.min.js',                'marked.min.js'],
+  ['dompurify/dist/purify.min.js',        'purify.min.js'],
+  ['xlsx/dist/xlsx.full.min.js',          'xlsx.full.min.js'],
+  ['jspdf/dist/jspdf.umd.min.js',         'jspdf.umd.min.js'],
+  ['docx/build/index.umd.js',             'docx.umd.min.js'],
+  ['pptxgenjs/dist/pptxgen.bundle.js',    'pptxgen.bundle.js'],
+  ['html2canvas/dist/html2canvas.min.js', 'html2canvas.min.js'],
+];
+
+/* O qrcode não vem com um arquivo pronto pro navegador — é CommonJS em vários
+   módulos. Como o build já usa esbuild, empacota aqui num arquivo só, em vez de
+   puxar de CDN (o CSP bloqueia) ou de escrever um codificador de QR na mão. */
+async function bundleQrcode() {
+  const saida = path.join(root, 'vendor', 'qrcode.min.js');
+  await esbuild.build({
+    entryPoints: [path.join(root, 'node_modules', 'qrcode', 'lib', 'browser.js')],
+    outfile: saida,
+    bundle: true,
+    minify: true,
+    format: 'iife',
+    globalName: 'QRCode',
+    platform: 'browser',
+    target: 'es2020',
+    logLevel: 'warning',
+  });
+  console.log(`vendor/qrcode.min.js: ${bytes(fs.statSync(saida).size)}`);
+}
+
+function copiaVendor() {
+  const destDir = path.join(root, 'vendor');
+  fs.mkdirSync(destDir, { recursive: true });
+  let total = 0;
+  for (const [origem, destino] of VENDOR) {
+    const de = path.join(root, 'node_modules', origem);
+    if (!fs.existsSync(de)) {
+      throw new Error(
+        `vendor: falta ${origem}. Rode "npm install" — sem este arquivo o app ` +
+        `abre sem markdown/exportação e ninguém descobre até tentar usar.`);
+    }
+    fs.copyFileSync(de, path.join(destDir, destino));
+    total += fs.statSync(de).size;
+  }
+  console.log(`vendor/: ${VENDOR.length} bibliotecas, ${bytes(total)}`);
+}
+
 async function main() {
+  copiaVendor();
+  await bundleQrcode();
   await buildJs();
   await buildCss();
 }

@@ -1,0 +1,6 @@
+<!-- Bancada de teste do 34-conversas-sync.js. Carrega o ARQUIVO REAL com um
+     `state` mínimo, porque o bundle de produção é uma IIFE e nada dele sai pro
+     window — expor a função só pra teste mudaria o produto pra acomodar o teste. -->
+<meta charset="utf-8">
+<script>window.state = { conversations: [], currentConvId: null };</script>
+<script src="34-conversas-sync.js"></script>

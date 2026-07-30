@@ -16,8 +16,44 @@ function migrateMemoriesToGraph(stored){
   localStorage.setItem('vtz_memory_graph', JSON.stringify(g));
   return g;
 }
+let _memPushTimer = null;
 function saveMemoryGraph(){
   localStorage.setItem('vtz_memory_graph', JSON.stringify(state.memoryGraph));
+  // Backend é a fonte única da memória (Seção 7). Com backend configurado, o
+  // localStorage vira só cache descartável e o grafo é empurrado pra lá.
+  // Debounce: uma extração/edição mexe em vários nós/arestas de uma vez.
+  if (backendUrl()){
+    clearTimeout(_memPushTimer);
+    _memPushTimer = setTimeout(pushMemoryToBackend, 800);
+  }
+}
+async function pushMemoryToBackend(){
+  if (!backendUrl()) return;
+  try{
+    await fetch(backendUrl() + '/api/memory', {
+      method:'PUT', headers: backendHeaders({ 'Content-Type':'application/json' }),
+      body: JSON.stringify({ nodes: state.memoryGraph.nodes, edges: state.memoryGraph.edges }),
+    });
+  }catch(_){ /* offline: o cache local já guardou; sobe na próxima escrita */ }
+}
+/* Puxa o grafo do backend (fonte única). Se o backend já tem grafo, ele VENCE e
+   substitui o cache local. Se o backend está vazio mas há grafo local, migra
+   (empurra o local pra cima) — uma vez, no 1º backend configurado da sessão. */
+let _memSynced = false;
+async function syncMemoryWithBackend(){
+  if (!backendUrl() || _memSynced) return;
+  try{
+    const d = await fetch(backendUrl() + '/api/memory', { headers: backendHeaders() }).then(okJson);
+    const remote = { nodes: d.nodes || [], edges: d.edges || [] };
+    if (remote.nodes.length){
+      state.memoryGraph = remote;
+      localStorage.setItem('vtz_memory_graph', JSON.stringify(remote));
+      renderMemoryUI();
+    } else if (state.memoryGraph.nodes.length){
+      await pushMemoryToBackend(); // migra o que já existia local pro backend
+    }
+    _memSynced = true;
+  }catch(_){ /* backend fora do ar: segue com o cache local, tenta de novo depois */ }
 }
 /* Resume o grafo (ou um subgrafo relevante) em texto natural pro system prompt.
    Barato: agrupa por nó de origem e lista as relações numa linha por entidade.
@@ -62,9 +98,20 @@ const state = {
   currentConvId: localStorage.getItem('vtz_current_conv') || null,
   totalCost: parseFloat(localStorage.getItem('vtz_or_cost') || '0'),
   imageModels: [],
-  toolsEnabled: false,
+  /* Lembrado entre sessões. Antes nascia sempre desligado, e isso escondia
+     funcionalidade: as ferramentas (buscar nos seus documentos, agir no PC) só
+     existem com ele ligado, então quem ligava uma vez encontrava tudo desligado
+     de novo no dia seguinte — sem aviso, e com o sintoma "ele esqueceu o que
+     estava nos meus arquivos". Desligado continua sendo o padrão de quem nunca
+     mexeu: ferramenta custa tokens e não se liga por conta própria. */
+  toolsEnabled: localStorage.getItem('vtz_tools') === '1',
   pickerTab: 'all',
   routerConfig: JSON.parse(localStorage.getItem('vtz_router_config') || 'null') || {fast:'', balanced:'', power:''},
+  /* Como o roteador automático decide entre qualidade e preço. Padrão
+     'equilibrio' porque é o único honesto pra quem acabou de instalar: não dá
+     pra saber se a pessoa tem crédito. Quem tem, põe em 'qualidade' e o
+     classificador para de economizar por conta própria. */
+  routerVies: localStorage.getItem('vtz_router_vies') || 'equilibrio',
   skills: JSON.parse(localStorage.getItem('vtz_skills') || 'null') || [],
   agents: JSON.parse(localStorage.getItem('vtz_agents') || 'null') || [],
   favorites: JSON.parse(localStorage.getItem('vtz_favorites') || '[]'),
@@ -75,7 +122,15 @@ const state = {
   ctxWindow: parseInt(localStorage.getItem('vtz_ctx_window') || '24', 10),
   streamOn: localStorage.getItem('vtz_stream') !== '0',
   perfMode: localStorage.getItem('vtz_perf') === '1',
-  webSearch: false, // busca web por sessão — off por padrão (custa ~$0,02/msg)
+  /* Lembrada entre sessões, igual às Ferramentas — voltar desligada todo dia
+     escondia a funcionalidade.
+
+     Mas continua NASCENDO desligada em instalação nova: é o único interruptor
+     do app que gasta dinheiro sozinho (~US$0,02 por mensagem, cobrado pelo
+     OpenRouter fora do contador de tokens daqui). Ligar por conta própria seria
+     decidir pelo bolso de quem acabou de instalar. E o aviso de custo sai toda
+     vez que ela liga, inclusive quando quem ligou foi a sessão passada. */
+  webSearch: localStorage.getItem('vtz_web_search') === '1',
   gens: {}, // convId -> AbortController (gerações ativas, uma por conversa)
   templates: JSON.parse(localStorage.getItem('vtz_templates') || 'null') || [],
   costByModel: JSON.parse(localStorage.getItem('vtz_cost_by_model') || '{}'),
@@ -90,5 +145,10 @@ const state = {
   backendUrl: (localStorage.getItem('vtz_backend_url') || '').replace(/\/+$/, ''), // VTz OS backend (opcional)
   backendToken: localStorage.getItem('vtz_backend_token') || '', // token de acesso, se o backend exigir
   replicateKey: localStorage.getItem('vtz_replicate_key') || '', // chave do Replicate (geração de vídeo)
+  voiceMode: localStorage.getItem('vtz_voice_mode') === '1',            // JARVIS fala/ouve (padrão: off)
+  voiceGreeting: localStorage.getItem('vtz_voice_greeting') !== '0',    // cumprimenta ao abrir
+  voiceAutoSpeak: localStorage.getItem('vtz_voice_autospeak') !== '0',  // fala respostas sozinho
+  voiceHandsfree: localStorage.getItem('vtz_voice_handsfree') !== '0',  // volta a escutar após falar
+  voiceName: localStorage.getItem('vtz_voice_name') || '',             // voz escolhida (nome do SpeechSynthesisVoice)
 };
 function backendUrl(){ return state.backendUrl || ''; }

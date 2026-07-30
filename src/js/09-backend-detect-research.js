@@ -15,6 +15,7 @@ async function autoDetectBackend(){
         localStorage.setItem('vtz_backend_url', url);
         const inp = document.getElementById('backend-url-input'); if (inp) inp.value = url;
         updateAgentBtnVisibility();
+        syncMemoryWithBackend(); // fonte única: puxa/migra a memória (Seção 7)
         toast('Backend local detectado ✓');
         return true;
       }

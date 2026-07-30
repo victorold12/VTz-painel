@@ -1,16 +1,78 @@
-/* Só modelos gratuitos, com um "papel" inferido do id — usado pelo RouteLLM Free */
+/* ---------- RouteLLM Free: quais grátis entram na disputa ----------
+
+   Preferência por FAMÍLIA, nunca por id exato. Modelo grátis entra e sai do
+   catálogo do OpenRouter toda semana; uma lista de ids fixos viraria, em pouco
+   tempo, um roteador apontando pra modelo que não existe mais. O padrão casa a
+   família — se ela sair do ar, o item some da conta sozinho, sem quebrar nada.
+
+   A ordem é opinião: quem é bom em quê entre os grátis. Nota alta = entra
+   primeiro na lista que o classificador vê. */
+const FREE_RANK = [
+  { re:/deepseek.*(r1|reasoner|think)/,        nota:100, papel:'raciocínio, matemática e análise longa' },
+  { re:/(qwen|qwq).*(coder|code)/,             nota:95,  papel:'código' },
+  { re:/deepseek/,                             nota:92,  papel:'uso geral forte' },
+  { re:/llama-?4/,                             nota:90,  papel:'uso geral, contexto longo' },
+  { re:/(qwen ?3|qwen-?3|qwq)/,                nota:88,  papel:'raciocínio e código' },
+  { re:/llama-?3\.[13].*(70b|405b)/,           nota:85,  papel:'tarefas complexas' },
+  { re:/(kimi|moonshot)/,                      nota:82,  papel:'contexto muito longo' },
+  { re:/nemotron/,                             nota:80,  papel:'instruções detalhadas' },
+  { re:/qwen.*(72b|32b)/,                      nota:78,  papel:'tarefas complexas' },
+  { re:/glm/,                                  nota:75,  papel:'conversa rápida' },
+  { re:/gemma-?3/,                             nota:72,  papel:'uso geral leve' },
+  { re:/mistral|ministral|magistral/,          nota:70,  papel:'uso geral leve' },
+  { re:/phi-?[45]/,                            nota:65,  papel:'respostas curtas e diretas' },
+  { re:/llama/,                                nota:60,  papel:'uso geral' },
+];
+
+function freeNota(id){
+  const s = String(id).toLowerCase();
+  const achou = FREE_RANK.find(r => r.re.test(s));
+  return achou || { nota: 40, papel: 'uso geral' };   // desconhecido participa, mas por último
+}
+
+/* Só modelos gratuitos, com papel e ordem de preferência — usado pelo RouteLLM Free.
+
+   Antes isto era `free.slice(0, 12)`: os 12 PRIMEIROS na ordem em que o
+   OpenRouter devolveu, que é arbitrária. Dava pra ficar com doze modelos
+   fraquinhos da mesma família enquanto os bons nem apareciam pro classificador.
+
+   Agora ordena por nota e depois garante VARIEDADE: de nada adianta o
+   classificador receber doze opções se todas fazem a mesma coisa — ele precisa
+   de um raciocinador, um de código, um rápido. Primeiro entra o melhor de cada
+   papel; o resto das vagas vai pros de nota mais alta que sobraram. */
 function freeCandidates(){
-  const free = state.models.filter(m => isFreeModel(m) && !isImageModel(m));
-  const role = (id) => {
-    const s = id.toLowerCase();
-    if (s.includes('r1') || s.includes('reason') || s.includes('think')) return 'raciocínio e matemática';
-    if (s.includes('coder') || s.includes('code')) return 'código';
-    if (s.includes('70b') || s.includes('72b') || s.includes('large') || s.includes('405b')) return 'tarefas complexas';
-    if (s.includes('mini') || s.includes('small') || s.includes('8b') || s.includes('flash')) return 'conversas rápidas';
-    return 'uso geral';
-  };
-  // no máximo 12 candidatos pra não estourar o prompt do classificador
-  return free.slice(0, 12).map(m => ({ id: m.id, role: role(m.id) }));
+  const free = state.models
+    .filter(m => isFreeModel(m) && !isImageModel(m))
+    .map(m => {
+      const { nota, papel } = freeNota(m.id);
+      return { id: m.id, role: papel, nota, ctx: Number(m.context_length) || 0 };
+    })
+    // contexto como desempate: mesmo nível, ganha quem aguenta conversa mais longa
+    .sort((a, b) => (b.nota - a.nota) || (b.ctx - a.ctx));
+
+  const escolhidos = [];
+  const papeisVistos = new Set();
+  for (const c of free){
+    if (papeisVistos.has(c.role)) continue;
+    papeisVistos.add(c.role);
+    escolhidos.push(c);
+  }
+  for (const c of free){
+    if (escolhidos.length >= 12) break;
+    if (!escolhidos.includes(c)) escolhidos.push(c);
+  }
+  // reordena por nota: o classificador tende a olhar mais o topo da lista
+  return escolhidos.slice(0, 12).sort((a, b) => b.nota - a.nota)
+                   .map(c => ({ id: c.id, role: c.role }));
+}
+
+/* O classificador é uma chamada a mais em TODA mensagem, então precisa ser
+   rápido e grátis. Prefere um modelo leve: pedir a um raciocinador pra escolher
+   modelo faz o app parecer travado antes mesmo de começar a responder. */
+function freeClassifier(){
+  const leves = state.models.filter(m => isFreeModel(m) && !isImageModel(m)
+                                    && /flash|mini|small|lite|8b|9b|12b|glm/i.test(m.id));
+  return (leves[0] || state.models.find(m => isFreeModel(m) && !isImageModel(m)))?.id || null;
 }
 function isFreeModel(m){
   if (!m) return false;
@@ -18,16 +80,46 @@ function isFreeModel(m){
   const p = m.pricing;
   return p && parseFloat(p.prompt||0) === 0 && parseFloat(p.completion||0) === 0;
 }
+/* A instrução que decide o comportamento do roteador. É uma frase, e é a
+   diferença entre gastar R$50 por mês e não gastar nada — por isso fica visível
+   na configuração em vez de escondida numa constante.
+
+   'equilibrio' é o padrão de instalação: sem saber se existe crédito, mandar o
+   roteador escolher o modelo caro seria decidir pelo bolso de outra pessoa. */
+const VIES_ROTEADOR = {
+  economia: 'PRIORIDADE: custo. Use o modelo grátis sempre que ele der conta. ' +
+    'Só suba de nível se a tarefa for claramente impossível pro grátis, e mesmo ' +
+    'assim pare no mais barato que resolve.',
+  equilibrio: 'PRIORIDADE: equilíbrio. Tarefa trivial (saudação, pergunta de uma ' +
+    'linha, formatação) vai no grátis ou no mais barato. Tarefa de verdade vai no ' +
+    'modelo adequado, sem medo do preço. Não use o mais caro por padrão.',
+  qualidade: 'PRIORIDADE: qualidade da resposta. Há crédito disponível e o custo ' +
+    'NÃO é a restrição principal. Escolha o modelo que dá a melhor resposta pra ' +
+    'esta tarefa. Só use um modelo barato ou grátis quando ele for genuinamente ' +
+    'tão bom quanto o caro pra este pedido específico — o que acontece em ' +
+    'saudações, respostas de uma linha e reformatação de texto, não em código, ' +
+    'análise ou escrita longa.',
+};
+function viesDoRoteador(){
+  return VIES_ROTEADOR[state.routerVies] || VIES_ROTEADOR.equilibrio;
+}
+
 async function classifyWithLLM(userText, signal, freeOnly){
   const candidates = routerCandidates(freeOnly);
   if (!candidates.length) return null;
   // classificador: sempre um modelo grátis (custo zero); senão o tier fast configurado
-  const freeModel = state.models.find(m => isFreeModel(m) && !isImageModel(m));
-  const classifier = freeModel?.id || state.routerConfig.fast;
+  const classifier = freeClassifier() || state.routerConfig.fast;
   if (!classifier) return null;
-  const listText = candidates.map(c => `- ${c.id} (${c.role})`).join('\n');
+  /* Com o preço na lista, "equilibrar qualidade e custo" deixa de ser adivinhação.
+     Antes o classificador recebia só ids e papéis e era mandado economizar sem
+     saber quanto custava nada — na prática ele decidia pelo nome do modelo. */
+  const listText = candidates.map(c => {
+    const p = Number(c.preco) || 0;
+    const etiqueta = p === 0 ? 'grátis' : `US$ ${p.toFixed(2)}/M tokens de saída`;
+    return `- ${c.id} (${c.role}) — ${etiqueta}`;
+  }).join('\n');
   const res = await orFetch({ model: classifier, messages:[
-      { role:'system', content:`Você é um roteador de modelos de IA. Analise a tarefa do usuário e escolha o MELHOR modelo da lista abaixo, equilibrando qualidade e custo (não escolha modelo caro pra tarefa trivial).\n${listText}\nResponda APENAS com JSON válido: {"model":"<id exato da lista>"}` },
+      { role:'system', content:`Você é um roteador de modelos de IA. Analise a tarefa do usuário e escolha o MELHOR modelo da lista abaixo.\n${listText}\n\n${viesDoRoteador()}\n\nResponda APENAS com JSON válido: {"model":"<id exato da lista>"}` },
       { role:'user', content: userText.slice(0, 2000) }
     ]}, { signal });
   if (!res.ok) throw new Error('classificador falhou');
@@ -42,12 +134,39 @@ async function classifyWithLLM(userText, signal, freeOnly){
    Sem o delay do debate sequencial: as duas respostas são pedidas ao mesmo tempo
    (Promise.all), então o tempo total ≈ o do modelo mais lento, não a soma. Um
    modelo grátis funde as duas na melhor versão. */
+/* O par que vai responder em paralelo.
+
+   DUAS CORREÇÕES, e as duas mudam a resposta que chega na tela:
+
+   1. Escolhe o melhor de cada família (melhorDaFamilia), não o primeiro que o
+      catálogo devolveu. `/gemini-3/` casava com `gemini-3.1-flash-lite` tão bem
+      quanto com `gemini-3.1-pro` — e aí o "forte" do par era o modelo leve.
+
+   2. FABRICANTES DIFERENTES, obrigatoriamente. Fundir duas respostas só vale
+      quando os dois erram em lugares diferentes; dois modelos da mesma casa,
+      treinados no mesmo dado com o mesmo método, tendem a errar no MESMO lugar.
+      Nesse caso o fusor recebe a mesma alucinação duas vezes e conclui que ela
+      está confirmada — pior que uma resposta só, porque vem com confiança. */
 function fusionPair(){
-  // um forte + um rápido/barato distinto, ambos presentes no catálogo
-  const strong = state.models.find(m => /claude-opus|gpt-5\.5|claude-sonnet-5|gemini-3/.test(m.id) && !isImageModel(m))
-              || state.models.find(m => !isImageModel(m) && !isFreeModel(m));
-  const fast = state.models.find(m => /deepseek|gemini-2\.5-flash|gpt-5-mini|llama-3\.3/.test(m.id) && !isImageModel(m) && m.id !== strong?.id)
-            || state.models.find(m => !isImageModel(m) && m.id !== strong?.id);
+  const provedor = (id) => String(id).split('/')[0];
+
+  const fortes = ['claude-opus', 'gpt-5', 'gemini-3.1-pro', 'claude-sonnet', 'grok'];
+  let strong = null;
+  for (const f of fortes){ strong = melhorDaFamilia(f); if (strong) break; }
+  strong = strong || state.models.find(m => !isImageModel(m) && !isFreeModel(m));
+  if (!strong) return [];
+
+  /* O segundo é o contraponto: bom, barato e de outra casa. A ordem aqui é
+     proposital — famílias com jeito de raciocinar diferente primeiro. */
+  const contrapontos = ['deepseek', 'qwen', 'llama', 'gemini-2.5-flash', 'glm', 'mistral', 'gpt-5'];
+  let fast = null;
+  for (const f of contrapontos){
+    const m = melhorDaFamilia(f);
+    if (m && m.id !== strong.id && provedor(m.id) !== provedor(strong.id)){ fast = m; break; }
+  }
+  /* Sem nenhum de outra casa no catálogo, aceita da mesma: uma fusão correlata
+     ainda é melhor que "Preciso de ao menos 2 modelos". */
+  fast = fast || state.models.find(m => !isImageModel(m) && m.id !== strong.id);
   return [strong, fast].filter(Boolean).map(m => m.id);
 }
 async function runFusion(conv, ctrl, thinking){
@@ -63,8 +182,13 @@ async function runFusion(conv, ctrl, thinking){
 
   thinking.update('Consultando 2 modelos em paralelo…');
   // dispara as duas ao MESMO tempo
+  /* orFetchRetry, não orFetch: é o que traz o teto de tempo com repetição em
+     instabilidade e, principalmente, a queda pra modelo grátis quando o crédito
+     acaba. Com orFetch cru, ficar sem crédito derrubava o Fusion inteiro
+     ("Nenhum dos modelos respondeu") enquanto o chat normal seguia respondendo —
+     a mesma conta, dois comportamentos. */
   const calls = models.map(model =>
-    orFetch({ model, messages: msgs }, { signal: ctrl.signal })
+    orFetchRetry({ model, messages: msgs }, { signal: ctrl.signal })
       .then(r => r.ok ? r.json() : null)
       .then(d => ({ model, text: d?.choices?.[0]?.message?.content || '', usage: d?.usage }))
       .catch(() => ({ model, text: '', usage: null }))
@@ -82,7 +206,7 @@ async function runFusion(conv, ctrl, thinking){
   const lastUser = contentToText([...conv.messages].reverse().find(m => m.role==='user')?.content || '');
   const fuseSystem = `Você recebe a mesma pergunta respondida por ${valid.length} modelos de IA diferentes. Produza UMA resposta final, a melhor possível: combine os acertos de cada uma, corrija erros, elimine redundância e contradições. Responda no idioma da pergunta, direto, sem citar "modelo A/B" nem explicar que houve fusão — entregue só a resposta final.`;
   const fuseUser = `PERGUNTA:\n${lastUser}\n\n` + valid.map((r,i) => `RESPOSTA ${i+1} (${r.model}):\n${r.text}`).join('\n\n---\n\n');
-  const fr = await orFetch({ model: fuser, messages:[
+  const fr = await orFetchRetry({ model: fuser, messages:[
     { role:'system', content: fuseSystem },
     { role:'user', content: fuseUser }
   ]}, { signal: ctrl.signal });
@@ -303,6 +427,7 @@ async function runChatLoop(depth=0, convArg, modelOverride){
         if (tool){
           if (conv.id === state.currentConvId) appendMessageDOM(null, `tool: ${toolName}(${JSON.stringify(args)})`, true);
           result = await tool.exec(args);
+          if ((toolName === 'pc_action' || toolName === 'pc_file') && conv.id === state.currentConvId) appendMessageDOM(null, formatPcActionResult(result), true);
         }
         conv.messages.push({ role:'tool', tool_call_id: call.id, content: String(result) });
       }
@@ -377,27 +502,72 @@ function renderAnalytics(){
     card.innerHTML = `<div class="metric-label">${label}</div><div class="metric-val ${cls}">${val}</div>`;
     grid.appendChild(card);
   });
+  /* Segundo bloco, de outra fonte: o log de auditoria do backend. Fica separado
+     porque mede outra coisa — o que foi executado no PC, não o uso do navegador. */
+  renderServerAnalytics();
 }
 
-/* ---------- Mic (best-effort ditado) ---------- */
-function setupMic(){
-  const btn = document.getElementById('mic-btn');
+/* ---------- Mic (ditado + mãos-livres do Modo Voz) ----------
+   Um único reconhecedor compartilhado. No modo normal, o botão dita pro campo.
+   No Modo Voz mãos-livres, o resultado é enviado automaticamente (startHandsfree
+   Listen), e o loop recomeça sozinho depois que o JARVIS termina de falar
+   (maybeAutoSpeak -> onEnd -> startHandsfreeListen). */
+let _voiceRec = null;
+let _voiceRecState = { listening: false, handsfree: false };
+
+function ensureRecognizer(){
+  if (_voiceRec) return _voiceRec;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR){ btn.style.opacity = '.3'; btn.title = 'Ditado não suportado neste navegador'; return; }
+  if (!SR) return null;
   const rec = new SR();
   rec.lang = 'pt-BR';
   rec.continuous = false;
   rec.interimResults = false;
-  let listening = false;
   rec.onresult = (e) => {
     const text = e.results[0][0].transcript;
     const input = document.getElementById('chat-input');
     input.value = (input.value ? input.value + ' ' : '') + text;
+    if (_voiceRecState.handsfree){
+      _voiceRecState.handsfree = false;
+      // manda sozinho: fecha o loop "eu falo -> ele responde -> fala de volta"
+      if (input.value.trim()) sendMessage();
+    }
   };
-  rec.onend = () => { listening = false; btn.classList.remove('recording'); };
+  rec.onend = () => {
+    _voiceRecState.listening = false;
+    document.getElementById('mic-btn')?.classList.remove('recording');
+  };
+  rec.onerror = () => { _voiceRecState.listening = false; _voiceRecState.handsfree = false; };
+  _voiceRec = rec;
+  return rec;
+}
+
+function startHandsfreeListen(){
+  const rec = ensureRecognizer();
+  if (!rec || _voiceRecState.listening) return;
+  _voiceRecState.handsfree = true;
+  _voiceRecState.listening = true;
+  document.getElementById('mic-btn')?.classList.add('recording');
+  try{ rec.start(); }catch(_){ _voiceRecState.listening = false; _voiceRecState.handsfree = false; }
+}
+
+function setupMic(){
+  const btn = document.getElementById('mic-btn');
+  const rec = ensureRecognizer();
+  if (!rec){ btn.style.opacity = '.3'; btn.title = 'Ditado não suportado neste navegador'; return; }
   btn.onclick = () => {
-    if (listening){ rec.stop(); listening = false; btn.classList.remove('recording'); }
-    else { rec.start(); listening = true; btn.classList.add('recording'); }
+    if (_voiceRecState.listening){
+      _voiceRecState.handsfree = false;
+      try{ rec.stop(); }catch(_){}
+      _voiceRecState.listening = false;
+      btn.classList.remove('recording');
+    } else {
+      // clicar no mic com Modo Voz ligado = mãos-livres (auto-envia); senão, dita
+      _voiceRecState.handsfree = !!state.voiceMode;
+      _voiceRecState.listening = true;
+      btn.classList.add('recording');
+      try{ rec.start(); }catch(_){ _voiceRecState.listening = false; btn.classList.remove('recording'); }
+    }
   };
 }
 

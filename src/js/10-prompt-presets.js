@@ -76,7 +76,19 @@ function resolveRouterModel(text){
   return {tier, modelId};
 }
 function pickDefaultRouterConfig(){
-  const findBy = (subs) => state.models.find(m => subs.some(s => m.id.includes(s)) && !isImageModel(m))?.id;
+  /* Testa os padrões NA ORDEM e pega o melhor de cada família (ver
+     melhorDaFamilia, em 24-humanize.js). Antes era um `find` com `subs.some()`:
+     vencia quem aparecesse primeiro no catálogo, não o primeiro da lista. Como
+     `state.models` vem na ordem do OpenRouter, o tier "Potente" podia acabar
+     preenchido com um `gpt-4.1-nano` — o último padrão da lista, e a variante
+     mais fraca dele. */
+  const findBy = (subs) => {
+    for (const s of subs){
+      const m = melhorDaFamilia(s);
+      if (m) return m.id;
+    }
+    return undefined;
+  };
   if (!state.routerConfig.fast) state.routerConfig.fast = findBy(['flash-lite','haiku-3','gpt-4.1-nano','gemma']) || state.models.find(m=>!isImageModel(m))?.id;
   if (!state.routerConfig.balanced) state.routerConfig.balanced = findBy(['gemini-2.5-flash','deepseek-v4-flash','flash']) || state.routerConfig.fast;
   if (!state.routerConfig.power) state.routerConfig.power = findBy(['claude-sonnet','claude-opus','gpt-5','gpt-4.1']) || state.routerConfig.balanced;
@@ -95,6 +107,25 @@ function populateRouterSelects(){
     });
     sel.onchange = () => { state.routerConfig[tier] = sel.value; localStorage.setItem('vtz_router_config', JSON.stringify(state.routerConfig)); };
   });
+  setupRouterVies();
+}
+
+/* O viés é uma frase no prompt do classificador, e é a diferença entre gastar o
+   crédito do mês e não gastar nada. Por isso fica aqui, com o efeito escrito
+   embaixo — e não escondido numa constante do código. */
+function setupRouterVies(){
+  const sel = document.getElementById('router-vies-select');
+  const msg = document.getElementById('router-vies-msg');
+  if (!sel) return;
+  const explica = () => { if (msg) msg.textContent = viesDoRoteador(); };
+  sel.value = state.routerVies;
+  explica();
+  sel.onchange = () => {
+    state.routerVies = sel.value;
+    localStorage.setItem('vtz_router_vies', sel.value);
+    explica();
+    toast('Roteamento automático: ' + sel.options[sel.selectedIndex].text.split('—')[0].trim() + '.');
+  };
 }
 
 /* ---------- Tool registry ---------- */
@@ -124,6 +155,108 @@ if (isVtzOS) {
     def:{ type:'function', function:{ name:'browse_web', description:'Navega e extrai conteúdo de uma URL via backend', parameters:{ type:'object', properties:{ url:{type:'string'} }, required:['url'] } } },
     exec: async (args) => await window.pywebview.api.execute_tool('browse_web', args)
   };
+}
+
+/* Agente Local (servidor/docs/SEGURANCA-AGENTE-LOCAL.md): o backend só encaminha
+   (Seção 0); quem decide o tier e executa é o agente, na máquina do usuário.
+   Duas tools — pc_action (comando de sistema) e pc_file (arquivo estruturado).
+   Ambas passam pelo mesmo gate de 4 camadas no PC: leitura/escrita nas pastas
+   permitidas roda sozinho; fora do padrão pede confirmação nativa lá (pode
+   demorar); destrutivo é bloqueado. */
+
+/* Acha um agente online e manda uma ação; devolve {agent, data} ou uma string
+   de erro/aviso legível pro modelo repassar ao usuário. */
+async function callAgentAction(action, actionArgs){
+  if (!backendUrl()) return 'Erro: backend não encontrado, não dá pra acionar o Agente Local.';
+  try{
+    const agentsRes = await fetch(backendUrl() + '/api/agents', { headers: backendHeaders() }).then(okJson);
+    const agent = (agentsRes.agents || []).find(a => a.online && !a.revoked);
+    if (!agent) return 'Nenhum Agente Local pareado e online agora. Peça pro usuário parear/abrir o Agente Local em Configurações > Agente Local.';
+    const r = await fetch(backendUrl() + `/api/agents/${encodeURIComponent(agent.agent_id)}/command`, {
+      method:'POST', headers: backendHeaders({ 'Content-Type':'application/json' }),
+      body: JSON.stringify({ action, args: actionArgs, timeout:90 }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: 'Erro ao acionar o Agente Local: ' + (d.detail || ('HTTP ' + r.status)) };
+    if (!d.ok) return { error: 'Ação recusada/negada pelo Agente Local: ' + (d.data?.error || 'sem detalhe'), agent: agent.name };
+    return { agent: agent.name, data: d.data || {} };
+  }catch(e){ return 'Erro ao acionar o Agente Local: ' + e.message; }
+}
+
+TOOLS.pc_action = {
+  def:{
+    type:'function',
+    function:{
+      name:'pc_action',
+      description:'Executa um COMANDO DE SISTEMA no PC do usuário via Agente Local pareado (ex.: git, npm, listar processos). Para ler/escrever/criar/apagar arquivo ou pasta, prefira pc_file. O comando passa por allowlist no PC; fora do padrão pede confirmação nativa lá (pode demorar). Só funciona com um Agente Local pareado e online — se der erro dizendo isso, avise o usuário para abrir/parear o Agente Local em Configurações.',
+      parameters:{
+        type:'object',
+        properties:{
+          command:{ type:'string', description:'Comando exato, ex.: "git status", "npm run build".' },
+        },
+        required:['command'],
+      },
+    },
+  },
+  exec: async (args) => {
+    const res = await callAgentAction('run', { command: String(args.command || '') });
+    if (typeof res === 'string') return res;
+    if (res.error) return res.error;
+    const stdout = String(res.data.stdout || '').trim().slice(0, 3000);
+    const stderr = String(res.data.stderr || '').trim().slice(0, 1000);
+    return JSON.stringify({ agent: res.agent, stdout, stderr });
+  }
+};
+
+TOOLS.pc_file = {
+  def:{
+    type:'function',
+    function:{
+      name:'pc_file',
+      description:'Lê, escreve, lista, cria ou apaga ARQUIVO/PASTA no PC do usuário via Agente Local pareado. Fica restrito às pastas que o usuário permitiu (ex.: Downloads); fora delas ou em arquivos sensíveis, o PC pede confirmação nativa (pode demorar). Apagar pasta sempre pede confirmação. Só funciona com um Agente Local pareado e online.',
+      parameters:{
+        type:'object',
+        properties:{
+          op:{ type:'string', enum:['read','list','write','mkdir','delete'], description:'read=ler arquivo, list=listar pasta, write=escrever/criar arquivo, mkdir=criar pasta, delete=apagar.' },
+          path:{ type:'string', description:'Caminho do arquivo ou pasta, ex.: "C:\\\\Users\\\\nome\\\\Downloads\\\\nota.txt".' },
+          content:{ type:'string', description:'Conteúdo a escrever (só para op="write").' },
+        },
+        required:['op','path'],
+      },
+    },
+  },
+  exec: async (args) => {
+    const op = String(args.op || '');
+    const actionArgs = { path: String(args.path || '') };
+    if (op === 'write') actionArgs.content = String(args.content ?? '');
+    const res = await callAgentAction('fs_' + op, actionArgs);
+    if (typeof res === 'string') return res;
+    if (res.error) return res.error;
+    const out = String(res.data.stdout || '').slice(0, 3000);
+    const meta = res.data.truncated ? ' (conteúdo truncado)' : '';
+    return JSON.stringify({ agent: res.agent, op, result: out + meta });
+  }
+};
+
+/* Formata o resultado cru de pc_action/pc_file (JSON) como markdown legível,
+   pra mostrar no chat antes da resposta do modelo. */
+function formatPcActionResult(result){
+  try{
+    const d = JSON.parse(result);
+    if (d && typeof d === 'object' && ('stdout' in d || 'stderr' in d)){
+      const parts = [`**Agente Local** (${esc(d.agent || '?')}) executou:`];
+      if (d.stdout) parts.push('```\n' + d.stdout + '\n```');
+      if (d.stderr) parts.push('_stderr:_\n```\n' + d.stderr + '\n```');
+      if (!d.stdout && !d.stderr) parts.push('_(sem saída)_');
+      return parts.join('\n');
+    }
+    if (d && typeof d === 'object' && 'op' in d && 'result' in d){
+      const parts = [`**Agente Local** (${esc(d.agent || '?')}) — \`${esc(d.op)}\`:`];
+      parts.push('```\n' + String(d.result || '(sem saída)') + '\n```');
+      return parts.join('\n');
+    }
+  }catch(e){ /* não é JSON -> é mensagem de erro/aviso simples, mostra cru */ }
+  return String(result);
 }
 
 /* ---------- Provider badges ---------- */
@@ -230,10 +363,22 @@ function applyTheme(theme){
   const iconEl = document.getElementById('theme-icon');
   if (iconEl) iconEl.innerHTML = iconHTML(theme === 'dark' ? 'sun' : 'moon');
 }
-function toggleTheme(){ applyTheme(state.theme === 'dark' ? 'light' : 'dark'); }
+function toggleTheme(){
+  applyTheme(state.theme === 'dark' ? 'light' : 'dark');
+  if (typeof renderTemaGrid === 'function') renderTemaGrid();
+}
 
 /* ---------- Init ---------- */
 document.addEventListener('DOMContentLoaded', () => {
+  // Rodando dentro do app Electron: herda a URL do backend que foi usada no
+  // pareamento (injetada pelo preload). Sem isto, o painel não sabia qual
+  // backend usar e a aba "Agente Local" ficava vazia mesmo com o agente
+  // pareado. Só adota se ainda não há backend configurado neste painel.
+  if (window.jarvisDesktop?.backendUrl && !state.backendUrl){
+    state.backendUrl = String(window.jarvisDesktop.backendUrl).replace(/\/+$/, '');
+    localStorage.setItem('vtz_backend_url', state.backendUrl);
+  }
+
   document.getElementById('env-detail').textContent = isVtzOS
     ? 'Rodando dentro do VTZ OS — tools pesadas disponíveis (execute_code, browse_web).'
     : 'Rodando como site standalone — apenas tools leves disponíveis.';
@@ -363,16 +508,30 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('chat-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
-  document.getElementById('tools-toggle').addEventListener('change', (e) => {
-    state.toolsEnabled = e.target.checked;
-    document.getElementById('tools-status').textContent = state.toolsEnabled ? `${Object.keys(TOOLS).length} tools ativas` : '';
+  /* Pinta a tela a partir do estado, em vez de só reagir ao clique — é o que
+     faz a escolha guardada aparecer no boot em vez de ficar num estado só na
+     memória, com o interruptor mostrando o contrário do que vale. */
+  const pintaTools = () => {
+    document.getElementById('tools-toggle').checked = state.toolsEnabled;
+    document.getElementById('tools-status').textContent =
+      state.toolsEnabled ? `${Object.keys(TOOLS).length} tools ativas` : '';
     document.getElementById('tp-tools').classList.toggle('active', state.toolsEnabled);
     updateToolsTrigger();
+  };
+  document.getElementById('tools-toggle').addEventListener('change', (e) => {
+    state.toolsEnabled = e.target.checked;
+    localStorage.setItem('vtz_tools', state.toolsEnabled ? '1' : '0');
+    pintaTools();
   });
+  pintaTools();
   setupToolsPopover();
 
   // mic (best-effort, Web Speech API)
   setupMic();
+
+  // Modo Voz (JARVIS fala/ouve) — config + cumprimento ao abrir
+  setupVoiceConfig();
+  if (state.voiceMode) speakGreeting();
 
   // config
   document.getElementById('save-key-btn').onclick = () => saveApiKey(document.getElementById('api-key-input').value.trim());
@@ -504,6 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.backendUrl = beInput.value.trim().replace(/\/+$/, '');
     localStorage.setItem('vtz_backend_url', state.backendUrl);
     updateAgentBtnVisibility();
+    if (state.backendUrl){ _memSynced = false; syncMemoryWithBackend(); } // fonte única: sincroniza a memória (Seção 7)
     toast(state.backendUrl ? 'Backend salvo.' : 'Backend removido (volta ao modo local).');
   });
   const beTokenInput = document.getElementById('backend-token-input');
@@ -511,10 +671,21 @@ document.addEventListener('DOMContentLoaded', () => {
   beTokenInput.addEventListener('change', () => {
     state.backendToken = beTokenInput.value.trim();
     localStorage.setItem('vtz_backend_token', state.backendToken);
+    if (state.backendUrl){ _memSynced = false; syncMemoryWithBackend(); } // token novo pode destravar a memória (Seção 7)
     toast(state.backendToken ? 'Token salvo.' : 'Token removido.');
   });
   document.getElementById('backend-test-btn').onclick = testBackend;
   setupConfigNav();
+  setupVoiceConfig();   // aba Voz (Seção 14) — o estado do PC é buscado ao abrir a aba
+  setupJarvis();        // cena JARVIS (Seção 6) — WebGL só liga quando a cena abre
+  setupBackendBridge(); // analytics/backup/memória do servidor
+  setupTemas();         // base clara/escura + cor de destaque
+  setupConversasSync(); // espelho das conversas + backup automático do servidor
+  setupQrCelular();     // atalho pra abrir este painel no celular
+  setupPwa();           // instalar como aplicativo / abrir offline
+  setupAcordaBackend(); // cutuca o backend pra ele não hibernar durante a sessão
+  setupDocumentos();    // documentos indexados: busca por significado no chat
+  setupGoogleAcoes();   // enviar e-mail / agenda + aviso de escopo desatualizado
   setupAccountMenu();
   autoDetectBackend();  // procura o backend local em segundo plano
   document.getElementById('goto-skills-btn').onclick = () => { switchView('skills'); toggleSidebar(false); };
@@ -531,6 +702,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pair-code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); confirmPairing(); } });
   document.getElementById('agents-refresh-btn').onclick = refreshAgentsList;
   document.getElementById('audit-refresh-btn').onclick = refreshAuditList;
+  document.getElementById('audit-verify-btn').onclick = verifyAuditChain;
   document.getElementById('agent-modal').addEventListener('click', (e) => { if (e.target.id === 'agent-modal') closeAgentModal(); });
 
   // busca no histórico (debounced)
@@ -552,14 +724,31 @@ document.addEventListener('DOMContentLoaded', () => {
   // diagnóstico + toggle de streaming
   const focusSel = document.getElementById('search-focus');
   focusSel.value = state.searchFocus || '';
-  document.getElementById('web-toggle').addEventListener('change', (e) => {
-    state.webSearch = e.target.checked;
+  /* Pinta a partir do estado (e não só ao clicar): é o que faz a escolha
+     guardada aparecer no boot, em vez de o interruptor mostrar o contrário do
+     que vale.
+
+     O AVISO DE CUSTO SAI TODA VEZ QUE ELA LIGA — inclusive quando quem ligou
+     foi a sessão passada. Lembrar a escolha é conveniência; lembrar em silêncio
+     que ela cobra ~US$0,02 por mensagem seria gastar sem avisar. */
+  const pintaWeb = (avisaCusto) => {
+    const t = document.getElementById('web-toggle');
+    t.checked = state.webSearch;
     focusSel.style.display = state.webSearch ? 'block' : 'none';
     document.getElementById('tp-web').classList.toggle('active', state.webSearch);
     updateToolsTrigger();
-    if (state.webSearch) toast('Busca web ativada — o modelo pesquisa a internet antes de responder (~US$0,02/msg, fora do contador de tokens).');
-    else toast('Busca web desativada.');
+    if (avisaCusto && state.webSearch){
+      toast('Busca web ligada — o modelo pesquisa a internet antes de responder ' +
+            '(~US$0,02/msg, fora do contador de tokens).', 'warn');
+    }
+  };
+  document.getElementById('web-toggle').addEventListener('change', () => {
+    state.webSearch = document.getElementById('web-toggle').checked;
+    localStorage.setItem('vtz_web_search', state.webSearch ? '1' : '0');
+    pintaWeb(true);
+    if (!state.webSearch) toast('Busca web desligada.');
   });
+  pintaWeb(true);
   focusSel.addEventListener('change', () => {
     state.searchFocus = focusSel.value;
     localStorage.setItem('vtz_search_focus', state.searchFocus);
@@ -631,6 +820,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('import-backup-file').addEventListener('change', (e) => {
     if (e.target.files[0]) importBackup(e.target.files[0]);
   });
+
+  // Se já havia um backend salvo, sincroniza a memória com ele na abertura
+  // (fonte única — Seção 7). autoDetectBackend só roda quando NÃO há URL salva,
+  // então este é o gatilho pro caso de URL já configurada (ex.: Render).
+  if (state.backendUrl) syncMemoryWithBackend();
 });
 
 /* ---------- View / sidebar switching ---------- */

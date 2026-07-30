@@ -163,6 +163,26 @@ async function refreshAuditList(){
   }catch(e){ box.innerHTML = '<p class="hint">Falha ao carregar: ' + esc(e.message) + '</p>'; }
 }
 
+/* Verifica a cadeia de hash da auditoria no backend (Seção 13.1). Detecta se
+   alguma linha do log foi adulterada, reordenada ou apagada. */
+async function verifyAuditChain(){
+  const status = document.getElementById('audit-verify-status');
+  if (!status) return;
+  if (!backendUrl()){ status.textContent = 'Backend não encontrado.'; return; }
+  status.textContent = 'Verificando…';
+  status.style.color = '';
+  try{
+    const d = await fetch(backendUrl() + '/api/audit/verify', { headers: backendHeaders() }).then(okJson);
+    if (d.ok){
+      status.textContent = `Íntegra ✓ (${d.chained} registro(s) encadeado(s)${d.legacy ? `, ${d.legacy} antigo(s)` : ''})`;
+      status.style.color = 'var(--good, #2db4aa)';
+    }else{
+      status.textContent = `ADULTERADA ✗ — quebra no registro #${d.broken_at}`;
+      status.style.color = 'var(--danger, #e5484d)';
+    }
+  }catch(e){ status.textContent = 'Falha ao verificar: ' + e.message; status.style.color = 'var(--danger, #e5484d)'; }
+}
+
 function renderAuditRow(e){
   const row = document.createElement('div');
   row.className = 'audit-row';

@@ -174,6 +174,9 @@ function selectConversation(id){
   toggleSidebar(false);
 }
 function deleteConversation(id){
+  /* Lápide antes de remover: sem registrar que ESTA conversa foi apagada aqui,
+     o outro dispositivo reenviaria a versão dele e ela voltaria do nada. */
+  if (typeof registraLapide === 'function') registraLapide(id);
   state.conversations = state.conversations.filter(c => c.id !== id);
   if (state.currentConvId === id){
     state.currentConvId = state.conversations[0]?.id || null;

@@ -1,0 +1,15 @@
+# Blueprint do Render para o painel (site estático).
+# No Render: New > Blueprint > aponta pro repo, ele lê isto.
+#
+# A URL do backend NÃO vai aqui: o painel guarda ela no navegador
+# (Configurações > Backend VTz OS). Cada pessoa aponta pro backend dela.
+services:
+  - type: web
+    name: vtz-painel
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: .
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
