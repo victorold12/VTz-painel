@@ -98,7 +98,13 @@ const state = {
   currentConvId: localStorage.getItem('vtz_current_conv') || null,
   totalCost: parseFloat(localStorage.getItem('vtz_or_cost') || '0'),
   imageModels: [],
-  toolsEnabled: false,
+  /* Lembrado entre sessões. Antes nascia sempre desligado, e isso escondia
+     funcionalidade: as ferramentas (buscar nos seus documentos, agir no PC) só
+     existem com ele ligado, então quem ligava uma vez encontrava tudo desligado
+     de novo no dia seguinte — sem aviso, e com o sintoma "ele esqueceu o que
+     estava nos meus arquivos". Desligado continua sendo o padrão de quem nunca
+     mexeu: ferramenta custa tokens e não se liga por conta própria. */
+  toolsEnabled: localStorage.getItem('vtz_tools') === '1',
   pickerTab: 'all',
   routerConfig: JSON.parse(localStorage.getItem('vtz_router_config') || 'null') || {fast:'', balanced:'', power:''},
   /* Como o roteador automático decide entre qualidade e preço. Padrão

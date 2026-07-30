@@ -508,12 +508,22 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('chat-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
-  document.getElementById('tools-toggle').addEventListener('change', (e) => {
-    state.toolsEnabled = e.target.checked;
-    document.getElementById('tools-status').textContent = state.toolsEnabled ? `${Object.keys(TOOLS).length} tools ativas` : '';
+  /* Pinta a tela a partir do estado, em vez de só reagir ao clique — é o que
+     faz a escolha guardada aparecer no boot em vez de ficar num estado só na
+     memória, com o interruptor mostrando o contrário do que vale. */
+  const pintaTools = () => {
+    document.getElementById('tools-toggle').checked = state.toolsEnabled;
+    document.getElementById('tools-status').textContent =
+      state.toolsEnabled ? `${Object.keys(TOOLS).length} tools ativas` : '';
     document.getElementById('tp-tools').classList.toggle('active', state.toolsEnabled);
     updateToolsTrigger();
+  };
+  document.getElementById('tools-toggle').addEventListener('change', (e) => {
+    state.toolsEnabled = e.target.checked;
+    localStorage.setItem('vtz_tools', state.toolsEnabled ? '1' : '0');
+    pintaTools();
   });
+  pintaTools();
   setupToolsPopover();
 
   // mic (best-effort, Web Speech API)
@@ -674,6 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupQrCelular();     // atalho pra abrir este painel no celular
   setupPwa();           // instalar como aplicativo / abrir offline
   setupAcordaBackend(); // cutuca o backend pra ele não hibernar durante a sessão
+  setupDocumentos();    // documentos indexados: busca por significado no chat
   setupAccountMenu();
   autoDetectBackend();  // procura o backend local em segundo plano
   document.getElementById('goto-skills-btn').onclick = () => { switchView('skills'); toggleSidebar(false); };

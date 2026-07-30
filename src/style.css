@@ -1409,6 +1409,19 @@ body[data-jstate="delivering"] .j-deliver>*:nth-child(6){animation-delay:.45s}
    se a cor for a mesma do aviso comum, ninguém lê. */
 .ab-aviso.perigo{color:var(--danger,#f87171);border-left:2px solid var(--danger,#f87171);
   padding-left:9px;border-radius:0 0 0 2px}
+/* Lista de documentos indexados. Nome à esquerda, tamanho no meio, remover na
+   ponta — a coluna do meio encolhe primeiro porque é a menos importante das
+   três num telefone. */
+.doc-lista{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.doc-item{display:flex;align-items:center;gap:10px;padding:7px 10px;
+  background:var(--input-bg);border:1px solid var(--line);border-radius:9px;font-size:12.5px}
+.doc-nome{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-item i{font-style:normal;color:var(--text-dim);font-size:11px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.doc-del{flex:none;background:none;border:none;color:var(--text-faint);cursor:pointer;
+  padding:2px 6px;border-radius:6px;line-height:1}
+.doc-del:hover{color:var(--danger);background:var(--layer-1,rgba(139,92,246,.12))}
+
 .ab-lista{display:flex;flex-direction:column;gap:5px;margin-top:10px}
 .ab-item{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11.5px;
   color:var(--text-dim);text-decoration:none;padding:6px 9px;border-radius:8px;

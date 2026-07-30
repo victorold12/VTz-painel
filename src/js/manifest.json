@@ -36,5 +36,6 @@
   "34-conversas-sync.js",
   "35-qr-celular.js",
   "36-pwa.js",
-  "37-acorda-backend.js"
+  "37-acorda-backend.js",
+  "38-documentos.js"
 ]
