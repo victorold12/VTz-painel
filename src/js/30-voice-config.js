@@ -292,6 +292,10 @@ function setupVoiceConfig(){
   const up = document.getElementById('voz-upload');
   if (!up) return;
   setupEscuta();
+  /* Antes do `return` por falta de agente pareado, de propósito: baixar o
+     instalador é justamente o que você faz ANTES de ter os motores de pé, e
+     exigir PC pareado pra isso seria pedir o resultado como pré-requisito. */
+  setupInstaladoresVoz();
 
   up.onclick = () => document.getElementById('voz-file').click();
 
@@ -491,4 +495,183 @@ function ligaWakePolling(){
   /* 2s é o intervalo: a fila do backend guarda por 2 min, então nada se perde,
      e é leve o suficiente pra não pesar no app. */
   _wakeTimer = setInterval(() => { if (_escutaState.running) puxaWake(); }, 2000);
+}
+
+/* ============================================================
+   INSTALADOR DOS MOTORES DE VOZ (.bat)
+
+   O PROBLEMA: a tela dizia "o Chatterbox não está rodando na porta 8004" e
+   mandava a pessoa pro GitHub. Entre ler o README de um projeto Python e ter
+   voz clonada funcionando existem seis passos que ninguém faz por diversão — e
+   o resultado prático era a voz local nunca sair do papel.
+
+   POR QUE UM .bat E NÃO EXECUTAR PELO AGENTE LOCAL: instalar programa é a coisa
+   mais invasiva que existe neste app. O Agente Local tem o gate de 4 níveis
+   justamente pra impedir que um clique (ou um modelo) mande instalar coisa na
+   sua máquina. Baixar um arquivo que VOCÊ abre, lê e roda mantém a decisão com
+   você, e deixa visível exatamente o que vai acontecer. É também o formato que
+   este projeto já usa pra Windows (deploy.bat, rollback.bat).
+
+   O QUE O SCRIPT NÃO INVENTA: os comandos vêm do padrão que os dois
+   repositórios usam — clonar, criar venv, `pip install -r requirements.txt`.
+   Onde a instalação depende da máquina (placa de vídeo, versão do torch), o
+   script NÃO adivinha: ele para e manda ler o README, em vez de instalar a
+   variante errada e falhar meia hora depois no primeiro áudio.
+   ============================================================ */
+const VOZ_INSTALADORES = {
+  chatterbox: {
+    nome: 'Chatterbox',
+    repo: 'https://github.com/devnen/Chatterbox-TTS-Server',
+    pasta: 'Chatterbox-TTS-Server',
+    porta: 8004,
+    peso: '~2 GB de modelo na primeira execução',
+    aviso: 'Funciona sem placa de vídeo, mas fica lento. Com placa NVIDIA, ' +
+           'instale o torch com CUDA seguindo o README do repositório.',
+  },
+  kokoro: {
+    nome: 'Kokoro',
+    repo: 'https://github.com/remsky/Kokoro-FastAPI',
+    pasta: 'Kokoro-FastAPI',
+    porta: 8880,
+    peso: '~350 MB de modelo',
+    aviso: 'Roda bem só com processador. Não clona a sua voz — usa vozes prontas.',
+  },
+};
+
+function scriptInstaladorVoz(id){
+  const m = VOZ_INSTALADORES[id];
+  if (!m) return null;
+  /* CRLF: .bat com quebra de linha do Unix roda torto no cmd do Windows —
+     algumas linhas simplesmente não executam, e sem erro. */
+  const L = [
+    '@echo off',
+    'chcp 65001 >nul',
+    'setlocal',
+    'title Instalar ' + m.nome + ' - voz do JARVIS',
+    'echo.',
+    'echo ===============================================',
+    'echo  ' + m.nome + ' - servidor de voz local do JARVIS',
+    'echo ===============================================',
+    'echo.',
+    'echo  Este script vai:',
+    'echo    1. conferir se Python e Git estao instalados',
+    'echo    2. clonar ' + m.repo,
+    'echo    3. criar um ambiente virtual isolado (venv)',
+    'echo    4. instalar as dependencias do projeto',
+    'echo.',
+    'echo  Download: ' + m.peso.replace(/~/g, 'aprox. '),
+    'echo  Porta que o JARVIS espera: ' + m.porta,
+    'echo.',
+    'echo  ' + m.aviso.replace(/[.]$/, ''),
+    'echo.',
+    'pause',
+    'echo.',
+    '',
+    'REM --- pre-requisitos. Falhar aqui, dizendo o que falta, vale mais que',
+    'REM     falhar tres minutos adiante com um erro de compilador. ---',
+    'where git >nul 2>nul',
+    'if errorlevel 1 (',
+    '  echo [FALTA] Git nao encontrado. Instale em https://git-scm.com e rode de novo.',
+    '  pause & exit /b 1',
+    ')',
+    'where python >nul 2>nul',
+    'if errorlevel 1 (',
+    '  echo [FALTA] Python nao encontrado. Instale 3.11 ou superior em',
+    '  echo         https://python.org  ^(marque "Add python.exe to PATH" no instalador^)',
+    '  pause & exit /b 1',
+    ')',
+    'echo [ok] Git e Python encontrados.',
+    'python --version',
+    'echo.',
+    '',
+    'REM --- clona ao lado deste .bat, nao no disco todo ---',
+    'cd /d "%~dp0"',
+    'if exist "' + m.pasta + '" (',
+    '  echo [ja existe] Pasta ' + m.pasta + ' encontrada. Atualizando...',
+    '  cd "' + m.pasta + '"',
+    '  git pull || echo [aviso] git pull falhou; seguindo com o que ja esta aqui.',
+    ') else (',
+    '  echo Clonando ' + m.repo + ' ...',
+    '  git clone --depth 1 ' + m.repo + ' "' + m.pasta + '" || (',
+    '    echo [ERRO] Nao consegui clonar. Sem internet, ou o repositorio mudou de endereco.',
+    '    pause & exit /b 1',
+    '  )',
+    '  cd "' + m.pasta + '"',
+    ')',
+    'echo.',
+    '',
+    'REM --- venv: as dependencias ficam NESTA pasta, nao no Python do sistema.',
+    'REM     Desinstalar = apagar a pasta. ---',
+    'if not exist ".venv" (',
+    '  echo Criando ambiente virtual...',
+    '  python -m venv .venv || ( echo [ERRO] Falha ao criar o venv. & pause & exit /b 1 )',
+    ')',
+    'call ".venv\\Scripts\\activate.bat"',
+    'python -m pip install --upgrade pip',
+    'echo.',
+    '',
+    'if not exist "requirements.txt" (',
+    '  echo [ATENCAO] Este repositorio nao tem requirements.txt no formato esperado.',
+    '  echo           O projeto pode ter mudado a forma de instalar.',
+    '  echo           Abra o README em ' + m.repo + ' e siga de la.',
+    '  pause & exit /b 1',
+    ')',
+    'echo Instalando dependencias ^(demora; o download grande e aqui^)...',
+    'pip install -r requirements.txt || (',
+    '  echo.',
+    '  echo [ERRO] A instalacao falhou.',
+    '  echo   Causa comum: a versao do torch depende da sua placa de video.',
+    '  echo   Abra o README em ' + m.repo,
+    '  echo   e siga a secao de instalacao para a SUA maquina.',
+    '  pause & exit /b 1',
+    ')',
+    'echo.',
+    'echo ===============================================',
+    'echo  Instalado em: %CD%',
+    'echo ===============================================',
+    'echo.',
+    'echo  Para LIGAR o servidor, rode nesta pasta:',
+    'echo      .venv\\Scripts\\activate.bat',
+    'echo      python server.py',
+    'echo  ^(se o README indicar outro comando, use o dele^)',
+    'echo.',
+    'echo  Na primeira vez ele baixa o modelo - ' + m.peso.replace(/~/g, 'aprox. ') + '.',
+    'echo  Deixe terminar antes de testar a voz no JARVIS.',
+    'echo.',
+    'echo  Depois, no app: Configuracoes ^> Voz ^> escolha ' + m.nome + ' ^> Salvar.',
+    'echo  O JARVIS procura na porta ' + m.porta + ' deste PC.',
+    'echo.',
+    'pause',
+  ];
+  return L.join('\r\n') + '\r\n';
+}
+
+function baixaInstaladorVoz(id){
+  const m = VOZ_INSTALADORES[id];
+  const txt = scriptInstaladorVoz(id);
+  const msg = document.getElementById('voz-inst-msg');
+  if (!txt){ if (msg){ msg.textContent = 'Motor desconhecido.'; msg.className = 'hint erro'; } return; }
+  try{
+    const nome = 'instalar-' + id + '.bat';
+    const url = URL.createObjectURL(new Blob([txt], { type: 'application/octet-stream' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = nome;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    if (msg){
+      msg.innerHTML = '<b>' + esc(nome) + '</b> baixado. Coloque numa pasta onde você queira ' +
+        'que o ' + esc(m.nome) + ' viva (ele instala ao lado do arquivo), <b>abra no Bloco de ' +
+        'Notas pra ver o que faz</b>, e então rode com duplo clique.';
+      msg.className = 'hint ok';
+    }
+  }catch(e){
+    if (msg){ msg.textContent = 'Não consegui gerar o arquivo: ' + e.message; msg.className = 'hint erro'; }
+  }
+}
+
+function setupInstaladoresVoz(){
+  const c = document.getElementById('voz-inst-chatterbox');
+  if (c) c.onclick = () => baixaInstaladorVoz('chatterbox');
+  const k = document.getElementById('voz-inst-kokoro');
+  if (k) k.onclick = () => baixaInstaladorVoz('kokoro');
 }

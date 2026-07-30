@@ -1436,3 +1436,10 @@ body[data-jstate="delivering"] .j-deliver>*:nth-child(6){animation-delay:.45s}
 /* O aviso do token não pode parecer nota de rodapé: quem fotografar a tela
    entra no servidor. */
 .qr-celular .hint.aviso{border-left:3px solid var(--bad,#ff6b6b);padding-left:10px;margin-top:8px}
+
+/* Instalador dos motores de voz. Fica FORA do bloco que some sem PC pareado:
+   baixar o instalador é o que se faz antes de ter os motores de pé. */
+.voz-instalar{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:14px 0;
+  background:var(--input-bg)}
+.voz-instalar h4{margin-top:0}
+.voz-instalar button{margin-right:8px;margin-bottom:6px}

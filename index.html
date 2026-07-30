@@ -412,6 +412,14 @@
         <h3>Voz do JARVIS</h3>
         <p class="hint" style="margin-bottom:12px;">A voz roda no <b>seu PC</b>, pelo Agente Local: <b>Chatterbox</b> clona a sua voz a partir de uma amostra, <b>Kokoro</b> tem vozes prontas e é o fallback, e o <b>navegador</b> sempre funciona. Nada de áudio é guardado no servidor.</p>
 
+        <div id="voz-instalar" class="voz-instalar">
+          <h4 style="margin:14px 0 8px;">Instalar os motores no seu PC</h4>
+          <p class="hint" style="margin-bottom:9px;">Chatterbox e Kokoro são servidores Python que rodam <b>na sua máquina</b> — não vêm no instalador de propósito (juntos passam de 3&nbsp;GB, contra 115&nbsp;MB do app inteiro). Os botões abaixo baixam um <code>.bat</code> que confere Python e Git, clona o repositório, cria um ambiente isolado e instala as dependências. <b>Abra no Bloco de Notas e leia antes de rodar</b> — ele mexe no seu PC, e você tem que ver o que vai acontecer.</p>
+          <button id="voz-inst-chatterbox">Baixar instalador do Chatterbox</button>
+          <button id="voz-inst-kokoro">Baixar instalador do Kokoro</button>
+          <p class="hint" id="voz-inst-msg" style="margin-top:8px;"></p>
+        </div>
+
         <p class="hint" id="voz-indisponivel" hidden></p>
 
         <div id="voz-body" hidden>
