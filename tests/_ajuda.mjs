@@ -116,6 +116,34 @@ export async function voltaProChat(p){
   await p.waitForTimeout(600);
 }
 
+/* Confere que a porta está LIVRE antes de o teste subir algo nela.
+ *
+ * POR QUE ISTO EXISTE: um teste que derruba e religa um backend deixa processo
+ * órfão se for interrompido no meio. Na execução seguinte, o backend novo não
+ * consegue abrir a porta, mas o teste faz a chamada de saúde e recebe "ok" — do
+ * processo VELHO, que continua lá com o banco antigo. A partir daí o teste
+ * conversa com um servidor que não é o dele e falha dizendo qualquer outra
+ * coisa: "o servidor deveria estar vazio e não está". Já custou meia hora.
+ *
+ * Falhar aqui, dizendo o nome do problema, vale mais que qualquer diagnóstico
+ * depois.
+ */
+export async function exigePortaLivre(porta){
+  const ocupada = await new Promise(ok => {
+    const s = http.createServer();
+    s.once('error', () => ok(true));
+    s.once('listening', () => s.close(() => ok(false)));
+    s.listen(porta, '127.0.0.1');
+  });
+  if (ocupada){
+    throw new Error(
+      `A porta ${porta} já está ocupada. Provavelmente sobrou um servidor de uma ` +
+      `execução anterior interrompida. Derrube com:\n` +
+      `  pkill -f "uvicorn app.main:app --port ${porta}"\n` +
+      `Seguir daqui faria o teste conversar com o servidor errado.`);
+  }
+}
+
 /** Placar simples; cada teste imprime as próprias linhas. */
 export function placar(){
   const falhas = [];

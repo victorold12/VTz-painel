@@ -6,10 +6,10 @@
    (~US$0,02 por mensagem, cobrado pelo OpenRouter fora do contador daqui).
    Lembrar a escolha é conveniência. Lembrar em silêncio que ela cobra seria
    gastar sem avisar — e o sintoma seria uma fatura maior sem nada na tela. */
-import { chromium } from 'playwright';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { abreNavegador } from './_ajuda.mjs';
 
 import { fileURLToPath } from 'node:url';
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -32,8 +32,7 @@ const srv = http.createServer((req, res) => {
 });
 await new Promise(r => srv.listen(8198, '127.0.0.1', r));
 
-const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-  headless:true, args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-proxy-server'] });
+const b = await abreNavegador();
 const ctx = await b.newContext({ viewport:{width:1200,height:840}, reducedMotion:'reduce' });
 await ctx.route('**/openrouter.ai/api/v1/models*', rota => rota.fulfill({ status:200,
   contentType:'application/json', body: JSON.stringify({ data:[

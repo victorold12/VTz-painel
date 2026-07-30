@@ -12,7 +12,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import {
   servePainel, abreNavegador, novoContexto, fingeCatalogo, gravaAvisos, avisos,
-  abreConfig, placar, achaServidor,
+  abreConfig, placar, achaServidor, exigePortaLivre,
 } from './_ajuda.mjs';
 
 const SERVIDOR = achaServidor();
@@ -31,6 +31,7 @@ const ARQ = path.join(TMP, 'cofre-teste.txt');
 fs.writeFileSync(ARQ, 'Notas do escritorio.\n\n' + SEGREDO +
   '\n\nA chave reserva fica com a Dona Ana.\n');
 
+for (const porta of [8194, 8195]) await exigePortaLivre(porta);
 const estatico = await servePainel(8194);
 
 let uvicorn = null;

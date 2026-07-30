@@ -17,7 +17,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import {
   servePainel, abreNavegador, novoContexto, fingeCatalogo,
-  abreConfig, voltaProChat, placar, achaServidor,
+  abreConfig, voltaProChat, placar, achaServidor, exigePortaLivre,
 } from './_ajuda.mjs';
 
 const SERVIDOR = achaServidor();
@@ -36,6 +36,7 @@ const ARQ = path.join(TMP, 'anotacoes-teste.txt');
 fs.writeFileSync(ARQ, 'Anotacoes da chacara.\n\nA cerca foi trocada em marco.\n\n' +
   SEGREDO + '\n\nO caseiro se chama Nilton e trabalha as tercas.\n');
 
+for (const porta of [8192, 8193]) await exigePortaLivre(porta);
 const estatico = await servePainel(8192);
 
 const uvicorn = spawn('python3', ['-m', 'uvicorn', 'app.main:app', '--port', '8193', '--host', '127.0.0.1'],

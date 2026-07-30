@@ -3,10 +3,10 @@
 
    Também se mede a armadilha oposta: rede primeiro tem que continuar entregando
    arquivo NOVO quando há rede. Um PWA que serve app.js velho é pior que nenhum. */
-import { chromium } from 'playwright';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { abreNavegador } from './_ajuda.mjs';
 
 import { fileURLToPath } from 'node:url';
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -38,8 +38,7 @@ fs.writeFileSync(path.join(RAIZ, 'marca.txt'), 'x');
 await new Promise((r) => srv.listen(8188, '127.0.0.1', r));
 const BASE = 'http://127.0.0.1:8188/index.html';
 
-const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-  headless:true, args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
+const b = await abreNavegador();
 const ctx = await b.newContext({ viewport:{width:430,height:900}, reducedMotion:'reduce' });
 await ctx.addInitScript(() => localStorage.setItem('vtz_or_key','sk-t'));
 const p = await ctx.newPage();

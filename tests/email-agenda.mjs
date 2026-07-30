@@ -14,10 +14,11 @@
  */
 import http from 'node:http';
 import {
-  servePainel, abreNavegador, novoContexto, fingeCatalogo, placar,
+  servePainel, abreNavegador, novoContexto, fingeCatalogo, placar, exigePortaLivre,
 } from './_ajuda.mjs';
 
 const { checa, fim } = placar();
+for (const porta of [8196, 8197]) await exigePortaLivre(porta);
 const estatico = await servePainel(8196);
 
 /* Conta o que REALMENTE chegou no backend. É a única medida honesta de "o

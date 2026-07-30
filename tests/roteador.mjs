@@ -7,10 +7,10 @@
    Roda contra o app.js REAL, no navegador — as funções vivem dentro do IIFE, e
    o único jeito honesto de alcançá-las é pelo mesmo caminho que a interface
    usa. Por isso o teste mexe no catálogo e observa o que a UI mostra. */
-import { chromium } from 'playwright';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { abreNavegador } from './_ajuda.mjs';
 
 import { fileURLToPath } from 'node:url';
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -50,8 +50,7 @@ const srv = http.createServer((req, res) => {
 });
 await new Promise((r) => srv.listen(8191, '127.0.0.1', r));
 
-const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-  headless:true, args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-proxy-server'] });
+const b = await abreNavegador();
 
 /* Abre o painel com um catálogo controlado, na ordem pedida, e devolve o que o
    app escolheu pra cada tier — lido dos <select> da tela, que é o que a pessoa
