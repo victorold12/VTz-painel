@@ -4,10 +4,12 @@
   "version": "1.0.0",
   "description": "VTz LLM Panel — build step: concatena src/js/*.js (ordem preservada) e minifica pra app.js/style.css.",
   "scripts": {
-    "build": "node scripts/build.js"
+    "build": "node scripts/build.js",
+    "test": "node tests/executa.mjs"
   },
   "devDependencies": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "playwright": "^1.56.1"
   },
   "dependencies": {
     "docx": "8.5.0",
