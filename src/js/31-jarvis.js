@@ -591,7 +591,16 @@ const API = {
   }
 };
 
-const VAD = { startMs:600, silenceMs:1100, threshold:0.055 };
+/* `maxMs` é rede de segurança, e existe por um defeito real: o `speechEnd` só
+   sai depois de o volume cruzar `threshold` uma vez. Microfone baixo, ganho no
+   mínimo ou ruído de fundo abafado nunca cruzam — e aí o laço rodava PARA
+   SEMPRE, com a cena parada em "escutando" e nenhuma mensagem. Era o sintoma
+   "ele fica escutando e não fala nada".
+
+   O comentário antigo dizia "quem fecha a escuta é o VAD, não um timer". Estava
+   certo no caso normal e errado no caso ruim: sem teto, um VAD que não dispara
+   não tem quem o socorra. */
+const VAD = { startMs:600, silenceMs:1100, threshold:0.055, maxMs:15000 };
 
 class BackendDriver extends Driver {
   constructor(){
@@ -633,6 +642,19 @@ class BackendDriver extends Driver {
       this.emit('audio', lvl);
 
       const now = performance.now();
+      /* Teto absoluto. Dois desfechos diferentes de propósito: se houve fala, o
+         que foi dito vale e segue como se o silêncio tivesse fechado; se não
+         houve som nenhum, o problema é de captação e dizer isso é o que evita a
+         pessoa ficar olhando pra uma tela muda. */
+      if(now - this._t0 > VAD.maxMs){
+        this._live = false;
+        if(this._spoke){ this.emit('speechEnd'); }
+        else{
+          this.emit('error','Não captei áudio nenhum em ' + Math.round(VAD.maxMs/1000) +
+            's. Confira se o microfone certo está selecionado e se o volume de entrada não está no mínimo.');
+        }
+        return;
+      }
       if(now - this._t0 > VAD.startMs){
         if(lvl > VAD.threshold){ this._spoke = true; this._quietSince = 0; }
         else if(this._spoke){
@@ -650,6 +672,11 @@ class BackendDriver extends Driver {
   }
   _startSTT(){
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    /* Guardado, e não ignorado. Sem reconhecimento o transcript fica vazio, e o
+       caminho antigo era voltar pra idle CALADO — indistinguível de "o JARVIS
+       me ignorou". Isso é o normal no aplicativo de desktop: o reconhecimento
+       do Chrome depende de um serviço do Google que não vem no Electron. */
+    this.sttDisponivel = !!SR;
     if(!SR) return;
     try{
       const r = new SR();
@@ -664,7 +691,7 @@ class BackendDriver extends Driver {
       };
       r.onerror = ()=>{};
       r.start(); this.rec = r;
-    }catch(e){ /* STT indisponível: a escuta segue só com o nível de áudio */ }
+    }catch(e){ this.sttDisponivel = false; /* a escuta segue só com o nível de áudio */ }
   }
   stopListening(){
     this._live = false;
@@ -921,7 +948,20 @@ driver.on('speechEnd', ()=>{
   if (jfsm.state !== 'listening') return;
   driver.stopListening();
   const q = (jQuery || '').trim();
-  if (!q){ jfsm.go('idle'); return; }   // ninguém falou → idle, sem inventar tarefa
+  if (!q){
+    /* Voltar pra idle sem dizer nada era o pior desfecho: parecia que o JARVIS
+       tinha ouvido e escolhido ignorar. Agora a cena diz QUAL dos dois casos
+       aconteceu, porque a saída é diferente em cada um. */
+    if (!driver.sttDisponivel){
+      mostraErroJarvis('Ouvi você, mas este app não transcreve fala: o reconhecimento ' +
+        'do navegador não existe aqui. Digite o pedido abaixo — ou ligue a escuta ' +
+        'contínua do seu PC em Configurações › Voz, que usa o whisper e entende ' +
+        '"Ei, JARVIS".');
+    } else {
+      mostraErroJarvis('Não entendi o que você disse. Fale um pouco mais alto, ou digite abaixo.');
+    }
+    return;
+  }
   runThinking(q);
 });
 
@@ -980,6 +1020,73 @@ function runThinking(text){
   driver.submit(q);
 }
 
+/* ---------- O JARVIS FALA A RESPOSTA ----------
+
+   Faltava isto, e é o que separava "um chat com uma esfera bonita" de um
+   assistente de voz: a cena escutava, pensava, executava e ENTREGAVA POR
+   ESCRITO. Quem falou com ele tinha que ler a resposta na tela.
+
+   ORDEM DE TENTATIVA, e o porquê de cada degrau:
+     1. o TTS do seu PC (Chatterbox clona a sua voz; Kokoro é mais leve) — é a
+        voz que você configurou, e é a única que soa como JARVIS
+     2. a voz do navegador — robótica, mas existe em qualquer máquina e nunca
+        depende de você ter instalado nada
+
+   Falhar em falar NUNCA pode derrubar a entrega: a resposta na tela já está lá,
+   e ficar mudo é pior que ficar sem áudio bonito. Por isso todo o caminho está
+   dentro de try/catch e o erro só vai pro console. */
+function jarvisPodeFalar(){
+  // respeita a mesma preferência da aba de Voz — um só interruptor pro app todo
+  return state.voiceAutoSpeak !== false;
+}
+
+function falaPeloNavegador(texto){
+  try{
+    if (!window.speechSynthesis) return false;
+    speechSynthesis.cancel();                 // não empilha falas antigas
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = 'pt-BR';
+    if (state.voiceName){
+      const v = speechSynthesis.getVoices().find(x => x.name === state.voiceName);
+      if (v) u.voice = v;
+    }
+    speechSynthesis.speak(u);
+    return true;
+  }catch(e){ return false; }
+}
+
+async function falaJarvis(texto){
+  const t = String(texto || '').trim();
+  if (!t || !jarvisPodeFalar()) return;
+  /* Corta pra não transformar uma resposta longa em três minutos de áudio —
+     o texto inteiro continua na tela. */
+  const dizer = t.length > 600 ? t.slice(0, 600) + '…' : t;
+
+  const agente = API.agentId || (typeof vozState === 'object' && vozState?.agentId) || null;
+  if (backendUrl() && agente){
+    try{
+      const r = await fetch(backendUrl() + '/api/voice/' + encodeURIComponent(agente) + '/speak', {
+        method:'POST', headers: backendHeaders({ 'Content-Type':'application/json' }),
+        body: JSON.stringify({ text: dizer }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j && j.audio_base64){
+        const bin = atob(j.audio_base64);
+        const arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        const url = URL.createObjectURL(new Blob([arr], { type: j.mime || 'audio/wav' }));
+        const a = new Audio(url);
+        a.onended = () => URL.revokeObjectURL(url);
+        await a.play();
+        return;
+      }
+      /* `delegate:'browser'` é o próprio agente dizendo "não tenho motor de pé,
+         fala você" — não é erro, é o contrato. */
+    }catch(e){ console.warn('[jarvis] TTS do PC falhou:', e && e.message); }
+  }
+  falaPeloNavegador(dizer);
+}
+
 function deliver(r, files){
   const jDeliver = jq('#j-deliver');
   jDeliver.innerHTML = `
@@ -998,6 +1105,9 @@ function deliver(r, files){
     </div>`;
   const mount = jq('#j-dl-files');
   files.forEach(f => { if (f.name) jCards[f.id] = new FileCard(mount, {...f, progress:100, status:'Concluído'}); });
+  /* Sem await: a fala acontece POR CIMA da entrega já desenhada. Esperar o áudio
+     pra só então mostrar o resultado deixaria a tela parada durante a síntese. */
+  falaJarvis(r.answer);
   jfsm.go('delivering');
   /* Tarefa do JARVIS costuma ser longa e você sai da frente — aviso nativo do
      Windows quando ela termina. O processo principal só mostra se a janela não
