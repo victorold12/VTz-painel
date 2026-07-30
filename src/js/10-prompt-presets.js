@@ -724,14 +724,31 @@ document.addEventListener('DOMContentLoaded', () => {
   // diagnóstico + toggle de streaming
   const focusSel = document.getElementById('search-focus');
   focusSel.value = state.searchFocus || '';
-  document.getElementById('web-toggle').addEventListener('change', (e) => {
-    state.webSearch = e.target.checked;
+  /* Pinta a partir do estado (e não só ao clicar): é o que faz a escolha
+     guardada aparecer no boot, em vez de o interruptor mostrar o contrário do
+     que vale.
+
+     O AVISO DE CUSTO SAI TODA VEZ QUE ELA LIGA — inclusive quando quem ligou
+     foi a sessão passada. Lembrar a escolha é conveniência; lembrar em silêncio
+     que ela cobra ~US$0,02 por mensagem seria gastar sem avisar. */
+  const pintaWeb = (avisaCusto) => {
+    const t = document.getElementById('web-toggle');
+    t.checked = state.webSearch;
     focusSel.style.display = state.webSearch ? 'block' : 'none';
     document.getElementById('tp-web').classList.toggle('active', state.webSearch);
     updateToolsTrigger();
-    if (state.webSearch) toast('Busca web ativada — o modelo pesquisa a internet antes de responder (~US$0,02/msg, fora do contador de tokens).');
-    else toast('Busca web desativada.');
+    if (avisaCusto && state.webSearch){
+      toast('Busca web ligada — o modelo pesquisa a internet antes de responder ' +
+            '(~US$0,02/msg, fora do contador de tokens).', 'warn');
+    }
+  };
+  document.getElementById('web-toggle').addEventListener('change', () => {
+    state.webSearch = document.getElementById('web-toggle').checked;
+    localStorage.setItem('vtz_web_search', state.webSearch ? '1' : '0');
+    pintaWeb(true);
+    if (!state.webSearch) toast('Busca web desligada.');
   });
+  pintaWeb(true);
   focusSel.addEventListener('change', () => {
     state.searchFocus = focusSel.value;
     localStorage.setItem('vtz_search_focus', state.searchFocus);

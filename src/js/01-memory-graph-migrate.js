@@ -122,7 +122,15 @@ const state = {
   ctxWindow: parseInt(localStorage.getItem('vtz_ctx_window') || '24', 10),
   streamOn: localStorage.getItem('vtz_stream') !== '0',
   perfMode: localStorage.getItem('vtz_perf') === '1',
-  webSearch: false, // busca web por sessão — off por padrão (custa ~$0,02/msg)
+  /* Lembrada entre sessões, igual às Ferramentas — voltar desligada todo dia
+     escondia a funcionalidade.
+
+     Mas continua NASCENDO desligada em instalação nova: é o único interruptor
+     do app que gasta dinheiro sozinho (~US$0,02 por mensagem, cobrado pelo
+     OpenRouter fora do contador de tokens daqui). Ligar por conta própria seria
+     decidir pelo bolso de quem acabou de instalar. E o aviso de custo sai toda
+     vez que ela liga, inclusive quando quem ligou foi a sessão passada. */
+  webSearch: localStorage.getItem('vtz_web_search') === '1',
   gens: {}, // convId -> AbortController (gerações ativas, uma por conversa)
   templates: JSON.parse(localStorage.getItem('vtz_templates') || 'null') || [],
   costByModel: JSON.parse(localStorage.getItem('vtz_cost_by_model') || '{}'),
