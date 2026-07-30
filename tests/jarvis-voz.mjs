@@ -29,6 +29,7 @@ const estatico = await servePainel(8201);
 /* Backend falso: o /api/agent do JARVIS fala NDJSON, e o /speak devolve o que o
    Agente Local devolveria. */
 let pediuFala = null;
+let transcreveu = null;
 const back = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
@@ -47,6 +48,12 @@ const back = http.createServer((req, res) => {
       manda({ type:'step', id:'s1', label:'Pensando', status:'active' });
       manda({ type:'done', answer:'O relatorio esta pronto, senhor.', files:[], steps:['Feito'] });
       return res.end();
+    }
+    if (/\/transcribe$/.test(rota)){
+      const d = JSON.parse(corpo || '{}');
+      transcreveu = { bytes: (d.audio_base64 || '').length, format: d.format };
+      /* Devolve no mesmo formato do agente: {ok, data:{text}} */
+      return json({ ok:true, data:{ text:'monta o relatorio', model:'base' } });
     }
     if (/\/speak$/.test(rota)){
       pediuFala = JSON.parse(corpo || '{}');
@@ -114,10 +121,14 @@ if (abriu){
     null, { timeout: 20000 }).catch(() => {});
   const e = await estado();
   checa('saiu de "escutando" sozinha', e.jstate !== 'listening', e);
-  checa('e explicou por quê, em vez de ficar muda',
-    /transcreve|não entendi|áudio/i.test(e.legenda), e.legenda);
-  checa('apontando a saída (digitar ou escuta do PC)',
-    /digite|whisper|Configura/i.test(e.legenda), e.legenda);
+  /* O PONTO DESTE TESTE: sem reconhecimento do navegador, o áudio tem que ir
+     pro whisper do PC. Antes deste conserto, aqui a cena parava e avisava; agora
+     ela transcreve e SEGUE. */
+  checa('mandou o áudio pro PC transcrever', !!transcreveu, transcreveu);
+  checa('com bytes de verdade', (transcreveu?.bytes || 0) > 100, transcreveu);
+  checa('e seguiu sozinha até entregar',
+    /Entregue|relatorio/i.test(await p.evaluate(() =>
+      document.querySelector('#j-deliver')?.innerText || '')), e);
 }
 
 console.log('— com o pedido por texto, ele responde E FALA');

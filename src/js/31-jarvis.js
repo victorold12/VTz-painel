@@ -633,6 +633,12 @@ class BackendDriver extends Driver {
 
     // STT real, se o navegador tiver. O transcript vem do reconhecimento, não de texto fixo.
     this._startSTT();
+    /* Grava em paralelo. No aplicativo de desktop o reconhecimento do navegador
+       não existe, e sem estes bytes não haveria o que mandar pro whisper do PC —
+       falar com o JARVIS no .msi era impossível por construção. Gravar sempre
+       (e descartar quando não precisa) evita ter que decidir antes de saber se o
+       reconhecimento vai funcionar. */
+    this._gravaAudio();
 
     const tick = ()=>{
       if(!this._live) return;
@@ -670,6 +676,28 @@ class BackendDriver extends Driver {
     tick();
     return true;
   }
+  _gravaAudio(){
+    this.pedacos = []; this.gravador = null;
+    if (!window.MediaRecorder || !this.stream) return;
+    try{
+      const g = new MediaRecorder(this.stream);
+      g.ondataavailable = e => { if (e.data && e.data.size) this.pedacos.push(e.data); };
+      g.start();
+      this.gravador = g;
+    }catch(e){ /* sem gravador: sobra o reconhecimento do navegador, se houver */ }
+  }
+  /* O áudio da última escuta. ASSÍNCRONO de propósito: o MediaRecorder entrega
+     o último pedaço DEPOIS do stop(), num evento. Ler os pedaços na hora — que
+     é o que eu fazia — devolvia vazio ou cortado, e o sintoma era "não gravou
+     nada" com o microfone funcionando perfeitamente.
+
+     Devolve null quando não há nada, e quem chama trata isso como "não deu",
+     não como silêncio. */
+  async audioGravado(){
+    if (this._flush) await this._flush;
+    if (!this.pedacos || !this.pedacos.length) return null;
+    return new Blob(this.pedacos, { type: this.pedacos[0].type || 'audio/webm' });
+  }
   _startSTT(){
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     /* Guardado, e não ignorado. Sem reconhecimento o transcript fica vazio, e o
@@ -696,6 +724,26 @@ class BackendDriver extends Driver {
   stopListening(){
     this._live = false;
     this.emit('audio', 0);
+    /* Para o gravador ANTES de soltar as faixas do microfone: parar a faixa
+       primeiro deixa o último pedaço sem chegar, e a gravação perde o fim da
+       frase — justo a parte que costuma carregar o verbo. */
+    if(this.gravador){
+      const g = this.gravador;
+      this.gravador = null;
+      /* Promessa resolvida no `onstop`: é o único ponto em que dá pra afirmar
+         que todos os pedaços chegaram. O teto de 3s evita travar pra sempre se
+         o evento não vier. */
+      this._flush = new Promise(ok => {
+        let feito = false;
+        const pronto = () => { if (!feito){ feito = true; ok(); } };
+        try{
+          if (g.state === 'inactive') return pronto();
+          g.onstop = pronto;
+          g.stop();
+          setTimeout(pronto, 3000);
+        }catch(e){ pronto(); }
+      });
+    }
     if(this.rec){ try{ this.rec.stop(); }catch(e){} this.rec = null; }
     if(this.stream){ this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
     if(this.ctx){ this.ctx.close().catch(()=>{}); this.ctx = null; }
@@ -944,19 +992,69 @@ driver.on('transcript', (txt)=>{
   jq('#j-cap-sub').textContent = txt ? txt.slice(-64) : 'escutando';
 });
 
-driver.on('speechEnd', ()=>{
+/* Manda o áudio gravado pro whisper DO SEU PC, pelo Agente Local.
+
+   É o caminho que faz o JARVIS ouvir no aplicativo de desktop, onde o
+   reconhecimento do navegador simplesmente não existe. O áudio não fica no
+   servidor: passa por ele, vai pro seu PC, e o arquivo temporário é apagado lá
+   assim que o texto volta. */
+async function transcreveNoPc(blob){
+  const agente = API.agentId || await jarvisDescobreAgente();
+  if (!backendUrl() || !agente) return null;
+  try{
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < buf.length; i += 8192){
+      bin += String.fromCharCode.apply(null, buf.subarray(i, i + 8192));
+    }
+    const fmt = (blob.type.split('/')[1] || 'webm').split(';')[0];
+    const r = await fetch(backendUrl() + '/api/voice/' + encodeURIComponent(agente) + '/transcribe', {
+      method:'POST', headers: backendHeaders({ 'Content-Type':'application/json' }),
+      body: JSON.stringify({ audio_base64: btoa(bin), format: fmt }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (j && j.ok === false) return { erro: j.data?.reason || j.data?.hint || j.detail || 'o PC recusou' };
+    return { texto: (j.data?.text || j.text || '').trim() };
+  }catch(e){ return { erro: e.message }; }
+}
+
+driver.on('speechEnd', async ()=>{
   if (jfsm.state !== 'listening') return;
   driver.stopListening();
-  const q = (jQuery || '').trim();
+  let q = (jQuery || '').trim();
+
+  /* Sem texto do navegador, tenta o whisper do PC antes de desistir. A legenda
+     muda porque transcrever leva alguns segundos e uma tela parada aqui parece
+     travamento — o mesmo defeito que a gente já corrigiu na escuta. */
+  if (!q && !driver.sttDisponivel){
+    const audio = await driver.audioGravado();
+    if (audio && backendUrl()){
+      jq('#j-cap-text').textContent = 'Transcrevendo no seu PC…';
+      const r = await transcreveNoPc(audio);
+      if (r && r.texto) q = r.texto;
+      else if (r && r.erro){
+        mostraErroJarvis('Não consegui transcrever no seu PC: ' + r.erro +
+          '. Confira o modelo do whisper em Configurações › Voz — ou digite abaixo.');
+        return;
+      }
+    }
+  }
+
   if (!q){
     /* Voltar pra idle sem dizer nada era o pior desfecho: parecia que o JARVIS
        tinha ouvido e escolhido ignorar. Agora a cena diz QUAL dos dois casos
        aconteceu, porque a saída é diferente em cada um. */
     if (!driver.sttDisponivel){
-      mostraErroJarvis('Ouvi você, mas este app não transcreve fala: o reconhecimento ' +
-        'do navegador não existe aqui. Digite o pedido abaixo — ou ligue a escuta ' +
-        'contínua do seu PC em Configurações › Voz, que usa o whisper e entende ' +
-        '"Ei, JARVIS".');
+      /* Três motivos diferentes, três saídas diferentes. Dizer sempre "nenhum PC
+         respondeu" culparia o PC até quando o problema é não haver áudio. */
+      const semAudio = !(await driver.audioGravado());
+      const motivo = !backendUrl()
+        ? 'o Backend VTz OS não está configurado — é por ele que o áudio chega no whisper do seu PC.'
+        : semAudio
+          ? 'não consegui gravar o áudio neste navegador.'
+          : 'nenhum PC pareado respondeu — abra o Agente Local.';
+      mostraErroJarvis('Ouvi você, mas não tenho como transcrever: o reconhecimento do ' +
+        'navegador não existe aqui, e ' + motivo + ' Digite o pedido abaixo.');
     } else {
       mostraErroJarvis('Não entendi o que você disse. Fale um pouco mais alto, ou digite abaixo.');
     }

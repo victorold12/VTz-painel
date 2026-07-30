@@ -22,6 +22,58 @@
    ============================================================ */
 let _docsCache = [];
 
+/* Extrai o texto de um PDF, página por página, no próprio navegador.
+
+   POR QUE AQUI E NÃO NO SERVIDOR: o backend ficaria com uma dependência a mais
+   (pypdf) e receberia megabytes por HTTP — que num plano grátis é a diferença
+   entre indexar e estourar o tempo. O navegador já tem o arquivo na mão.
+
+   O QUE ELE NÃO CONSEGUE, E DIZ: PDF que é FOTO de papel escaneado não tem
+   camada de texto pra extrair. O resultado seria um documento vazio indexado
+   com sucesso — o pior desfecho, porque a busca simplesmente nunca acha e
+   ninguém entende por quê. Por isso a verificação no fim. */
+async function textoDoPdf(file, nome){
+  if (typeof pdfjsLib === 'undefined'){
+    throw new Error('O leitor de PDF não carregou. Recarregue a página e tente de novo.');
+  }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+  const dados = new Uint8Array(await file.arrayBuffer());
+  let doc;
+  try{
+    doc = await pdfjsLib.getDocument({ data: dados }).promise;
+  }catch(e){
+    throw new Error(`Não consegui abrir "${nome}": ${e.message}. ` +
+      'PDF protegido por senha não dá pra ler.');
+  }
+  const partes = [];
+  for (let n = 1; n <= doc.numPages; n++){
+    const pag = await doc.getPage(n);
+    const conteudo = await pag.getTextContent();
+    /* Junta os pedaços respeitando a quebra de linha que o próprio PDF marca —
+       sem isso o texto vira uma linha só e o fatiador perde as fronteiras de
+       parágrafo, que é justamente onde ele prefere cortar. */
+    let linha = '';
+    const linhas = [];
+    for (const item of conteudo.items){
+      linha += item.str;
+      if (item.hasEOL){ linhas.push(linha); linha = ''; }
+    }
+    if (linha) linhas.push(linha);
+    partes.push(linhas.join('\n'));
+  }
+  await doc.destroy();
+  const texto = partes.join('\n\n').replace(/[ \t]+\n/g, '\n').trim();
+
+  /* Menos de 20 caracteres por página é papel escaneado, não documento. */
+  if (texto.length < doc.numPages * 20){
+    throw new Error(`"${nome}" não tem texto pra extrair (${doc.numPages} página(s), ` +
+      `${texto.length} caracteres). Parece um PDF escaneado — é imagem de papel, ` +
+      'não texto. Passe por um OCR antes, ou anexe o PDF direto na conversa, ' +
+      'que aí o modelo enxerga a imagem.');
+  }
+  return texto;
+}
+
 /* Extrai texto do arquivo. PDF depende do que o navegador consegue: aqui só
    sai texto de PDF com camada de texto (o normal). PDF que é foto de papel
    escaneado não tem texto pra extrair — e isso é dito, não escondido, senão a
@@ -33,9 +85,7 @@ async function textoDoArquivo(file){
     return await file.text();
   }
   if (file.type === 'application/pdf' || /\.pdf$/i.test(nome)){
-    throw new Error('PDF ainda não: por enquanto indexo .txt, .md, .csv e código. ' +
-      'Abra o PDF, copie o texto e salve como .txt — ou use o PDF como anexo ' +
-      'normal da conversa, que continua funcionando.');
+    return await textoDoPdf(file, nome);
   }
   /* Extensão desconhecida: tenta como texto, mas confere antes de aceitar.
      .docx e .xlsx são ZIP; lidos como texto viram lixo com bytes de controle no
@@ -48,7 +98,7 @@ async function textoDoArquivo(file){
   const controle = (bruto.match(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g) || []).length;
   if (controle > bruto.length * 0.01){
     throw new Error(`Não consigo ler "${nome}" como texto (parece binário). ` +
-      'Formatos aceitos: .txt, .md, .csv, .json e arquivos de código.');
+      'Formatos aceitos: PDF, .txt, .md, .csv, .json e arquivos de código.');
   }
   return bruto;
 }

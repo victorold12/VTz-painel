@@ -75,6 +75,30 @@ const VENDOR = [
 /* O qrcode não vem com um arquivo pronto pro navegador — é CommonJS em vários
    módulos. Como o build já usa esbuild, empacota aqui num arquivo só, em vez de
    puxar de CDN (o CSP bloqueia) ou de escrever um codificador de QR na mão. */
+/* O pdf.js 4.x só vem como ESM, e o painel carrega tudo por <script> clássico
+   (é um IIFE com globais, não um app de módulos). Então é empacotado aqui, no
+   mesmo padrão do qrcode: IIFE com nome global.
+
+   O WORKER também vira clássico de propósito. pdf.js sabe usar worker de
+   módulo, mas no aplicativo de desktop a página vem de file:// — e worker de
+   módulo em file:// falha em várias combinações de navegador. Worker clássico
+   funciona nos dois mundos, e este app roda nos dois. */
+async function bundlePdfjs() {
+  const alvos = [
+    ['pdfjs-dist/build/pdf.mjs', 'pdf.min.js', 'pdfjsLib'],
+    ['pdfjs-dist/build/pdf.worker.mjs', 'pdf.worker.min.js', undefined],
+  ];
+  for (const [entrada, saidaNome, globalName] of alvos) {
+    const saida = path.join(root, 'vendor', saidaNome);
+    await esbuild.build({
+      entryPoints: [require.resolve(entrada)],
+      bundle: true, minify: true, format: 'iife', globalName,
+      target: 'es2020', outfile: saida, logLevel: 'warning',
+    });
+    console.log(`vendor/${saidaNome}: ${bytes(fs.statSync(saida).size)}`);
+  }
+}
+
 async function bundleQrcode() {
   const saida = path.join(root, 'vendor', 'qrcode.min.js');
   await esbuild.build({
@@ -111,6 +135,7 @@ function copiaVendor() {
 async function main() {
   copiaVendor();
   await bundleQrcode();
+  await bundlePdfjs();
   await buildJs();
   await buildCss();
 }

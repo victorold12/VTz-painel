@@ -67,6 +67,9 @@
 <!-- Rasteriza mirrors HTML pro loop de QA visual (skills de pdf/docx/pptx/dashboard-html) -->
 <script src="vendor/html2canvas.min.js"></script>
 <script src="vendor/qrcode.min.js"></script>
+<!-- Leitor de PDF, pra indexar documento sem converter na mão. O worker fica em
+     vendor/pdf.worker.min.js e é apontado em 38-documentos.js. -->
+<script src="vendor/pdf.min.js"></script>
 <!-- Firebase (login opcional + sync na nuvem) — SDK compat via CDN -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -524,7 +527,7 @@
         <p class="hint" style="margin-bottom:10px;">Diferente do <b>Conhecimento do projeto</b>, que é colado inteiro no prompt a cada mensagem: aqui o documento é quebrado em pedaços no servidor, e só os pedaços que interessam à pergunta chegam ao modelo. Um manual de 80 páginas cabe; e você paga pelo que usa. O modelo consulta sozinho quando a pergunta pede — <b>peça pra ele citar a fonte</b>.</p>
         <button class="primary" id="docs-add-btn">Indexar arquivo</button>
         <button id="docs-reindex-btn">Reindexar tudo</button>
-        <input type="file" id="docs-file" accept=".txt,.md,.csv,.json,.log,.xml,.yml,.yaml,.html,.js,.ts,.py,.css,text/*" multiple style="display:none;">
+        <input type="file" id="docs-file" accept=".pdf,.txt,.md,.csv,.json,.log,.xml,.yml,.yaml,.html,.js,.ts,.py,.css,application/pdf,text/*" multiple style="display:none;">
         <p class="hint" id="docs-msg" style="margin-top:8px;"></p>
         <div id="docs-lista" style="margin-top:10px;"></div>
       </div>

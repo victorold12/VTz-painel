@@ -138,6 +138,24 @@ const busca = await fetch('http://127.0.0.1:8193/api/memory/search?q=codigo+do+p
 checa('e sumiu do índice do backend',
   !JSON.stringify(busca.results || []).includes('8813-KX'), busca.results);
 
+console.log('— PDF entra sem converter na mão');
+/* PDF de verdade, com camada de texto, montado em tests/fixtures. Se o pdf.js
+   não carregar ou o worker não subir, isto falha — que é o ponto: o caminho
+   inteiro (script + worker + extração) precisa funcionar no navegador. */
+const PDF = path.join(path.dirname(new URL(import.meta.url).pathname), 'fixtures', 'contrato.pdf');
+await p.setInputFiles('#docs-file', PDF);
+await p.waitForTimeout(4000);
+const msgPdf = await p.evaluate(() => document.getElementById('docs-msg')?.textContent || '');
+checa('indexou o PDF', /pedaço/i.test(msgPdf), msgPdf);
+const doPdf = await fetch('http://127.0.0.1:8193/api/memory/search?q=codigo+do+portao')
+  .then(r => r.json());
+checa('e o texto do PDF ficou buscável',
+  JSON.stringify(doPdf.results || []).includes('8813-KX'),
+  (doPdf.results || []).map(r => r.text.slice(0, 60)));
+checa('com o nome do arquivo como origem',
+  (doPdf.results || []).some(r => /contrato\.pdf/.test(r.source || '')),
+  (doPdf.results || []).map(r => r.source));
+
 checa('sem erro de página', erros.length === 0, erros.slice(0, 3));
 
 const saida = fim();
