@@ -685,6 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupPwa();           // instalar como aplicativo / abrir offline
   setupAcordaBackend(); // cutuca o backend pra ele não hibernar durante a sessão
   setupDocumentos();    // documentos indexados: busca por significado no chat
+  setupGoogleAcoes();   // enviar e-mail / agenda + aviso de escopo desatualizado
   setupAccountMenu();
   autoDetectBackend();  // procura o backend local em segundo plano
   document.getElementById('goto-skills-btn').onclick = () => { switchView('skills'); toggleSidebar(false); };
