@@ -1443,3 +1443,12 @@ body[data-jstate="delivering"] .j-deliver>*:nth-child(6){animation-delay:.45s}
   background:var(--input-bg)}
 .voz-instalar h4{margin-top:0}
 .voz-instalar button{margin-right:8px;margin-bottom:6px}
+
+/* Ferramentas por agente. Grade e não lista: com 8+ itens a lista vertical
+   empurrava os botões do modal pra fora da tela no celular. */
+.agent-tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px}
+.agent-tools label{display:flex;align-items:center;gap:8px;font-size:12.5px;
+  padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--input-bg);cursor:pointer}
+.agent-tools input{width:auto;margin:0}
+.agent-teto{font-family:var(--mono);font-size:11px}
+.agent-teto.estourou{color:var(--danger)}

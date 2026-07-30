@@ -94,6 +94,14 @@ async function sendMessage(){
     userMsg = { role:'user', content: text, ts: Date.now() };
   }
 
+  /* Trava do teto ANTES de gastar. Depois da chamada seria tarde: o dinheiro
+     já teria saído, e um limite que só avisa no extrato não é limite. */
+  const travado = (typeof bloqueioPorTeto === 'function') ? bloqueioPorTeto(conv) : null;
+  if (travado){
+    appendMessageDOM('assistant', travado);
+    return;
+  }
+
   conv.messages.push(userMsg);
   if (conv.title === 'Nova conversa') conv.title = (text || userMsg._att?.[0] || 'Anexo').slice(0,32);
   conv.updatedAt = Date.now();

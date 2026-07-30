@@ -303,7 +303,14 @@ async function runChatLoop(depth=0, convArg, modelOverride){
 
     const useStream = state.streamOn && !state.toolsEnabled; // tool-use exige resposta completa
     const body = { model: effectiveModel, messages: apiMessages };
-    if (state.toolsEnabled) body.tools = Object.values(TOOLS).map(t => t.def);
+    if (state.toolsEnabled){
+      /* Só as ferramentas DESTE agente. Antes ia tudo pra qualquer agente: o da
+         incubadora recebia acesso ao PC e ao Gmail sem precisar, e modelo
+         pequeno com oito opções na mesa escolhe errado. */
+      const permitidas = ferramentasDoAgente(conv);
+      body.tools = permitidas.map(n => TOOLS[n]?.def).filter(Boolean);
+      if (!body.tools.length) delete body.tools;
+    }
     // Busca web nativa do OpenRouter: funciona com qualquer modelo (incl. :free).
     // Custo do plugin (~US$0,02/req) é cobrado pelo provedor e NÃO aparece no
     // contador de tokens — declarado no toast ao ativar.

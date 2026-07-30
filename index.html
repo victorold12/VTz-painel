@@ -827,6 +827,12 @@
     <select id="agent-model-select"></select>
     <label class="hint" style="display:block; margin:10px 0 4px;">Ações rápidas (botões) — uma por linha, no formato <b>Rótulo | prompt que será enviado</b></label>
     <textarea id="agent-actions-input" placeholder="Resumir isto | Resuma o texto acima em 5 bullets&#10;Traduzir | Traduza para inglês" style="min-height:70px;"></textarea>
+    <label class="hint" style="display:block; margin:14px 0 4px;">Teto de gasto deste agente (US$) — 0 = sem teto</label>
+    <input type="text" id="agent-budget-input" inputmode="decimal" placeholder="ex.: 2.00" style="font-family:var(--mono); max-width:140px;">
+    <p class="hint" id="agent-spent-hint" style="margin-top:6px;"></p>
+    <button class="secondary" id="agent-reset-spent" type="button" style="width:auto; padding:7px 12px; font-size:12px; margin-top:6px;">Zerar contador</button>
+    <label class="hint" style="display:block; margin:14px 0 6px;">Ferramentas que este agente enxerga</label>
+    <div id="agent-tools-list" class="agent-tools"></div>
     <div class="row-btns">
       <button class="secondary" id="agent-cancel-btn">Cancelar</button>
       <button id="agent-save-btn">Salvar</button>

@@ -50,6 +50,7 @@ function renderAgents(){
       <div class="agent-card-top">
         <div class="icon">${agent.photo ? `<img src="${agent.photo}" alt="" class="agent-photo">` : iconHTML(agent.icon)}</div>
         <div class="agent-card-actions">
+          <button class="run-agent-btn" title="Solta o agente numa tarefa: ele planeja, age e replaneja até terminar">Rodar sozinho</button>
           <button class="edit-agent-btn">Editar</button>
           <button class="export-agent-btn">Exportar</button>
           <button class="delete-agent-btn">Excluir</button>
@@ -57,7 +58,11 @@ function renderAgents(){
       </div>
       <div class="name">${esc(agent.name)}</div>
       <div class="desc">${esc(agent.desc)}</div>
+      ${tetoDoCard(agent)}
     `;
+    /* stopPropagation em todos: o card inteiro abre uma conversa com o agente,
+       e sem isso "Rodar sozinho" abriria a conversa E soltaria o agente. */
+    card.querySelector('.run-agent-btn').onclick = (e) => { e.stopPropagation(); rodaAgenteSozinho(agent); };
     card.querySelector('.edit-agent-btn').onclick = (e) => { e.stopPropagation(); openAgentModal(agent); };
     card.querySelector('.export-agent-btn').onclick = (e) => { e.stopPropagation(); exportAgent(agent); };
     card.querySelector('.delete-agent-btn').onclick = (e) => {
@@ -80,4 +85,17 @@ function updateAgentIconPreview(){
   } else {
     prev.innerHTML = iconHTML(document.getElementById('agent-icon-input').value);
   }
+}
+
+
+/* Gasto do agente no card. Só aparece quando há teto ou gasto — um "US$ 0,0000"
+   em todo card seria ruído em quem nunca usou. */
+function tetoDoCard(agent){
+  const n = agenteNormalizado(agent);
+  if (!n.budget && !n.spent) return '';
+  const estourou = n.budget > 0 && n.spent >= n.budget;
+  const txt = n.budget
+    ? `US$ ${n.spent.toFixed(4)} de ${n.budget.toFixed(2)}` + (estourou ? ' · TRAVADO' : '')
+    : `US$ ${n.spent.toFixed(4)} gastos`;
+  return `<div class="agent-teto${estourou ? ' estourou' : ''}">${esc(txt)}</div>`;
 }

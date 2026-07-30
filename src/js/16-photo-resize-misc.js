@@ -37,6 +37,8 @@ function openAgentModal(existing){
     sel.appendChild(o);
   });
   sel.value = existing?.model || '';
+  pintaTetoAgente(existing);
+  pintaFerramentasAgente(existing);
   updateAgentIconPreview();
   document.getElementById('agent-modal').style.display = 'flex';
 }
@@ -51,12 +53,21 @@ function saveAgentFromModal(){
   const quickActions = document.getElementById('agent-actions-input').value.split('\n')
     .map(l => { const i = l.indexOf('|'); if (i < 0) return null; const label = l.slice(0,i).trim(); const prompt = l.slice(i+1).trim(); return (label && prompt) ? { label, prompt } : null; })
     .filter(Boolean);
+  const budget = Math.max(0, parseFloat(String(document.getElementById('agent-budget-input').value)
+    .replace(',', '.')) || 0);
+  /* Marcadas -> lista. TUDO marcado vira `null` (= todas), e não a lista cheia:
+     assim uma ferramenta nova que apareça numa versão futura já vale pra quem
+     não restringiu nada, em vez de ficar de fora sem ninguém entender por quê. */
+  const marcadas = [...document.querySelectorAll('#agent-tools-list input:checked')].map(i => i.value);
+  const todas = Object.keys(TOOLS);
+  const tools = marcadas.length === todas.length ? null : marcadas;
+
   const editId = document.getElementById('agent-modal').dataset.editId;
   if (editId){
     const a = state.agents.find(x => x.id === editId);
-    if (a){ a.icon=icon; a.name=name; a.desc=desc; a.systemPrompt=systemPrompt; a.model=model; a.photo=agentPhotoDraft; a.quickActions=quickActions; }
+    if (a){ a.icon=icon; a.name=name; a.desc=desc; a.systemPrompt=systemPrompt; a.model=model; a.photo=agentPhotoDraft; a.quickActions=quickActions; a.budget=budget; a.tools=tools; }
   } else {
-    state.agents.push({ id: uid(), icon, name, desc, systemPrompt, model, photo: agentPhotoDraft, quickActions });
+    state.agents.push({ id: uid(), icon, name, desc, systemPrompt, model, photo: agentPhotoDraft, quickActions, budget, tools, spent: 0 });
   }
   persistAgents();
   renderAgents();
@@ -170,3 +181,50 @@ function buildSystemPrompt(conv){
 }
 
 /* ---------- Models ---------- */
+
+
+/* ---------- teto e ferramentas no editor de agente ---------- */
+
+function pintaTetoAgente(existing){
+  const n = agenteNormalizado(existing);
+  document.getElementById('agent-budget-input').value = n.budget ? String(n.budget) : '';
+  const hint = document.getElementById('agent-spent-hint');
+  const btn = document.getElementById('agent-reset-spent');
+  if (!hint) return;
+  if (!existing){
+    hint.textContent = 'O contador começa em zero. O teto trava o agente quando o gasto alcança ele — e só destrava quando você aumenta o limite ou zera aqui.';
+    hint.className = 'hint';
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  const estourou = n.budget > 0 && n.spent >= n.budget;
+  hint.textContent = `Já gastou US$ ${n.spent.toFixed(4)}` +
+    (n.budget ? ` de US$ ${n.budget.toFixed(2)}` + (estourou ? ' — TRAVADO.' : '.') : ' (sem teto).');
+  hint.className = 'hint ' + (estourou ? 'erro' : '');
+  if (btn){
+    btn.style.display = n.spent > 0 ? '' : 'none';
+    btn.onclick = () => {
+      if (!confirm('Zerar o contador de gasto deste agente? O histórico do valor já gasto se perde.')) return;
+      existing.spent = 0;
+      persistAgents();
+      pintaTetoAgente(existing);
+      if (typeof renderAgents === 'function') renderAgents();
+    };
+  }
+}
+
+function pintaFerramentasAgente(existing){
+  const cx = document.getElementById('agent-tools-list');
+  if (!cx) return;
+  const n = agenteNormalizado(existing);
+  const todas = Object.keys(TOOLS);
+  if (!todas.length){
+    cx.innerHTML = '<p class="hint">Nenhuma ferramenta disponível — ligue as Ferramentas no rodapé do chat.</p>';
+    return;
+  }
+  cx.innerHTML = todas.map(t => {
+    const marcado = !n.tools || n.tools.includes(t);
+    return `<label><input type="checkbox" value="${esc(t)}"${marcado ? ' checked' : ''}>` +
+           `<span>${esc(rotuloFerramenta(t))}</span></label>`;
+  }).join('');
+}

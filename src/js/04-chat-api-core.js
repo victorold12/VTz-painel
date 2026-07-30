@@ -57,6 +57,9 @@ function trackUsage(usage, modelId, conv){
   state.costByModel[modelId] = (state.costByModel[modelId] || 0) + cost;
   localStorage.setItem('vtz_cost_by_model', JSON.stringify(state.costByModel));
   if (conv){ conv.cost = (conv.cost || 0) + cost; }
+  /* Mesmo lugar do gasto global, de propósito: duas contabilidades separadas
+     divergem, e a que o usuário confere é sempre a outra. */
+  try{ debitaAgente(conv, cost); }catch(e){ /* nunca derruba a resposta */ }
   updateCostBadge();
 }
 /* Conta do OpenRouter sem crédito. Repetir o mesmo pedido não resolve — só um
