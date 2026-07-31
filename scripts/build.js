@@ -70,7 +70,29 @@ const VENDOR = [
   ['docx/build/index.umd.js',             'docx.umd.min.js'],
   ['pptxgenjs/dist/pptxgen.bundle.js',    'pptxgen.bundle.js'],
   ['html2canvas/dist/html2canvas.min.js', 'html2canvas.min.js'],
+  ['katex/dist/katex.min.js',             'katex.min.js'],
+  ['katex/dist/katex.min.css',            'katex.min.css'],
 ];
+
+/* As fontes do KaTeX. Só .woff2 (296 KB); as versões .woff e .ttf que vêm no
+   pacote somam 1,2 MB e existem pra navegador que nenhum usuário deste app tem.
+   Sem as fontes o KaTeX ainda renderiza, mas cai numa serif do sistema e os
+   sinais grandes (integral, somatório, raiz esticada) saem desalinhados — o
+   layout dele conta com as métricas dessas fontes. */
+function copiaFontesKatex() {
+  const de = path.join(root, 'node_modules', 'katex', 'dist', 'fonts');
+  const para = path.join(root, 'vendor', 'fonts');
+  if (!fs.existsSync(de)) throw new Error('vendor: faltam as fontes do KaTeX. Rode "npm install".');
+  fs.mkdirSync(para, { recursive: true });
+  let n = 0, total = 0;
+  for (const f of fs.readdirSync(de)) {
+    if (!f.endsWith('.woff2')) continue;
+    fs.copyFileSync(path.join(de, f), path.join(para, f));
+    total += fs.statSync(path.join(de, f)).size;
+    n++;
+  }
+  console.log(`vendor/fonts/: ${n} fontes do KaTeX, ${bytes(total)}`);
+}
 
 /* O qrcode não vem com um arquivo pronto pro navegador — é CommonJS em vários
    módulos. Como o build já usa esbuild, empacota aqui num arquivo só, em vez de
@@ -134,6 +156,7 @@ function copiaVendor() {
 
 async function main() {
   copiaVendor();
+  copiaFontesKatex();
   await bundleQrcode();
   await bundlePdfjs();
   await buildJs();
