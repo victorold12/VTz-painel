@@ -981,6 +981,12 @@ function scriptInstalaTudo(modeloWhisper){
        ativo, e o Chatterbox baixa 2 GB na primeira execucao — misturar os dois
        na mesma janela esconde qual esta baixando e qual quebrou.
 
+       `cmd /k` e NAO `cmd /c`, e sem /min. A primeira versao usava /c minimizado:
+       quando o servidor falhava, a janela fechava sozinha levando a mensagem de
+       erro junto, e pro usuario parecia que nada tinha acontecido. Ficar aberta
+       e o ponto — quem sobe bem fica mostrando o log, quem quebra fica mostrando
+       o motivo. Janela sobrando na barra e um preco baratissimo por isso.
+
        O atalho fica na pasta Inicializar do USUARIO, nao no registro nem como
        servico: some arrastando pra lixeira, e da pra ver que existe. Iniciar
        junto com o Windows e invasivo o bastante pra ter que ser obvio. */
@@ -990,10 +996,10 @@ function scriptInstalaTudo(modeloWhisper){
     '  echo title Ligando as vozes do JARVIS',
     '  echo cd /d "%%~dp0"',
     '  echo if exist "vozes\\' + cb.pasta + '\\.venv\\Scripts\\activate.bat" (',
-    '  echo   start "Chatterbox ^(porta ' + cb.porta + '^)" /min cmd /c "cd /d vozes\\' + cb.pasta + ' ^&^& call .venv\\Scripts\\activate.bat ^&^& python server.py"',
+    '  echo   start "Chatterbox ^(porta ' + cb.porta + '^)" cmd /k "cd /d vozes\\' + cb.pasta + ' ^&^& call .venv\\Scripts\\activate.bat ^&^& python server.py"',
     '  echo ^) else ^( echo [pulado] Chatterbox nao instalado. ^)',
     '  echo if exist "vozes\\' + kk.pasta + '\\.venv\\Scripts\\activate.bat" (',
-    '  echo   start "Kokoro ^(porta ' + kk.porta + '^)" /min cmd /c "cd /d vozes\\' + kk.pasta + ' ^&^& call .venv\\Scripts\\activate.bat ^&^& python server.py"',
+    '  echo   start "Kokoro ^(porta ' + kk.porta + '^)" cmd /k "cd /d vozes\\' + kk.pasta + ' ^&^& call .venv\\Scripts\\activate.bat ^&^& python server.py"',
     '  echo ^) else ^( echo [pulado] Kokoro nao instalado. ^)',
     '  echo echo.',
     '  echo echo Os dois servidores estao subindo em janelas minimizadas.',
