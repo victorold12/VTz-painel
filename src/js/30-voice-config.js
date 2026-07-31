@@ -835,15 +835,7 @@ function scriptInstalaTudo(modeloWhisper){
     '',
     'REM ============ 2. Git ============',
     'echo --- [1/7] Git',
-    'where git >nul 2>nul',
-    'if errorlevel 1 (',
-    '  if defined SEMWINGET (',
-    '    echo [FALTA] Git. Instale em https://git-scm.com',
-    '    set "FALHOU=%FALHOU% Git"',
-    '  ) else (',
-    '    winget install --id Git.Git -e --accept-source-agreements --accept-package-agreements',
-    '  )',
-    ') else ( echo      [ok] ja instalado. )',
+    'call :garante "git --version" Git.Git Git https://git-scm.com',
     'echo.',
     '',
     'REM ============ 3. Python 3.12 ============',
@@ -851,28 +843,12 @@ function scriptInstalaTudo(modeloWhisper){
     'REM instalador pra Python 3.13+. Conviver com um Python mais novo no',
     'REM mesmo PC nao da problema - o lancador `py` escolhe qual usar.',
     'echo --- [2/7] Python 3.12',
-    'py -3.12 --version >nul 2>nul',
-    'if errorlevel 1 (',
-    '  if defined SEMWINGET (',
-    '    echo [FALTA] Python 3.12. https://www.python.org/downloads/',
-    '    set "FALHOU=%FALHOU% Python3.12"',
-    '  ) else (',
-    '    winget install --id Python.Python.3.12 -e --accept-source-agreements --accept-package-agreements',
-    '  )',
-    ') else ( echo      [ok] ja instalado. )',
+    'call :garante "py -3.12 --version" Python.Python.3.12 Python3.12 https://www.python.org/downloads/',
     'echo.',
     '',
     'REM ============ 4. ffmpeg ============',
     'echo --- [3/7] ffmpeg',
-    'where ffmpeg >nul 2>nul',
-    'if errorlevel 1 (',
-    '  if defined SEMWINGET (',
-    '    echo [FALTA] ffmpeg. https://ffmpeg.org',
-    '    set "FALHOU=%FALHOU% ffmpeg"',
-    '  ) else (',
-    '    winget install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements',
-    '  )',
-    ') else ( echo      [ok] ja instalado. )',
+    'call :garante "ffmpeg -version" Gyan.FFmpeg ffmpeg https://ffmpeg.org',
     'echo.',
     '',
     'REM ============ 5. modelo do whisper ============',
@@ -1017,6 +993,52 @@ function scriptInstalaTudo(modeloWhisper){
     'exit /b 0',
     '',
     'REM ---------- sub-rotinas ----------',
+    /* :garante "<comando de teste>" <id-winget> <nome-no-resumo> <site>
+       Confere -> instala -> RECARREGA O PATH -> confere de novo.
+
+       O passo do meio é o que faltava e derrubou a primeira tentativa inteira:
+       quando o winget instala Git ou Python, a janela do .bat que JÁ ESTÁ
+       ABERTA continua com o PATH antigo. O Windows só entrega o PATH novo pra
+       processos criados DEPOIS da instalação. O script instalava o Python 3.12
+       com sucesso e, três linhas abaixo, `py -3.12` falhava — e tudo que
+       dependia dele caía em cascata, como se nada tivesse sido instalado.
+
+       Reler o PATH do registro resolve dentro da própria janela. E a segunda
+       conferida existe porque antes eu chamava `winget install` e seguia em
+       frente sem olhar: se ele falhasse, o script mentia por omissão. */
+    ':garante',
+    'setlocal',
+    'set "TESTE=%~1"',
+    'set "WID=%~2"',
+    'set "NOME=%~3"',
+    'set "SITE=%~4"',
+    '%TESTE% >nul 2>nul',
+    'if not errorlevel 1 ( echo      [ok] ja instalado. & endlocal & exit /b 0 )',
+    'if defined SEMWINGET (',
+    '  echo      [FALTA] %NOME%. Instale em %SITE% e rode este arquivo de novo.',
+    '  endlocal & set "FALHOU=%FALHOU% %~3" & exit /b 0',
+    ')',
+    'echo      instalando pelo winget...',
+    'winget install --id %WID% -e --accept-source-agreements --accept-package-agreements',
+    'call :recarrega_path',
+    '%TESTE% >nul 2>nul',
+    'if not errorlevel 1 ( echo      [ok] instalado. & endlocal & exit /b 0 )',
+    'echo      [ATENCAO] instalou, mas este terminal ainda nao enxerga %NOME%.',
+    'echo                Isso e normal: o Windows so entrega o PATH novo pra',
+    'echo                janelas abertas DEPOIS da instalacao. FECHE esta janela',
+    'echo                e rode este arquivo de novo - ele pula o que ja entrou.',
+    'endlocal & set "FALHOU=%FALHOU% %~3" & exit /b 0',
+    '',
+    /* Relê o PATH das duas chaves do registro (máquina e usuário). É o que o
+       Explorer faz ao abrir um terminal novo; aqui evita ter que fechar a
+       janela no meio da instalação. */
+    ':recarrega_path',
+    'for /f "usebackq tokens=2,*" %%A in (`reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path 2^>nul`) do set "PATH_M=%%B"',
+    'for /f "usebackq tokens=2,*" %%A in (`reg query "HKCU\\Environment" /v Path 2^>nul`) do set "PATH_U=%%B"',
+    'if defined PATH_M set "PATH=%PATH_M%"',
+    'if defined PATH_U set "PATH=%PATH%;%PATH_U%"',
+    'exit /b 0',
+    '',
     ':confere_tamanho',
     /* Um redirecionamento pra página de erro chega como HTML de poucos KB e
        ficaria salvo com o nome do modelo — pra falhar bem depois, dentro do
