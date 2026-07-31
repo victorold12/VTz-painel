@@ -1444,6 +1444,18 @@ body[data-jstate="delivering"] .j-deliver>*:nth-child(6){animation-delay:.45s}
 .voz-instalar h4{margin-top:0}
 .voz-instalar button{margin-right:8px;margin-bottom:6px}
 
+/* Progresso da instalação embutida (app de desktop). O log tem altura FIXA e
+   rola por dentro: sem isso, um `pip install` de 2 mil linhas esticaria a aba
+   de configurações a perder de vista e empurraria todo o resto pra fora. */
+.voz-inst-painel{margin-top:12px;border:1px solid var(--line);border-radius:10px;
+  overflow:hidden;background:var(--void)}
+.voz-inst-topo{display:flex;align-items:center;gap:8px;padding:8px 10px;
+  border-bottom:1px solid var(--line);font-size:13px;background:var(--surface)}
+.voz-inst-topo button{margin:0}
+.voz-inst-log{margin:0;padding:10px;height:260px;overflow:auto;
+  font-family:var(--mono);font-size:12px;line-height:1.45;
+  white-space:pre-wrap;word-break:break-word;color:var(--text-dim)}
+
 /* Ferramentas por agente. Grade e não lista: com 8+ itens a lista vertical
    empurrava os botões do modal pra fora da tela no celular. */
 .agent-tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px}
