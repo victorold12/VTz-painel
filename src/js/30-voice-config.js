@@ -1249,6 +1249,25 @@ function baixaInstaladorVoz(id){
   }
 }
 
+/* Reconexão automática enquanto a aba Voz está aberta.
+
+   Sem isto o estado dos motores era lido UMA vez, ao carregar. Quem instalava,
+   ligava os servidores e voltava pro app continuava vendo "não está rodando" —
+   e a conclusão natural é que a instalação falhou, quando só faltava um F5.
+   Agora a tela procura sozinha a cada 12s, e para quando você sai da aba: é
+   uma chamada ao PC pareado, não vale gastar com ela em segundo plano. */
+let _vozRelogio = null;
+function paraProcuraVozes(){ if (_vozRelogio){ clearInterval(_vozRelogio); _vozRelogio = null; } }
+function comecaProcuraVozes(){
+  paraProcuraVozes();
+  _vozRelogio = setInterval(() => {
+    const aba = document.querySelector('.cfg-group[data-cat="voz"]');
+    /* offsetParent nulo = escondido. Se a pessoa saiu da aba, para sozinho. */
+    if (!aba || !aba.offsetParent){ paraProcuraVozes(); return; }
+    vozCarregar().catch(() => {});
+  }, 12000);
+}
+
 function setupInstaladoresVoz(){
   const c = document.getElementById('voz-inst-chatterbox');
   if (c) c.onclick = () => baixaInstaladorVoz('chatterbox');
@@ -1256,4 +1275,21 @@ function setupInstaladoresVoz(){
   if (k) k.onclick = () => baixaInstaladorVoz('kokoro');
   const t = document.getElementById('voz-inst-tudo');
   if (t) t.onclick = () => baixaInstaladorTudo();
+  const rec = document.getElementById('voz-reconectar');
+  if (rec) rec.onclick = async () => {
+    rec.disabled = true;
+    vozMsg('Procurando Chatterbox e Kokoro neste PC…');
+    try{
+      await vozCarregar();
+      const ligados = Object.entries(vozState.engines || {}).filter(([, e]) => e && e.up).map(([id]) => id);
+      vozMsg(ligados.length
+        ? 'Encontrei: ' + ligados.join(' e ') + '.'
+        : 'Nenhuma voz respondeu. Elas estão RODANDO? Abra Documentos\\VTz LLM e execute ligar-vozes.bat.',
+        ligados.length ? 'ok' : 'erro');
+      comecaProcuraVozes();
+    }catch(e){
+      vozMsg('Não consegui perguntar ao seu PC: ' + e.message, 'erro');
+    }finally{ rec.disabled = false; }
+  };
+  comecaProcuraVozes();
 }
