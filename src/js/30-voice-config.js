@@ -954,17 +954,30 @@ function scriptInstalaTudo(modeloWhisper){
     'REM motivo de nao funcionar. Mescla no stt.json que ja existe, em vez de',
     'REM sobrescrever: as escolhas de modelo e threads sao preservadas.',
     'echo --- Apontando o Agente Local pras pastas',
+    /* `ConvertFrom-Json -AsHashtable` NAO existe no PowerShell 5.1, que e o que
+       o `powershell.exe` do Windows roda — o -AsHashtable chegou no PowerShell 6,
+       que e o `pwsh.exe` e nao vem instalado. Ou seja, este passo falhava em
+       TODA maquina, sempre, com "Nao e possivel localizar um parametro que
+       coincida com o nome de parametro 'AsHashtable'". E falhava calado: o
+       catch transformava em "[aviso]" e o script seguia dizendo que terminou.
+       O efeito era o Agente Local procurando o modelo do whisper na pasta
+       antiga e nao achando nada.
+
+       PSObject + Add-Member -Force funciona nas duas versoes, e preserva as
+       chaves que ja estavam no arquivo (modelo e threads escolhidos a mao). */
     ps(
       "$ErrorActionPreference='Stop'; " +
       "try{ " +
         "$d=Join-Path $env:USERPROFILE '.jarvis-agente'; " +
         "if(-not (Test-Path $d)){ New-Item -ItemType Directory -Path $d | Out-Null } " +
         "$f=Join-Path $d 'stt.json'; " +
-        "$c=@{}; if(Test-Path $f){ $c=Get-Content $f -Raw | ConvertFrom-Json -AsHashtable } " +
-        "$c['modelsDir']='%WMOD%'; " +
+        "$c=$null; " +
+        "if(Test-Path $f){ try{ $c=Get-Content $f -Raw | ConvertFrom-Json }catch{ $c=$null } } " +
+        "if($null -eq $c){ $c=New-Object PSObject } " +
+        "$c | Add-Member -NotePropertyName modelsDir -NotePropertyValue '%WMOD%' -Force; " +
         "$exe=Join-Path '%WPROG%' 'whisper-cli.exe'; " +
-        "if(Test-Path $exe){ $c['binary']=$exe } " +
-        "$c['model']='" + mw + "'; " +
+        "if(Test-Path $exe){ $c | Add-Member -NotePropertyName binary -NotePropertyValue $exe -Force } " +
+        "$c | Add-Member -NotePropertyName model -NotePropertyValue '" + mw + "' -Force; " +
         "$c | ConvertTo-Json -Depth 5 | Set-Content $f -Encoding UTF8; " +
         "Write-Host '      [ok] stt.json atualizado.' " +
       "}catch{ Write-Host ('      [aviso] nao consegui escrever stt.json: ' + $_.Exception.Message) }"
@@ -999,7 +1012,11 @@ function scriptInstalaTudo(modeloWhisper){
     '  echo   start "Chatterbox ^(porta ' + cb.porta + '^)" cmd /k "cd /d vozes\\' + cb.pasta + ' ^&^& call .venv\\Scripts\\activate.bat ^&^& python server.py"',
     '  echo ^) else ^( echo [pulado] Chatterbox nao instalado. ^)',
     '  echo if exist "vozes\\' + kk.pasta + '\\.venv\\Scripts\\activate.bat" (',
-    '  echo   start "Kokoro ^(porta ' + kk.porta + '^)" cmd /k "cd /d vozes\\' + kk.pasta + ' ^&^& call .venv\\Scripts\\activate.bat ^&^& python server.py"',
+    /* O Kokoro NAO tem server.py — a entrada dele e `api.src.main:app` pelo
+       uvicorn. Esta linha mandava `python server.py` nos dois, entao o Kokoro
+       falhava com "can't open file server.py" toda vez que este .bat rodava,
+       inclusive no login do Windows pelo atalho da Inicializacao. */
+    '  echo   start "Kokoro ^(porta ' + kk.porta + '^)" cmd /k "cd /d vozes\\' + kk.pasta + ' ^&^& call .venv\\Scripts\\activate.bat ^&^& python -m uvicorn api.src.main:app --host 127.0.0.1 --port ' + kk.porta + '"',
     '  echo ^) else ^( echo [pulado] Kokoro nao instalado. ^)',
     '  echo echo.',
     '  echo echo Os dois servidores estao subindo em janelas minimizadas.',
@@ -1133,6 +1150,35 @@ function scriptInstalaTudo(modeloWhisper){
     'if defined PATH_U set "PATH=%PATH%;%PATH_U%"',
     'exit /b 0',
     '',
+    /* Copia o requirements.txt tirando as linhas de torch, quando a versao certa
+       do torch JA foi instalada antes. Sem isso o pip leria "torch==2.5.1",
+       decidiria que precisa trocar o 2.6.0 que acabou de entrar, e faria
+       exatamente a desinstalacao que este arranjo existe pra evitar.
+
+       `torch\\b` e nao `torch`: pacotes como `torchsde` (que o Chatterbox usa de
+       verdade) NAO podem ser removidos da lista. A fronteira de palavra separa
+       "torch" de "torchsde", e o grupo opcional cobre torchvision/torchaudio. */
+    ':requirements_sem_torch',
+    'if not defined ALINHA_TORCH (',
+    '  copy /y "requirements.txt" "requirements-jarvis.txt" >nul',
+    '  exit /b 0',
+    ')',
+    ps(
+      "try{ " +
+        "$L=Get-Content 'requirements.txt' | Where-Object { $_ -notmatch '^\\s*torch(vision|audio)?\\b\\s*[=<>!~]' }; " +
+        "Set-Content 'requirements-jarvis.txt' $L -Encoding UTF8; " +
+    /* Sem `^(` aqui: o `^` so escapa fora de aspas. Como a linha inteira do
+       PowerShell vai entre aspas duplas, o cmd nao mexe nos parenteses — e um
+       `^` escrito a mao sairia impresso na tela. */
+        "Write-Host ('      ' + $L.Count + ' dependencias (as linhas de torch saem: a versao certa ja entrou)') " +
+      "}catch{ Copy-Item 'requirements.txt' 'requirements-jarvis.txt' -Force }"
+    ),
+    /* Se o PowerShell falhar por qualquer motivo, seguir sem o arquivo faria o
+       pip reclamar de um caminho inexistente — pior que instalar com a lista
+       original. */
+    'if not exist "requirements-jarvis.txt" copy /y "requirements.txt" "requirements-jarvis.txt" >nul',
+    'exit /b 0',
+    '',
     ':confere_tamanho',
     /* Um redirecionamento pra página de erro chega como HTML de poucos KB e
        ficaria salvo com o nome do modelo — pra falhar bem depois, dentro do
@@ -1198,15 +1244,62 @@ function scriptInstalaTudo(modeloWhisper){
     'if not exist ".venv" %PY% -m venv .venv',
     'call ".venv\\Scripts\\activate.bat"',
     'python -m pip install --upgrade pip >nul',
+    /* Nem todo projeto Python usa requirements.txt. O Kokoro-FastAPI declara as
+       dependencias no pyproject.toml, e o script recusava instalar dizendo "sem
+       requirements.txt; veja o README" — ou seja, o Kokoro NUNCA foi instalado
+       por este instalador. O venv ficava criado e vazio, e o servidor morria
+       depois com "No module named uvicorn", que parece outro problema. */
+    'set "USA_PYPROJECT="',
     'if not exist "requirements.txt" (',
-    '  echo      [ATENCAO] sem requirements.txt; veja o README de %REPO%.',
-    '  popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '  if exist "pyproject.toml" (',
+    '    set "USA_PYPROJECT=1"',
+    '  ) else (',
+    '    echo      [ATENCAO] sem requirements.txt nem pyproject.toml; veja o README de %REPO%.',
+    '    popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '  )',
     ')',
-    'pip install -r requirements.txt || (',
-    '  echo      [ERRO] instalacao das dependencias falhou.',
-    '  echo             "Could not find a version ... torch" = Python incompativel.',
-    '  echo             erro de compilador ou CUDA = placa de video.',
-    '  popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '',
+    /* ===== O torch vai ANTES, e nao depois =====
+       A ordem antiga era: instalar requirements.txt (que fixa torch==2.5.1) e
+       DEPOIS forcar 2.6.0. Isso obriga o pip a DESINSTALAR o 2.5.1 pra por o
+       2.6.0 no lugar — e desinstalar é a operacao mais fragil que existe aqui,
+       porque mexe em milhares de arquivos ja em uso.
+
+       Na maquina do Victor o pip foi interrompido exatamente ai, por uma pasta
+       do PATH que o Windows recusa atravessar (o Codex da OpenAI instala a sua
+       como junção; o erro sai como "ponto de montagem nao confiavel"). O
+       rollback nao conseguiu restaurar: "ERROR: Failed to restore ...\torch\".
+       O resultado foi um torch pela metade, que depois produz erros que nao
+       parecem ter nada a ver — "No module named 'torch.distributed.tensor'" e
+       "cannot import name 'autocast' from 'torch.amp'".
+
+       Instalando a versao certa PRIMEIRO, e tirando as linhas de torch do
+       requirements, nao existe desinstalacao nenhuma pra ser interrompida. */
+    'if defined ALINHA_TORCH (',
+    '  echo      instalando torch 2.6.0 ^(antes das dependencias, pra nao ter que trocar depois^)...',
+    '  pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 || (',
+    '    echo      [ERRO] nao consegui instalar o torch.',
+    '    popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '  )',
+    ')',
+    '',
+    'if defined USA_PYPROJECT (',
+    '  echo      sem requirements.txt; instalando pelo pyproject.toml...',
+    '  pip install . || (',
+    '    echo      [ERRO] instalacao pelo pyproject.toml falhou. Veja o README de %REPO%.',
+    '    popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '  )',
+    ') else (',
+    /* Nome FIXO, e nao uma variavel devolvida pela sub-rotina: o cmd expande o
+       bloco inteiro do `if` ANTES de executar qualquer coisa dentro dele, entao
+       um %REQ% definido pelo `call` chegaria aqui ainda vazio. */
+    '  call :requirements_sem_torch',
+    '  pip install -r "requirements-jarvis.txt" || (',
+    '    echo      [ERRO] instalacao das dependencias falhou.',
+    '    echo             "Could not find a version ... torch" = Python incompativel.',
+    '    echo             erro de compilador ou CUDA = placa de video.',
+    '    popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '  )',
     ')',
     /* O requirements.txt do Chatterbox instala TUDO menos o motor: `pip install`
        termina com sucesso, e `import chatterbox` estoura na primeira execução.
@@ -1237,9 +1330,34 @@ function scriptInstalaTudo(modeloWhisper){
           callable" 4 GB depois de baixar o modelo. A marca-d'agua so identifica
           audio gerado por IA — nao participa de sintetizar fala. Desligar troca
           um travamento total por uma funcao que ninguem aqui usa. */
+    /* Sucesso do pip nao e prova de que da pra usar — a lição que este projeto
+       ja pagou duas vezes. Aqui ela aparece na forma mais cruel: o pip pode ser
+       INTERROMPIDO no meio e ainda assim o script seguir, porque o passo
+       seguinte nao tinha por que desconfiar.
+
+       Um torch pela metade nao falha no import de cara: falha lá dentro, com
+       "cannot import name 'autocast'" ou "No module named
+       'torch.distributed.tensor'" — mensagens que mandam procurar bug no
+       Chatterbox, no CUDA, na versao do Python. Em nenhuma delas aparece a
+       palavra que explicaria tudo: o pacote esta corrompido no disco.
+
+       Nao da pra consertar um venv nesse estado; da pra reconhecer e refazer.
+       Apagar aqui e o certo: a proxima execucao recria limpo, e o script ja
+       existe pra ser rodado de novo. */
     'if defined ALINHA_TORCH (',
-    '  echo      alinhando torch/torchvision/torchaudio ^(2.6.0^)...',
-    '  pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0',
+    '  python -c "import torch; torch.zeros(1)" >nul 2>nul',
+    '  if errorlevel 1 (',
+    '    echo      [ERRO] o torch ficou quebrado neste ambiente.',
+    '    echo             O pip foi interrompido no meio de uma instalacao. A causa',
+    '    echo             mais comum e uma pasta do PATH que o Windows recusa',
+    '    echo             atravessar ^(o erro sai como "ponto de montagem nao',
+    '    echo             confiavel"^); antivirus e disco cheio dao no mesmo.',
+    '    echo             Apagando o ambiente - rode este arquivo de novo pra',
+    '    echo             recria-lo limpo.',
+    '    call deactivate >nul 2>nul',
+    '    rmdir /s /q ".venv"',
+    '    popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '  )',
     ')',
     'if defined DESLIGA_MARCA if exist "config.yaml" (',
     '  echo      desligando a marca-d^\'agua ^(perth^)...',
