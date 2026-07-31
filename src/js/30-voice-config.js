@@ -1244,6 +1244,26 @@ function scriptInstalaTudo(modeloWhisper){
     'if not exist ".venv" %PY% -m venv .venv',
     'call ".venv\\Scripts\\activate.bat"',
     'python -m pip install --upgrade pip >nul',
+    /* ===== setuptools: a peca que sumiu debaixo do projeto inteiro =====
+       Ate o Python 3.11, todo venv novo vinha com setuptools dentro, e por isso
+       `import pkg_resources` sempre funcionou. No 3.12 o venv passou a vir
+       LIMPO — e este instalador usa `py -3.12` de proposito, por causa do torch.
+
+       Quem paga a conta e o `perth` (a marca-d'agua da Resemble): ele importa
+       pkg_resources e, quando falha, o __init__ dele ENGOLE o ImportError e
+       deixa `PerthImplicitWatermarker` valendo None. O Chatterbox entao morre
+       carregando o modelo com "TypeError: 'NoneType' object is not callable" —
+       uma mensagem que nao cita marca-d'agua, nem setuptools, nem pkg_resources.
+
+       Foi essa cadeia que fez o projeto passar sessoes chutando o nome de uma
+       chave no config.yaml. Nenhuma chave resolveria: o crash acontece dentro
+       do pacote chatterbox, antes de qualquer configuracao do servidor.
+       Confirmado em github.com/resemble-ai/Perth/issues/7.
+
+       Vai pra TODOS os motores, nao so pro Chatterbox: bibliotecas Python
+       escritas antes do 3.12 assumem pkg_resources sem declarar, e este e o
+       tipo de falta que aparece longe da causa. */
+    'python -m pip install --upgrade setuptools wheel >nul || echo      [aviso] nao consegui instalar setuptools.',
     /* Nem todo projeto Python usa requirements.txt. O Kokoro-FastAPI declara as
        dependencias no pyproject.toml, e o script recusava instalar dizendo "sem
        requirements.txt; veja o README" — ou seja, o Kokoro NUNCA foi instalado
@@ -1359,6 +1379,38 @@ function scriptInstalaTudo(modeloWhisper){
     '    popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
     '  )',
     ')',
+    /* Confere que o perth resolve ANTES de declarar vitoria. Se
+       PerthImplicitWatermarker ainda for None aqui, o servidor vai subir, abrir
+       a porta e morrer carregando o modelo — respondendo ao painel sem falar,
+       que e o pior estado possivel porque parece que funcionou.
+
+       O `pip install` de setuptools acima ja deve ter resolvido; esta segunda
+       tentativa cobre o caso de o proprio resemble-perth nao ter entrado. E se
+       ainda assim falhar, o script DIZ, em vez de deixar a descoberta pro
+       usuario ouvir silencio depois. */
+    'if defined DESLIGA_MARCA (',
+    '  python -c "import perth,sys; sys.exit(0 if perth.PerthImplicitWatermarker else 1)" >nul 2>nul',
+    '  if errorlevel 1 (',
+    '    echo      a marca-d^\'agua nao carregou; instalando resemble-perth e setuptools...',
+    '    pip install --upgrade setuptools resemble-perth >nul 2>nul',
+    '    python -c "import perth,sys; sys.exit(0 if perth.PerthImplicitWatermarker else 1)" >nul 2>nul',
+    '    if errorlevel 1 (',
+    '      echo      [ATENCAO] o perth continua sem carregar. O servidor vai subir e',
+    '      echo                abrir a porta, mas o modelo NAO vai carregar - ele',
+    '      echo                responde e nao fala. Causa conhecida: falta pkg_resources',
+    '      echo                ^(setuptools^). Veja github.com/resemble-ai/Perth/issues/7',
+    /* Sem `set "FALHOU=..."` aqui: esta sub-rotina roda dentro de um `setlocal`,
+       entao a variavel morreria no `endlocal` e a linha seria codigo que nao faz
+       nada — pior que nao existir, porque parece que faz. Quem registra esta
+       falha e a mensagem acima, e quem a pega no automatico e o sobe-vozes.js,
+       que le o stdout do servidor e reprova modelo que nao carregou. */
+    '    ) else ( echo      [ok] marca-d^\'agua carregando. )',
+    '  ) else ( echo      [ok] marca-d^\'agua carregando. )',
+    ')',
+    /* O passo abaixo desliga a marca-d'agua na CONFIGURACAO do servidor, quando
+       ela existe. Ele NAO e o que conserta o travamento — isso ficou provado
+       quando o Chatterbox quebrou no CI com o config.yaml ja editado. Fica
+       porque gerar audio sem marca-d'agua continua sendo o que se quer aqui. */
     'if defined DESLIGA_MARCA if exist "config.yaml" (',
     '  echo      desligando a marca-d^\'agua ^(perth^)...',
     '  ' + ps(
