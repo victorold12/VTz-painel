@@ -527,6 +527,14 @@ const VOZ_INSTALADORES = {
     peso: '~2 GB de modelo na primeira execução',
     aviso: 'Funciona sem placa de vídeo, mas fica lento. Com placa NVIDIA, ' +
            'instale o torch com CUDA seguindo o README do repositório.',
+    /* O Chatterbox fixa torch==2.5.1, e o torch só publica instalador pras
+       versões de Python que existiam quando ele saiu. Num Python novo demais o
+       pip não acha NADA e a mensagem dele ("Could not find a version that
+       satisfies") não diz por quê — parece falta de internet ou repositório
+       fora do ar. Aconteceu de verdade: Python 3.14 no PC, e o script mandou
+       ler a seção de placa de vídeo do README, que não tinha nada a ver. */
+    pythons: ['3.12', '3.11', '3.10'],
+    porqueEssePython: 'ele fixa torch==2.5.1, que nao tem instalador pra Python 3.13 ou mais novo',
   },
   kokoro: {
     nome: 'Kokoro',
@@ -537,6 +545,62 @@ const VOZ_INSTALADORES = {
     aviso: 'Roda bem só com processador. Não clona a sua voz — usa vozes prontas.',
   },
 };
+
+/* Escolhe COM QUAL Python criar o ambiente, quando o motor exige uma faixa.
+   Sem isto o script usa o `python` do PATH — que é o mais NOVO instalado, e
+   justamente o que costuma não ter instalador de torch ainda.
+
+   O lançador `py` do Windows resolve: ele lista as versões instaladas e deixa
+   pedir uma. Vem junto com o instalador oficial do python.org, então quem tem
+   Python tem o `py`.
+
+   Motor sem faixa declarada (Kokoro) não passa por aqui — não inventa
+   exigência pra quem já funciona. */
+function blocoPythonCompativel(m){
+  if (!Array.isArray(m.pythons) || !m.pythons.length) {
+    return ['set "PYEXE=python"', ''];
+  }
+  const faixa = m.pythons.join(', ');
+  const L = [
+    'REM --- Python compativel: ' + (m.porqueEssePython || 'o projeto exige uma faixa') + '. ---',
+    'set "PYEXE="',
+  ];
+  for (const v of m.pythons){
+    L.push('if not defined PYEXE ( py -' + v + ' --version >nul 2>nul && set "PYEXE=py -' + v + '" )');
+  }
+  /* Sem o lançador `py` (acontece com Python da Microsoft Store), ainda vale
+     perguntar ao `python` do PATH: se ELE já estiver na faixa, está resolvido.
+     Sem esta linha o script mandaria instalar uma versão que a pessoa tem. */
+  L.push('if not defined PYEXE ( ' + testePythonDoVenv(m) + ' && set "PYEXE=python" )');
+  L.push(
+    'if not defined PYEXE (',
+    '  echo [FALTA] O ' + m.nome + ' precisa de Python ' + faixa + '.',
+    '  echo         Motivo: ' + (m.porqueEssePython || '') + '.',
+    '  echo         O Python que voce tem no PATH e este:',
+    '  python --version',
+    '  echo.',
+    '  echo   Instale a versao pedida ^(pode ter as duas no mesmo PC, uma nao atrapalha a outra^):',
+    '  echo       winget install Python.Python.' + m.pythons[0],
+    '  echo   ou baixe em https://www.python.org/downloads/',
+    '  echo   Depois rode este arquivo de novo.',
+    '  pause & exit /b 1',
+    ')',
+    'echo [ok] Usando Python compativel:',
+    '%PYEXE% --version',
+    'echo.',
+    ''
+  );
+  return L;
+}
+
+/* Uma linha de .bat que sai com codigo 1 se o Python ATIVO estiver fora da
+   faixa do motor. Motor sem faixa aceita qualquer um (sai sempre 0). */
+function testePythonDoVenv(m){
+  if (!Array.isArray(m.pythons) || !m.pythons.length) return 'cmd /c exit 0';
+  const tuplas = m.pythons.map(v => '(' + v.split('.').join(',') + ')').join(',');
+  return 'python -c "import sys; raise SystemExit(0 if sys.version_info[:2] in [' +
+         tuplas + '] else 1)" >nul 2>nul';
+}
 
 function scriptInstaladorVoz(id){
   const m = VOZ_INSTALADORES[id];
@@ -584,6 +648,7 @@ function scriptInstaladorVoz(id){
     'python --version',
     'echo.',
     '',
+    ...blocoPythonCompativel(m),
     'REM --- clona ao lado deste .bat, nao no disco todo ---',
     'cd /d "%~dp0"',
     'if exist "' + m.pasta + '" (',
@@ -602,9 +667,22 @@ function scriptInstaladorVoz(id){
     '',
     'REM --- venv: as dependencias ficam NESTA pasta, nao no Python do sistema.',
     'REM     Desinstalar = apagar a pasta. ---',
+    /* Ambiente que já existe pode ter sido criado com o Python errado numa
+       tentativa anterior — e aí reaproveitar significa falhar de novo pelo
+       mesmo motivo, agora sem nem a pista da versão na tela. Confere e refaz. */
+    'if exist ".venv" (',
+    '  call ".venv\\Scripts\\activate.bat"',
+    '  ' + testePythonDoVenv(m),
+    '  if errorlevel 1 (',
+    '    echo [refazendo] O ambiente aqui foi criado com um Python incompativel.',
+    '    echo              Apagando .venv e criando de novo com o certo.',
+    '    call deactivate >nul 2>nul',
+    '    rmdir /s /q ".venv"',
+    '  )',
+    ')',
     'if not exist ".venv" (',
     '  echo Criando ambiente virtual...',
-    '  python -m venv .venv || ( echo [ERRO] Falha ao criar o venv. & pause & exit /b 1 )',
+    '  %PYEXE% -m venv .venv || ( echo [ERRO] Falha ao criar o venv. & pause & exit /b 1 )',
     ')',
     'call ".venv\\Scripts\\activate.bat"',
     'python -m pip install --upgrade pip',
@@ -617,12 +695,24 @@ function scriptInstaladorVoz(id){
     '  pause & exit /b 1',
     ')',
     'echo Instalando dependencias ^(demora; o download grande e aqui^)...',
+    /* A ordem das causas aqui importa. A primeira versão listava a placa de
+       vídeo primeiro, e mandou o Victor caçar CUDA num erro que era de versão
+       de Python — o pip diz "Could not find a version that satisfies", que
+       parece internet caída ou repositório fora do ar, e não é. */
     'pip install -r requirements.txt || (',
     '  echo.',
-    '  echo [ERRO] A instalacao falhou.',
-    '  echo   Causa comum: a versao do torch depende da sua placa de video.',
-    '  echo   Abra o README em ' + m.repo,
-    '  echo   e siga a secao de instalacao para a SUA maquina.',
+    '  echo [ERRO] A instalacao falhou. Olhe a ULTIMA linha vermelha acima:',
+    '  echo.',
+    '  echo   "Could not find a version that satisfies ... torch"',
+    '  echo       = Python incompativel, NAO e a sua placa de video.',
+    '  echo         Este script ja tenta escolher a versao certa; se caiu aqui,',
+    '  echo         o projeto mudou o que ele exige. Veja no requirements.txt',
+    '  echo         qual torch ele pede e em que Python esse torch existe.',
+    '  echo.',
+    '  echo   erro de compilador, CUDA, ou "no kernel image"',
+    '  echo       = ai sim e a placa de video. Siga a secao de instalacao do',
+    '  echo         README em ' + m.repo,
+    '  echo.',
     '  pause & exit /b 1',
     ')',
     'echo.',
