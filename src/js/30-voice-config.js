@@ -1259,6 +1259,175 @@ function scriptInstalaTudo(modeloWhisper){
   return L.join('\r\n') + '\r\n';
 }
 
+/* ============================================================
+   INSTALAR DENTRO DO APP (Electron)
+
+   O download do .bat resolvia o problema técnico e não resolvia o humano. Entre
+   "baixar um arquivo" e "ter voz clonada" sobravam quatro passos que ninguém
+   faz com prazer: achar o arquivo em Downloads, abrir no Bloco de Notas, rodar,
+   e acompanhar numa janela preta que fecha sozinha justamente quando dá errado
+   — levando junto a mensagem de erro. Cada passo era um lugar pra desistir.
+
+   Aqui o app roda O MESMO .bat e mostra a saída nesta tela. O arquivo continua
+   existindo, continua sendo gerado pelo mesmo código, e continua sendo testado
+   num Windows de verdade pelo testa-instalador.yml — trocar isso por uma
+   reimplementação em JavaScript jogaria fora a única prova de execução real que
+   este projeto tem.
+
+   NO NAVEGADOR NADA MUDA. Sem a casca Electron não existe como executar coisa
+   nenhuma no PC (e ainda bem), então o botão continua baixando o .bat. É por
+   isso que a decisão é tomada no clique, e não no carregamento da tela: a mesma
+   build do painel roda nos dois lugares.
+
+   O QUE NÃO SE PERDEU NO CAMINHO: a confirmação. Instalar programa continua
+   sendo a coisa mais invasiva que este app faz. Quem pergunta agora é o diálogo
+   nativo do Windows, disparado pelo processo principal — dizendo o que vai
+   baixar, onde vai instalar e como desinstalar. O que sumiu foi o terminal, não
+   o consentimento.
+   ============================================================ */
+const VOZ_LOG_MAX = 600;   /* o pip imprime aos milhares; o DOM não aguenta tudo */
+let _vozInst = { rodando:false, desinscreve:null, linhas:[] };
+
+/* Devolve a ponte só quando ela REALMENTE serve. `window.jarvisDesktop.vozes`
+   existe em qualquer Electron, mas o instalador é um .bat: em macOS/Linux o
+   honesto é voltar pro download em vez de oferecer um botão que não anda. */
+async function vozPonteDesktop(){
+  const v = window.jarvisDesktop?.vozes;
+  if (!v || typeof v.instalar !== 'function') return null;
+  try{
+    const e = await v.estado();
+    return e?.suportado ? v : null;
+  }catch(err){ return null; }
+}
+
+function vozInstEl(id){ return document.getElementById(id); }
+
+function abrePainelInstalacao(){
+  const p = vozInstEl('voz-inst-painel');
+  if (p) p.hidden = false;
+  _vozInst.linhas = [];
+  const log = vozInstEl('voz-inst-log');
+  if (log) log.textContent = '';
+}
+
+function fasedaInstalacao(txt){
+  const el = vozInstEl('voz-inst-fase');
+  if (el) el.textContent = txt || '';
+}
+
+/* textContent, nunca innerHTML: isto aqui é saída de pip, git e PowerShell —
+   texto de terceiros. Um caminho de arquivo com "<" já bastaria pra sumir com
+   metade da linha; um pacote com nome malicioso seria pior. */
+function logInstalacao(linha){
+  _vozInst.linhas.push(String(linha ?? ''));
+  if (_vozInst.linhas.length > VOZ_LOG_MAX) _vozInst.linhas.splice(0, _vozInst.linhas.length - VOZ_LOG_MAX);
+  const log = vozInstEl('voz-inst-log');
+  if (!log) return;
+  log.textContent = _vozInst.linhas.join('\n');
+  /* Só acompanha o fim se a pessoa já estava no fim. Rolar à força enquanto
+     alguém lê uma linha de erro lá em cima é a forma mais rápida de esconder
+     justamente o que ela foi procurar. */
+  const noFim = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  if (noFim) log.scrollTop = log.scrollHeight;
+}
+
+function botoesInstalacao(){
+  const c = vozInstEl('voz-inst-cancelar');
+  const f = vozInstEl('voz-inst-fechar');
+  if (c) c.hidden = !_vozInst.rodando;
+  if (f) f.hidden = _vozInst.rodando;
+  const t = vozInstEl('voz-inst-tudo');
+  if (t) t.disabled = _vozInst.rodando;
+}
+
+async function instalaVozesNoApp(v){
+  if (_vozInst.rodando) return;
+  const modelo = vozInstEl('voz-stt-model')?.value || 'base';
+
+  abrePainelInstalacao();
+  fasedaInstalacao('Esperando você confirmar na janela do Windows…');
+  logInstalacao('Modelo do whisper escolhido: ' + modelo);
+
+  _vozInst.desinscreve?.();
+  _vozInst.desinscreve = v.aoProgredir((ev) => {
+    if (!ev) return;
+    if (ev.tipo === 'linha') logInstalacao(ev.texto);
+    else if (ev.tipo === 'fase'){ fasedaInstalacao(ev.texto); logInstalacao('=== ' + ev.texto); }
+    else if (ev.tipo === 'fim'){ fasedaInstalacao(ev.texto); logInstalacao('=== ' + ev.texto); }
+  });
+
+  _vozInst.rodando = true;
+  botoesInstalacao();
+  const msg = vozInstEl('voz-inst-msg');
+  if (msg){ msg.textContent = ''; msg.className = 'hint'; }
+
+  try{
+    const r = await v.instalar(modelo);
+    if (r?.ok){
+      fasedaInstalacao('Instalado.');
+      if (msg){
+        msg.textContent = 'Pronto. Os motores subiram sozinhos — a aba já deve mostrar ' +
+          '"no ar" em instantes. Na primeira vez o Chatterbox ainda baixa ~2 GB de modelo ' +
+          'antes de conseguir falar.';
+        msg.className = 'hint ok';
+      }
+    }else{
+      fasedaInstalacao(r?.cancelado ? 'Cancelado.' : 'Não terminou.');
+      if (msg){
+        msg.textContent = (r?.erro || 'A instalação não terminou.') +
+          (r?.cancelado ? '' : ' Rodar de novo é seguro: ele pula tudo que já deu certo.');
+        msg.className = r?.cancelado ? 'hint' : 'hint erro';
+      }
+    }
+  }catch(e){
+    fasedaInstalacao('Falhou.');
+    logInstalacao('[erro] ' + e.message);
+    if (msg){ msg.textContent = 'Não consegui falar com o instalador: ' + e.message; msg.className = 'hint erro'; }
+  }finally{
+    _vozInst.rodando = false;
+    botoesInstalacao();
+    /* Relê o estado dos motores: é o que faz a linha "no ar" aparecer sem F5,
+       e o que prova que a instalação valeu de alguma coisa. */
+    vozCarregar().catch(() => {});
+  }
+}
+
+/* Decide no CLIQUE, não no carregamento: a mesma build roda no navegador e
+   dentro do Electron. */
+async function instalarTudo(){
+  const v = await vozPonteDesktop();
+  if (!v) return baixaInstaladorTudo();
+  return instalaVozesNoApp(v);
+}
+
+/* Ajusta o texto da seção quando dá pra instalar aqui dentro. Se a ponte não
+   existir, o HTML fica como está — falando de download, que é o que acontece. */
+async function ajustaTextoInstaladores(){
+  const v = await vozPonteDesktop();
+  if (!v) return;
+  const b = vozInstEl('voz-inst-tudo');
+  if (b) b.textContent = 'Instalar TUDO neste PC';
+  const explica = vozInstEl('voz-inst-explica');
+  if (explica){
+    explica.innerHTML = 'O de <b>TUDO</b> resolve a lista inteira sem você sair daqui: Git, ' +
+      'Python 3.12, ffmpeg, Chatterbox, Kokoro e o modelo do whisper. O JARVIS pede sua ' +
+      'confirmação, mostra cada etapa abaixo em tempo real, e no fim <b>liga os motores ' +
+      'sozinho</b>. Instala em <b>Documentos\\VTz LLM</b>; desinstalar é apagar essa pasta. ' +
+      'São <b>vários GB</b> — dá pra cancelar no meio e continuar depois, que ele pula o ' +
+      'que já ficou pronto.';
+  }
+  /* Já instalado de uma sessão anterior? Sobe sem reinstalar nada. O atalho da
+     Inicialização do Windows cobre o login; isto cobre quem instalou, fechou o
+     app e voltou antes de reiniciar a máquina. */
+  const ligar = vozInstEl('voz-inst-ligar');
+  if (ligar){
+    try{
+      const e = await v.estado();
+      ligar.hidden = !(e?.motores || []).some(m => m.instalado);
+    }catch(err){ ligar.hidden = true; }
+  }
+}
+
 function baixaInstaladorTudo(){
   const msg = document.getElementById('voz-inst-msg');
   const mw = document.getElementById('voz-stt-model')?.value || 'base';
@@ -1328,7 +1497,48 @@ function setupInstaladoresVoz(){
   const k = document.getElementById('voz-inst-kokoro');
   if (k) k.onclick = () => baixaInstaladorVoz('kokoro');
   const t = document.getElementById('voz-inst-tudo');
-  if (t) t.onclick = () => baixaInstaladorTudo();
+  if (t) t.onclick = () => instalarTudo();
+
+  const canc = document.getElementById('voz-inst-cancelar');
+  if (canc) canc.onclick = async () => {
+    canc.disabled = true;
+    try{
+      await window.jarvisDesktop?.vozes?.cancelar();
+      logInstalacao('=== cancelando (derrubando o instalador e o que ele abriu)…');
+    }catch(e){ logInstalacao('[erro ao cancelar] ' + e.message); }
+    finally{ canc.disabled = false; }
+  };
+
+  const fech = document.getElementById('voz-inst-fechar');
+  if (fech) fech.onclick = () => {
+    const p = document.getElementById('voz-inst-painel');
+    if (p) p.hidden = true;
+    /* Solta o ouvinte do IPC ao fechar: sem isso, abrir e fechar a aba dez
+       vezes deixaria dez inscrições vivas escrevendo a mesma linha dez vezes. */
+    _vozInst.desinscreve?.();
+    _vozInst.desinscreve = null;
+  };
+
+  const ligar = document.getElementById('voz-inst-ligar');
+  if (ligar) ligar.onclick = async () => {
+    const v = await vozPonteDesktop();
+    if (!v) return;
+    ligar.disabled = true;
+    abrePainelInstalacao();
+    fasedaInstalacao('Ligando os motores…');
+    _vozInst.desinscreve?.();
+    _vozInst.desinscreve = v.aoProgredir((ev) => { if (ev?.tipo === 'linha') logInstalacao(ev.texto); });
+    botoesInstalacao();
+    try{
+      const r = await v.ligar();
+      fasedaInstalacao(r?.ok ? 'Motores no ar.' : 'Nenhum motor subiu — veja o log.');
+      vozCarregar().catch(() => {});
+    }catch(e){ fasedaInstalacao('Falhou: ' + e.message); }
+    finally{ ligar.disabled = false; }
+  };
+
+  ajustaTextoInstaladores();
+
   const rec = document.getElementById('voz-reconectar');
   if (rec) rec.onclick = async () => {
     rec.disabled = true;

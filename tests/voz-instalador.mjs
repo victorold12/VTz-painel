@@ -77,16 +77,25 @@ for (const [motor, botao, porta, repo] of [
     /git-scm\.com/.test(txt) && /python\.org/.test(txt));
   checa(motor + ': instala ao lado do próprio arquivo', /cd \/d "%~dp0"/.test(txt));
   checa(motor + ': clona o repositório certo', txt.includes(repo), repo);
-  checa(motor + ': usa ambiente virtual isolado', /python -m venv \.venv/.test(txt));
+  /* `-m venv .venv` sem cravar o executável: desde que o script passou a
+     escolher a versão compatível, quem cria o ambiente é `%PYEXE%` (que vale
+     `py -3.12`, ou `python` quando o do PATH já serve). Exigir literalmente
+     "python -m venv" reprovava justamente a correção. */
+  checa(motor + ': usa ambiente virtual isolado', /-m venv \.venv/.test(txt));
   checa(motor + ': instala as dependências do projeto', /pip install -r requirements\.txt/.test(txt));
   checa(motor + ': manda ler o README quando depende da máquina',
     /README/.test(txt) && /torch/i.test(txt));
   checa(motor + ': diz a porta que o JARVIS procura', txt.includes(porta), porta);
   checa(motor + ': avisa que o modelo baixa na primeira vez', /primeira vez/i.test(txt));
-  /* Um `rmdir /s`, `del /q` ou `format` aqui seria catastrófico e silencioso.
-     O script só clona e instala — nada que apague. */
-  checa(motor + ': não apaga nada no PC de ninguém',
-    !/rmdir|del \/|format |reg delete/i.test(txt));
+  /* Um `rmdir /s`, `del /q` ou `format` solto aqui seria catastrófico e
+     silencioso. A regra NÃO é "nenhum apagar existe" — o script apaga o próprio
+     `.venv` de propósito, quando descobre que um ambiente sobrou de uma
+     tentativa com o Python errado (reaproveitar significaria falhar de novo pelo
+     mesmo motivo, agora sem nem a pista da versão na tela). A regra é que TODO
+     apagar aponte pra algo que o próprio script criou. */
+  const destrutivas = txt.split('\r\n').filter(l => /rmdir|del \/|format |reg delete/i.test(l));
+  checa(motor + ': só apaga o que ele mesmo criou',
+    destrutivas.every(l => /\.venv/.test(l)), destrutivas);
   checa(motor + ': para no primeiro erro em vez de seguir quebrado',
     /exit \/b 1/.test(txt));
 }
@@ -96,7 +105,121 @@ const msg = await p.evaluate(() => document.getElementById('voz-inst-msg')?.inne
 checa('confirma o download', /baixado/i.test(msg), msg.slice(0, 120));
 checa('e manda ler antes de rodar', /Bloco de Notas|leia/i.test(msg), msg.slice(0, 160));
 
-checa('sem erro de página', erros.length === 0, erros.slice(0, 3));
+/* ============================================================
+   No navegador o botão de TUDO tem que continuar BAIXANDO. É metade do pedido
+   do instalador embutido ("no navegador, manter o download como está"), e a
+   forma de quebrar isso é sutil: bastaria a tela decidir o modo ao carregar,
+   em vez de no clique, pra a mesma build passar a se comportar diferente. */
+console.log('— fora do Electron, TUDO continua baixando um .bat');
+const tudo = await baixa('#voz-inst-tudo');
+checa('nome do arquivo de TUDO', tudo.nome === 'instalar-tudo.bat', tudo.nome);
+checa('conteúdo é script do Windows', tudo.txt.startsWith('@echo off'), tudo.txt.slice(0, 30));
+checa('instala em Documentos\\VTz LLM', /VTz LLM/.test(tudo.txt));
+
+/* ============================================================
+   DENTRO do Electron o MESMO botão instala aqui dentro.
+
+   A ponte é falsificada porque o que está sendo testado é a decisão do painel,
+   não o Electron: se ele chama a ponte em vez de baixar, se manda o modelo que
+   está selecionado na tela, e se o log aparece na hora em vez de no fim. Um
+   teste que só conferisse "a função existe" não pegaria nenhuma das três.
+   ============================================================ */
+console.log('— dentro do Electron, o mesmo botão instala sem baixar nada');
+/* Contexto NOVO, e a ponte instalada por addInitScript: o build é um IIFE, então
+   as funções do painel não existem em `window` e não dá pra religar os botões de
+   fora. Injetar antes do app carregar é também o que acontece de verdade — o
+   preload do Electron roda antes do documento. */
+const ctxE = await novoContexto(b, { acceptDownloads: true });
+await fingeCatalogo(ctxE);
+await ctxE.addInitScript(() => {
+  localStorage.setItem('vtz_or_key', 'sk-t');
+  window.__chamadas = [];
+  let emite = null;
+  window.jarvisDesktop = {
+    isElectron: true,
+    platform: 'win32',
+    vozes: {
+      estado: async () => ({ suportado: true, rodando: false,
+                             motores: [{ id:'chatterbox', instalado: true }] }),
+      instalar: async (modelo) => {
+        window.__chamadas.push(modelo);
+        emite?.({ tipo:'fase', fase:'instalando', texto:'Rodando o instalador…' });
+        emite?.({ tipo:'linha', texto:'--- [1/7] Git' });
+        emite?.({ tipo:'linha', texto:'      [ok] ja instalado.' });
+        /* Saída de terceiros com cara de HTML: é o que chegaria se um caminho de
+           pacote (ou um pacote malicioso) trouxesse marcação. */
+        emite?.({ tipo:'linha', texto:'<img src=x onerror="window.__xss=1">' });
+        emite?.({ tipo:'fim', ok:true, texto:'Pronto.' });
+        return { ok: true };
+      },
+      ligar: async () => ({ ok: true }),
+      cancelar: async () => ({ ok: true }),
+      aoProgredir: (cb) => { emite = cb; return () => { emite = null; }; },
+    },
+  };
+});
+const pe = await ctxE.newPage();
+const errosE = [];
+pe.on('pageerror', e => errosE.push(e.message));
+await pe.goto(estatico.url + '/index.html');
+await pe.waitForTimeout(2600);
+await abreConfig(pe, 'voz');
+/* ajustaTextoInstaladores() é assíncrono: pergunta o estado à ponte. */
+await pe.waitForTimeout(400);
+
+const rotulo = await pe.evaluate(() => document.getElementById('voz-inst-tudo')?.textContent || '');
+checa('o botão passa a dizer que instala, não que baixa',
+  /instalar/i.test(rotulo) && !/baixar/i.test(rotulo), rotulo);
+
+/* Escolhe um modelo diferente do padrão: se o painel mandasse "base" cravado
+   pra ponte, este é o teste que pegaria.
+
+   A lista de modelos é preenchida por vozRenderStt(), que só roda quando existe
+   um PC pareado — e aqui, de propósito, não existe (é o estado de quem ainda vai
+   instalar; sem pareamento o instalador usa "base", que é o padrão certo). Então
+   o teste monta a opção à mão pra chegar no estado de DEPOIS do pareamento, que
+   é quando trocar de modelo e reinstalar faz sentido. */
+const trocou = await pe.evaluate(() => {
+  const s = document.getElementById('voz-stt-model');
+  if (!s) return false;
+  s.innerHTML = '<option value="base">base</option><option value="small">small</option>';
+  s.value = 'small';
+  return s.value === 'small';
+});
+checa('deu pra escolher outro modelo do whisper', trocou === true);
+
+let baixouAlgo = false;
+pe.once('download', () => { baixouAlgo = true; });
+await pe.click('#voz-inst-tudo');
+await pe.waitForTimeout(800);
+
+const dentro = await pe.evaluate(() => ({
+  chamadas: window.__chamadas,
+  painelVisivel: !document.getElementById('voz-inst-painel')?.hidden,
+  log: document.getElementById('voz-inst-log')?.textContent || '',
+  fase: document.getElementById('voz-inst-fase')?.textContent || '',
+  xss: !!window.__xss,
+  temImg: !!document.getElementById('voz-inst-log')?.querySelector('img'),
+}));
+
+checa('chamou a ponte do desktop', dentro.chamadas.length === 1, dentro.chamadas);
+checa('e mandou o modelo escolhido na tela, não um fixo',
+  dentro.chamadas[0] === 'small', dentro.chamadas);
+checa('NÃO baixou arquivo nenhum', baixouAlgo === false);
+checa('abriu o painel de progresso', dentro.painelVisivel === true);
+checa('e mostra as linhas do instalador em tempo real',
+  /\[1\/7\] Git/.test(dentro.log) && /ja instalado/.test(dentro.log), dentro.log.slice(0, 300));
+checa('a fase aparece pra quem está olhando', dentro.fase.length > 0, dentro.fase);
+
+/* O log recebe saída de pip, git e PowerShell — texto de terceiros. Escrito como
+   HTML, um caminho com "<" sumiria com metade da linha, e coisa pior seria
+   possível numa janela que já tem a ponte pro processo principal. */
+checa('o log não executa o que veio do instalador', dentro.xss === false);
+checa('nem cria elemento a partir dele', dentro.temImg === false);
+checa('mostra o texto como veio', dentro.log.includes('<img src=x'), dentro.log.slice(-120));
+
+checa('sem erro de página (navegador)', erros.length === 0, erros.slice(0, 3));
+checa('sem erro de página (desktop)', errosE.length === 0, errosE.slice(0, 3));
 
 const saida = fim();
 await b.close();
