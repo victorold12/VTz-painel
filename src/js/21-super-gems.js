@@ -60,7 +60,16 @@ function renderChat(){
 }
 function safeRenderMarkdown(content){
   if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined'){
-    try{ return DOMPurify.sanitize(marked.parse(content || '')); }
+    try{
+      /* Matemática sai do texto ANTES do markdown e volta DEPOIS do sanitize.
+         Antes: `_` da fórmula virava itálico e `\frac{}{}` chegava cru na tela.
+         Depois do sanitize porque o KaTeX gera <span> com estilo inline, e o
+         DOMPurify com a configuração daqui removeria metade do layout dele. */
+      const mat = katexDisponivel() ? extraiMatematica(content || '') : null;
+      const bruto = marked.parse(mat ? mat.texto : (content || ''));
+      const limpo = DOMPurify.sanitize(bruto);
+      return mat ? devolveMatematica(limpo, mat.achados) : limpo;
+    }
     catch(e){ console.error('Erro no parse de markdown, usando fallback texto puro:', e); }
   }
   // Fallback: CDN de marked/DOMPurify não carregou (ad-blocker, firewall, offline).

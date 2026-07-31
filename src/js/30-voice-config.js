@@ -788,7 +788,20 @@ function scriptInstalaTudo(modeloWhisper){
     'REM Uma raiz só, com as coisas separadas por assunto. Apagar esta pasta',
     'REM desinstala tudo que este script trouxe — nada vai parar no Windows,',
     'REM em Arquivos de Programas, nem no registro.',
-    'set "RAIZ=%~dp0JARVIS"',
+    /* Pasta FIXA, e não "ao lado do .bat". O Victor rodou `cd JARVIS\\vozes\\...`
+       a partir da pasta pessoal e não achou nada — porque o .bat estava em
+       Downloads, e o caminho dependia de onde o arquivo tinha parado. Endereço
+       previsível vale mais que flexibilidade aqui: dá pra escrever no LEIA-ME,
+       no atalho e no suporte sem perguntar onde foi salvo.
+
+       O caminho de Documentos vem do registro: em Windows em português a pasta
+       APARECE como "Documentos", mas o nome real no disco costuma ser
+       "Documents" — e pode ter sido movida pro OneDrive. Perguntar ao Windows
+       acerta nos três casos; chutar acerta em um. */
+    'set "RAIZ="',
+    'for /f "usebackq tokens=2,*" %%A in (`reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders" /v Personal 2^>nul`) do set "DOCS=%%B"',
+    'if not defined DOCS set "DOCS=%USERPROFILE%\\Documents"',
+    'set "RAIZ=%DOCS%\\VTz LLM"',
     'set "VOZES=%RAIZ%\\vozes"',
     'set "WPROG=%RAIZ%\\whisper\\programa"',
     'set "WMOD=%RAIZ%\\whisper\\modelos"',
@@ -801,7 +814,7 @@ function scriptInstalaTudo(modeloWhisper){
     'echo.',
     'echo  Vai criar esta arvore:',
     'echo.',
-    'echo     JARVIS\\',
+    'echo     Documentos\\VTz LLM\\',
     'echo       vozes\\' + cb.pasta + '\\      voz clonada',
     'echo       vozes\\' + kk.pasta + '\\      vozes prontas',
     'echo       whisper\\programa\\               transcricao',
@@ -959,6 +972,58 @@ function scriptInstalaTudo(modeloWhisper){
     'echo.',
     '',
     'REM ============ papeis que ficam na pasta ============',
+    /* ============ ligar as vozes sem digitar nada ============
+       Pedido depois de errar o `cd` duas vezes: ninguem quer decorar caminho de
+       venv pra ouvir a propria voz. Este .bat sobe os dois servidores em
+       janelas minimizadas, e o atalho na Inicializacao faz isso no login.
+
+       DUAS janelas separadas, e nao uma: cada servidor precisa do venv DELE
+       ativo, e o Chatterbox baixa 2 GB na primeira execucao — misturar os dois
+       na mesma janela esconde qual esta baixando e qual quebrou.
+
+       O atalho fica na pasta Inicializar do USUARIO, nao no registro nem como
+       servico: some arrastando pra lixeira, e da pra ver que existe. Iniciar
+       junto com o Windows e invasivo o bastante pra ter que ser obvio. */
+    'echo --- Atalhos pra ligar as vozes',
+    '> "%RAIZ%\\ligar-vozes.bat" (',
+    '  echo @echo off',
+    '  echo title Ligando as vozes do JARVIS',
+    '  echo cd /d "%%~dp0"',
+    '  echo if exist "vozes\\' + cb.pasta + '\\.venv\\Scripts\\activate.bat" (',
+    '  echo   start "Chatterbox ^(porta ' + cb.porta + '^)" /min cmd /c "cd /d vozes\\' + cb.pasta + ' ^&^& call .venv\\Scripts\\activate.bat ^&^& python server.py"',
+    '  echo ^) else ^( echo [pulado] Chatterbox nao instalado. ^)',
+    '  echo if exist "vozes\\' + kk.pasta + '\\.venv\\Scripts\\activate.bat" (',
+    '  echo   start "Kokoro ^(porta ' + kk.porta + '^)" /min cmd /c "cd /d vozes\\' + kk.pasta + ' ^&^& call .venv\\Scripts\\activate.bat ^&^& python server.py"',
+    '  echo ^) else ^( echo [pulado] Kokoro nao instalado. ^)',
+    '  echo echo.',
+    '  echo echo Os dois servidores estao subindo em janelas minimizadas.',
+    '  echo echo Na PRIMEIRA vez o Chatterbox baixa ~2 GB e demora - deixe terminar.',
+    '  echo echo Abra o JARVIS: Configuracoes ^^^> Voz.',
+    '  echo timeout /t 6 ^>nul',
+    ')',
+    'echo      [ok] ligar-vozes.bat criado.',
+    '',
+    /* O atalho é criado pelo PowerShell (COM WScript.Shell); o cmd sozinho não
+       sabe escrever .lnk. Sobrescrever é de propósito: rodar o instalador de
+       novo não deve acumular atalhos repetidos na Inicialização. */
+    ps(
+      "$ErrorActionPreference='Stop'; " +
+      "try{ " +
+        "$ini=[Environment]::GetFolderPath('Startup'); " +
+        "$lnk=Join-Path $ini 'JARVIS - vozes.lnk'; " +
+        "$w=New-Object -ComObject WScript.Shell; " +
+        "$a=$w.CreateShortcut($lnk); " +
+        "$a.TargetPath='%RAIZ%\\ligar-vozes.bat'; " +
+        "$a.WorkingDirectory='%RAIZ%'; " +
+        "$a.WindowStyle=7; " +
+        "$a.Description='Sobe Chatterbox e Kokoro para o JARVIS'; " +
+        "$a.Save(); " +
+        "Write-Host '      [ok] vao ligar sozinhos quando voce entrar no Windows.'; " +
+        "Write-Host ('      Pra desligar isso, apague: ' + $lnk) " +
+      "}catch{ Write-Host ('      [aviso] nao consegui criar o atalho de inicializacao: ' + $_.Exception.Message) }"
+    ),
+    'echo.',
+    '',
     '> "%RAIZ%\\LEIA-ME.txt" (',
     '  echo JARVIS - dependencias instaladas aqui',
     '  echo =====================================',
@@ -1184,6 +1249,25 @@ function baixaInstaladorVoz(id){
   }
 }
 
+/* Reconexão automática enquanto a aba Voz está aberta.
+
+   Sem isto o estado dos motores era lido UMA vez, ao carregar. Quem instalava,
+   ligava os servidores e voltava pro app continuava vendo "não está rodando" —
+   e a conclusão natural é que a instalação falhou, quando só faltava um F5.
+   Agora a tela procura sozinha a cada 12s, e para quando você sai da aba: é
+   uma chamada ao PC pareado, não vale gastar com ela em segundo plano. */
+let _vozRelogio = null;
+function paraProcuraVozes(){ if (_vozRelogio){ clearInterval(_vozRelogio); _vozRelogio = null; } }
+function comecaProcuraVozes(){
+  paraProcuraVozes();
+  _vozRelogio = setInterval(() => {
+    const aba = document.querySelector('.cfg-group[data-cat="voz"]');
+    /* offsetParent nulo = escondido. Se a pessoa saiu da aba, para sozinho. */
+    if (!aba || !aba.offsetParent){ paraProcuraVozes(); return; }
+    vozCarregar().catch(() => {});
+  }, 12000);
+}
+
 function setupInstaladoresVoz(){
   const c = document.getElementById('voz-inst-chatterbox');
   if (c) c.onclick = () => baixaInstaladorVoz('chatterbox');
@@ -1191,4 +1275,21 @@ function setupInstaladoresVoz(){
   if (k) k.onclick = () => baixaInstaladorVoz('kokoro');
   const t = document.getElementById('voz-inst-tudo');
   if (t) t.onclick = () => baixaInstaladorTudo();
+  const rec = document.getElementById('voz-reconectar');
+  if (rec) rec.onclick = async () => {
+    rec.disabled = true;
+    vozMsg('Procurando Chatterbox e Kokoro neste PC…');
+    try{
+      await vozCarregar();
+      const ligados = Object.entries(vozState.engines || {}).filter(([, e]) => e && e.up).map(([id]) => id);
+      vozMsg(ligados.length
+        ? 'Encontrei: ' + ligados.join(' e ') + '.'
+        : 'Nenhuma voz respondeu. Elas estão RODANDO? Abra Documentos\\VTz LLM e execute ligar-vozes.bat.',
+        ligados.length ? 'ok' : 'erro');
+      comecaProcuraVozes();
+    }catch(e){
+      vozMsg('Não consegui perguntar ao seu PC: ' + e.message, 'erro');
+    }finally{ rec.disabled = false; }
+  };
+  comecaProcuraVozes();
 }

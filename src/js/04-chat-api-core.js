@@ -15,11 +15,27 @@ function orTimeoutMs(){
   return (Number.isFinite(v) && v >= 1000) ? v : 120000;
 }
 
+/* Teto de resposta, em tokens.
+
+   Existe por causa de um 402 com crédito na conta: "You requested up to 65536
+   tokens, but can only afford 8941". O app nunca mandava max_tokens, e sem esse
+   campo o OpenRouter RESERVA o máximo de saída do modelo e exige crédito pra
+   reserva inteira — mesmo que a resposta vá usar 300 tokens. Com R$ 50/mês isso
+   trava a conta bem antes de o dinheiro acabar de verdade.
+
+   4096 cobre com folga qualquer resposta de chat (~3 mil palavras). Quem
+   precisar de mais muda em vtz_or_max_tokens. */
+function orMaxTokens(){
+  const v = Number(localStorage.getItem('vtz_or_max_tokens'));
+  return (Number.isFinite(v) && v >= 256) ? v : 4096;
+}
+
 /* Chamada única à API de chat — todas as features passam por aqui */
 function orFetch(payload, opts = {}){
   // Roteamento por throughput: mesma qualidade (modelo idêntico), mas o OpenRouter
   // escolhe o provedor mais rápido no momento. Não sobrescreve preferências já postas.
-  const body = payload.provider ? payload : { ...payload, provider: { sort: 'throughput' } };
+  const comTeto = payload.max_tokens ? payload : { ...payload, max_tokens: orMaxTokens() };
+  const body = comTeto.provider ? comTeto : { ...comTeto, provider: { sort: 'throughput' } };
   const ctrl = new AbortController();
   const cancelaPeloUsuario = () => ctrl.abort(opts.signal?.reason);
   if (opts.signal){
@@ -68,7 +84,31 @@ function trackUsage(usage, modelId, conv){
 
    Avisa em toast de propósito: cair pra um modelo mais fraco em silêncio faria
    você culpar o app por uma resposta ruim sem saber que o crédito acabou. */
+/* O 402 do OpenRouter diz quanto ainda cabe: "can only afford 8941". Tentar de
+   novo com esse número aproveita o crédito que sobrou, em vez de trocar de
+   modelo por causa de uma reserva grande demais. Margem de 10% porque o preço
+   do prompt pode ter mudado entre as duas chamadas. */
+async function tentaComTetoQueCabe(payload, opts, respostaPaga){
+  let texto = '';
+  try{ texto = await respostaPaga.clone().text(); }catch(_){ return null; }
+  const m = texto.match(/can only afford (\d+)/i);
+  if (!m) return null;
+  const cabe = Math.floor(Number(m[1]) * 0.9);
+  if (!Number.isFinite(cabe) || cabe < 256) return null;   // sobra pouca demais pra valer a pena
+  if (payload.max_tokens && payload.max_tokens <= cabe) return null;  // já era menor: o problema é outro
+  toast(`Crédito baixo — respondendo com resposta mais curta (${cabe} tokens).`, 'warn');
+  try{
+    const res = await orFetch({ ...payload, max_tokens: cabe }, opts);
+    return res.ok ? res : null;
+  }catch(e){
+    if (e.name === 'AbortError') throw e;
+    return null;
+  }
+}
+
 async function quedaPraGratis(payload, opts, respostaPaga){
+  const curto = await tentaComTetoQueCabe(payload, opts, respostaPaga);
+  if (curto) return curto;
   const atual = payload.model || '';
   const lista = (state.models && state.models.length) ? state.models : FALLBACK_MODELS;
   const gratis = lista.find(m => isFreeModel(m) && !isImageModel(m) && m.id !== atual);
