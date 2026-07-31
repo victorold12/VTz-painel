@@ -890,8 +890,10 @@ function scriptInstalaTudo(modeloWhisper){
       "$ErrorActionPreference='Stop'; " +
       "try{ " +
         "$r=Invoke-RestMethod -Uri 'https://api.github.com/repos/ggml-org/whisper.cpp/releases/latest' -Headers @{'User-Agent'='jarvis'}; " +
-        "$a=$r.assets | Where-Object { $_.name -match 'win' -and $_.name -match 'x64' -and $_.name -like '*.zip' } | Select-Object -First 1; " +
-        "if(-not $a){ throw 'nenhum anexo de Windows x64 nesta release' } " +
+        "$zips=$r.assets | Where-Object { $_.name -like '*.zip' }; " +
+        "$a=$zips | Where-Object { $_.name -match 'win' -and $_.name -match 'x64' } | Select-Object -First 1; " +
+        "if(-not $a){ $a=$zips | Where-Object { $_.name -match 'win|x64|bin' } | Select-Object -First 1 } " +
+"if(-not $a){ throw ('nenhum anexo servivel. Anexos desta release: ' + (($r.assets | ForEach-Object { $_.name }) -join ', ')) } " +
         "Write-Host ('      achei: ' + $a.name); " +
         "$z=Join-Path $env:TEMP $a.name; " +
         "Invoke-WebRequest -Uri $a.browser_download_url -OutFile $z; " +
@@ -929,7 +931,7 @@ function scriptInstalaTudo(modeloWhisper){
     'if defined JARVIS_PULAR_VOZES (',
     '  echo      [pulado] JARVIS_PULAR_VOZES ligado.',
     ') else (',
-    '  call :instala_python_repo "' + kk.repo + '" "' + kk.pasta + '" 0',
+    '  call :instala_python_repo "' + kk.repo + '" "' + kk.pasta + '" 2',
     ')',
     'echo.',
     '',
@@ -1081,8 +1083,13 @@ function scriptInstalaTudo(modeloWhisper){
     'set "REPO=%~1"',
     'set "PASTA=%VOZES%\\%~2"',
     'set "PRECISA312=%~3"',
+    /* 0 = qualquer Python serve | 1 = exige 3.12 | 2 = prefere 3.12, aceita outro.
+       O Kokoro virou 2 depois do teste no Windows: ele nao FIXA torch como o
+       Chatterbox, mas o `python` do PATH e o mais novo instalado, e foi nele
+       que o pip quebrou no runner. Preferir uma versao conhecida-boa custa nada
+       e some com a classe inteira do problema. */
     'set "PY=python"',
-    'if "%PRECISA312%"=="1" ( py -3.12 --version >nul 2>nul && set "PY=py -3.12" )',
+    'if not "%PRECISA312%"=="0" ( py -3.12 --version >nul 2>nul && set "PY=py -3.12" )',
     'if "%PRECISA312%"=="1" if "%PY%"=="python" (',
     '  echo      [pulado] precisa do Python 3.12, que nao esta disponivel.',
     '  endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
