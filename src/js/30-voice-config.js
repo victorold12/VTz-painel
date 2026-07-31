@@ -816,7 +816,7 @@ function scriptInstalaTudo(modeloWhisper){
     'echo  Instalado em: %RAIZ%',
     'echo  Desinstalar = apagar essa pasta.',
     'echo.',
-    'pause',
+    'call :pausa',
     'echo.',
     '',
     'if not exist "%VOZES%" mkdir "%VOZES%"',
@@ -914,11 +914,23 @@ function scriptInstalaTudo(modeloWhisper){
     'echo.',
     '',
     'REM ============ 7. Chatterbox e Kokoro ============',
+    /* JARVIS_PULAR_VOZES: escape pro CI. O `pip install` do torch é de longe o
+       passo mais lento, e quando o que se quer testar é a mecânica do script
+       (pastas, PATH, whisper, stt.json) esperar por ele desperdiça minutos de
+       Windows a cada iteração. Fora do CI ninguém define isso. */
     'echo --- [6/7] ' + cb.nome + ' (clona a sua voz)',
-    'call :instala_python_repo "' + cb.repo + '" "' + cb.pasta + '" 1',
+    'if defined JARVIS_PULAR_VOZES (',
+    '  echo      [pulado] JARVIS_PULAR_VOZES ligado.',
+    ') else (',
+    '  call :instala_python_repo "' + cb.repo + '" "' + cb.pasta + '" 1',
+    ')',
     'echo.',
     'echo --- [7/7] ' + kk.nome + ' (vozes prontas)',
-    'call :instala_python_repo "' + kk.repo + '" "' + kk.pasta + '" 0',
+    'if defined JARVIS_PULAR_VOZES (',
+    '  echo      [pulado] JARVIS_PULAR_VOZES ligado.',
+    ') else (',
+    '  call :instala_python_repo "' + kk.repo + '" "' + kk.pasta + '" 0',
+    ')',
     'echo.',
     '',
     'REM ============ apontar o Agente Local pras pastas novas ============',
@@ -989,10 +1001,19 @@ function scriptInstalaTudo(modeloWhisper){
     'echo.',
     'echo  No app: Configuracoes ^> Voz ^> escolha o motor ^> Salvar.',
     'echo.',
-    'pause',
+    'call :pausa',
     'exit /b 0',
     '',
     'REM ---------- sub-rotinas ----------',
+    /* `pause` espera tecla — e um script que espera tecla nunca termina numa
+       maquina sem ninguem na frente. Com JARVIS_SEM_PAUSA=1 ele roda direto,
+       que e como o CI do Windows executa isto pra valer de verdade num Windows
+       real, em vez de eu conferir chaves e escapes no olho e torcer. */
+    ':pausa',
+    'if defined JARVIS_SEM_PAUSA exit /b 0',
+    'pause',
+    'exit /b 0',
+    '',
     /* :garante "<comando de teste>" <id-winget> <nome-no-resumo> <site>
        Confere -> instala -> RECARREGA O PATH -> confere de novo.
 
