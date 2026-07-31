@@ -1263,7 +1263,13 @@ function scriptInstalaTudo(modeloWhisper){
        Vai pra TODOS os motores, nao so pro Chatterbox: bibliotecas Python
        escritas antes do 3.12 assumem pkg_resources sem declarar, e este e o
        tipo de falta que aparece longe da causa. */
-    'python -m pip install --upgrade setuptools wheel >nul || echo      [aviso] nao consegui instalar setuptools.',
+    /* `setuptools<82` e NAO `--upgrade setuptools`. O pkg_resources foi REMOVIDO
+       no setuptools 82.0.0 — entao pedir a versao mais nova instala justamente
+       a que nao tem o que o perth precisa. A primeira tentativa deste conserto
+       fez exatamente isso: instalou setuptools, e o `import pkg_resources`
+       continuou falhando. Conserto certo, versao errada.
+       (setuptools.pypa.io/en/stable/history.html — removido na v82) */
+    'python -m pip install "setuptools<82" wheel >nul || echo      [aviso] nao consegui instalar setuptools.',
     /* Nem todo projeto Python usa requirements.txt. O Kokoro-FastAPI declara as
        dependencias no pyproject.toml, e o script recusava instalar dizendo "sem
        requirements.txt; veja o README" — ou seja, o Kokoro NUNCA foi instalado
@@ -1392,7 +1398,7 @@ function scriptInstalaTudo(modeloWhisper){
     '  python -c "import perth,sys; sys.exit(0 if perth.PerthImplicitWatermarker else 1)" >nul 2>nul',
     '  if errorlevel 1 (',
     '    echo      a marca-d^\'agua nao carregou; instalando resemble-perth e setuptools...',
-    '    pip install --upgrade setuptools resemble-perth >nul 2>nul',
+    '    pip install "setuptools<82" resemble-perth >nul 2>nul',
     '    python -c "import perth,sys; sys.exit(0 if perth.PerthImplicitWatermarker else 1)" >nul 2>nul',
     '    if errorlevel 1 (',
     '      echo      [ATENCAO] o perth continua sem carregar. O servidor vai subir e',
