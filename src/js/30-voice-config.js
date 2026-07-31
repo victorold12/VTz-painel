@@ -736,6 +736,284 @@ function scriptInstaladorVoz(id){
   return L.join('\r\n') + '\r\n';
 }
 
+/* ============================================================
+   INSTALADOR DE TUDO NUMA PASSADA
+
+   Pedido do Victor: "quando eu baixar o app via .msi, baixa todas as
+   dependências de tudo".
+
+   POR QUE NÃO DENTRO DO .msi: são vários GB. Instalador do Windows que fica 40
+   minutos baixando não tem barra de progresso própria, não retoma de onde
+   parou, e uma queda de rede no meio deixa a instalação pela metade — com
+   direito a entrada no "Adicionar ou remover programas" apontando pra algo que
+   não funciona. Fora que roda como administrador, então o estrago é maior. O
+   .msi continua sendo 110 MB que instala em segundos; o peso vem depois, aqui,
+   onde dá pra ver, cancelar e repetir.
+
+   O QUE ELE FAZ: uma lista de etapas independentes. Cada uma confere se já
+   está feita e pula. Uma falhar não derruba as outras — no fim ele diz o que
+   entrou e o que não, em vez de morrer na primeira e esconder o resto.
+
+   O QUE ELE NÃO INVENTA: o binário do whisper.cpp. O nome do arquivo muda a
+   cada release, e eu não tenho como conferir daqui — chutar significaria um
+   link quebrado dentro de um script que a pessoa roda achando que resolve.
+   ============================================================ */
+const WHISPER_URL_BASE = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main';
+
+/* Tamanho mínimo plausível de cada modelo, em MB. Serve pra UMA coisa: se o
+   download trouxer uma página de erro em vez do modelo (link mudou, HF fora do
+   ar), o arquivo sai com poucos KB, e sem esta checagem ele ficaria lá com
+   nome certo e conteúdo de HTML — pra falhar depois, dentro do whisper, com
+   uma mensagem que não ajuda ninguém. */
+const WHISPER_MB_MIN = { tiny: 60, base: 120, small: 400, medium: 1200, 'large-v3': 2500 };
+
+function scriptInstalaTudo(modeloWhisper){
+  const mw = WHISPER_MB_MIN[modeloWhisper] ? modeloWhisper : 'base';
+  const minMb = WHISPER_MB_MIN[mw];
+  const cb = VOZ_INSTALADORES.chatterbox;
+  const kk = VOZ_INSTALADORES.kokoro;
+  const L = [
+    '@echo off',
+    'chcp 65001 >nul',
+    'setlocal',
+    'title Instalar tudo - JARVIS',
+    'cd /d "%~dp0"',
+    'set "FALHOU="',
+    'echo.',
+    'echo ===============================================',
+    'echo  JARVIS - instalar todas as dependencias',
+    'echo ===============================================',
+    'echo.',
+    'echo  Etapas: Git, Python 3.12, ffmpeg, Chatterbox, Kokoro,',
+    'echo          e o modelo do whisper (' + mw + ').',
+    'echo.',
+    'echo  Sao varios GB no total. Cada etapa pula sozinha se ja estiver',
+    'echo  feita, entao voce pode rodar este arquivo quantas vezes quiser.',
+    'echo.',
+    'echo  Tudo e instalado NESTA pasta (ou no seu usuario), nunca no Windows.',
+    'echo  Desinstalar = apagar as pastas que aparecem no fim.',
+    'echo.',
+    'pause',
+    'echo.',
+    '',
+    'REM =============== 1. winget ===============',
+    'where winget >nul 2>nul',
+    'if errorlevel 1 (',
+    '  echo [ATENCAO] winget nao encontrado. Ele vem no "Instalador de Aplicativo"',
+    '  echo           da Microsoft Store. Sem ele eu nao instalo Git/Python/ffmpeg',
+    '  echo           sozinho - as outras etapas seguem, e no fim eu digo o que faltou.',
+    '  set "SEMWINGET=1"',
+    '  echo.',
+    ')',
+    '',
+    'REM =============== 2. Git ===============',
+    'echo --- Git',
+    'where git >nul 2>nul',
+    'if errorlevel 1 (',
+    '  if defined SEMWINGET (',
+    '    echo [FALTA] Git. Instale em https://git-scm.com',
+    '    set "FALHOU=%FALHOU% Git"',
+    '  ) else (',
+    '    winget install --id Git.Git -e --accept-source-agreements --accept-package-agreements',
+    '  )',
+    ') else ( echo [ok] ja instalado. )',
+    'echo.',
+    '',
+    'REM =============== 3. Python 3.12 ===============',
+    'REM O 3.12 e por causa do Chatterbox: ele fixa torch==2.5.1, que nao tem',
+    'REM instalador pra Python 3.13+. Ter o 3.12 ao lado do seu Python nao',
+    'REM atrapalha nada - o lancador `py` escolhe qual usar.',
+    'echo --- Python 3.12',
+    'py -3.12 --version >nul 2>nul',
+    'if errorlevel 1 (',
+    '  if defined SEMWINGET (',
+    '    echo [FALTA] Python 3.12. Baixe em https://www.python.org/downloads/',
+    '    set "FALHOU=%FALHOU% Python3.12"',
+    '  ) else (',
+    '    winget install --id Python.Python.3.12 -e --accept-source-agreements --accept-package-agreements',
+    '  )',
+    ') else ( echo [ok] ja instalado. )',
+    'echo.',
+    '',
+    'REM =============== 4. ffmpeg ===============',
+    'REM Sem ffmpeg a escuta continua ("Ei, JARVIS") nao grava nada.',
+    'echo --- ffmpeg',
+    'where ffmpeg >nul 2>nul',
+    'if errorlevel 1 (',
+    '  if defined SEMWINGET (',
+    '    echo [FALTA] ffmpeg. Instale em https://ffmpeg.org',
+    '    set "FALHOU=%FALHOU% ffmpeg"',
+    '  ) else (',
+    '    winget install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements',
+    '  )',
+    ') else ( echo [ok] ja instalado. )',
+    'echo.',
+    '',
+    'REM =============== 5. modelo do whisper ===============',
+    'echo --- Modelo do whisper (' + mw + ')',
+    'set "WDIR=%USERPROFILE%\\.jarvis-agente\\whisper-models"',
+    'set "WBIN=%WDIR%\\ggml-' + mw + '.bin"',
+    'if not exist "%WDIR%" mkdir "%WDIR%"',
+    'if exist "%WBIN%" (',
+    '  echo [ok] ja baixado.',
+    ') else (',
+    '  echo Baixando... isto e grande, pode demorar.',
+    '  curl -L --fail --progress-bar -o "%WBIN%" "' + WHISPER_URL_BASE + '/ggml-' + mw + '.bin" || (',
+    '    echo [ERRO] download falhou.',
+    '    del /q "%WBIN%" 2>nul',
+    '    set "FALHOU=%FALHOU% modelo-whisper"',
+    '  )',
+    ')',
+    /* Conferir o tamanho é o que separa "baixou" de "baixou o arquivo certo":
+       um redirecionamento pra página de erro vem como HTML de poucos KB. */
+    /* O tamanho vem pelo PowerShell, não por `set /a`: a aritmética do cmd é
+       de 32 bits (para em 2.147.483.647) e o large-v3 tem uns 3,1 GB. Com
+       `set /a` a conta estoura e dá número errado — a checagem reprovaria um
+       download perfeito. */
+    'if exist "%WBIN%" (',
+    '  for /f %%A in (\'powershell -NoProfile -Command "[int]((Get-Item \'\'%WBIN%\'\').Length/1MB)"\') do set "WMB=%%A"',
+    '  call :confere_tamanho',
+    ')',
+    'echo.',
+    '',
+    'REM =============== 6. binario do whisper.cpp ===============',
+    'echo --- Programa do whisper.cpp',
+    'where whisper-cli >nul 2>nul',
+    'if errorlevel 1 (',
+    '  echo [FALTA] whisper-cli nao esta no PATH.',
+    '  echo         Este e o unico item que eu NAO baixo sozinho: o nome do',
+    '  echo         arquivo muda a cada versao do whisper.cpp, e um link chutado',
+    '  echo         aqui viraria erro na sua mao. Pegue o zip de Windows em:',
+    '  echo             https://github.com/ggml-org/whisper.cpp/releases',
+    '  echo         Extraia e deixe whisper-cli.exe numa pasta do PATH.',
+    '  set "FALHOU=%FALHOU% whisper-cli"',
+    ') else ( echo [ok] encontrado. )',
+    'echo.',
+    '',
+    'REM =============== 7. Chatterbox ===============',
+    'echo --- ' + cb.nome + ' (voz clonada)',
+    'call :instala_python_repo "' + cb.repo + '" "' + cb.pasta + '" 1',
+    'echo.',
+    '',
+    'REM =============== 8. Kokoro ===============',
+    'echo --- ' + kk.nome + ' (vozes prontas)',
+    'call :instala_python_repo "' + kk.repo + '" "' + kk.pasta + '" 0',
+    'echo.',
+    '',
+    'REM =============== fim ===============',
+    'echo ===============================================',
+    'if defined FALHOU (',
+    '  echo  Terminou, mas ficou faltando:%FALHOU%',
+    '  echo  O resto esta instalado e funciona. Resolva os itens acima e',
+    '  echo  rode este arquivo de novo - ele pula tudo que ja deu certo.',
+    ') else (',
+    '  echo  Tudo instalado.',
+    ')',
+    'echo ===============================================',
+    'echo.',
+    'echo  Para LIGAR as vozes, em cada pasta:',
+    'echo      .venv\\Scripts\\activate.bat  e depois  python server.py',
+    'echo  Depois, no app: Configuracoes ^> Voz.',
+    'echo.',
+    'echo  Instalado em: %~dp0',
+    'echo  Modelos do whisper em: %USERPROFILE%\\.jarvis-agente\\whisper-models',
+    'echo.',
+    'pause',
+    'exit /b 0',
+    '',
+    'REM ---------- sub-rotinas ----------',
+    ':confere_tamanho',
+    'if not defined WMB ( echo [aviso] nao consegui medir o arquivo; seguindo. & exit /b 0 )',
+    'if %WMB% LSS ' + minMb + ' (',
+    '  echo [ERRO] o arquivo baixado tem so %WMB% MB; o modelo ' + mw + ' tem uns ' + minMb + ' MB ou mais.',
+    '  echo        Provavelmente veio uma pagina de erro no lugar do modelo.',
+    '  del /q "%WBIN%" 2>nul',
+    '  set "FALHOU=%FALHOU% modelo-whisper"',
+    ') else ( echo [ok] %WMB% MB. )',
+    'exit /b 0',
+    '',
+    /* Chatterbox e Kokoro são o mesmo ritual (clonar, venv, requirements); o
+       que muda é só se exige Python 3.12. Uma sub-rotina evita duas cópias
+       divergirem com o tempo. */
+    ':instala_python_repo',
+    'setlocal',
+    'set "REPO=%~1"',
+    'set "PASTA=%~2"',
+    'set "PRECISA312=%~3"',
+    'set "PY=python"',
+    'if "%PRECISA312%"=="1" (',
+    '  py -3.12 --version >nul 2>nul && set "PY=py -3.12"',
+    ')',
+    'if "%PY%"=="python" if "%PRECISA312%"=="1" (',
+    '  echo [pulado] precisa do Python 3.12 e ele nao esta disponivel.',
+    '  endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    ')',
+    'where git >nul 2>nul || (',
+    '  echo [pulado] precisa do Git.',
+    '  endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    ')',
+    'if exist "%PASTA%" (',
+    '  echo Atualizando %PASTA%...',
+    '  pushd "%PASTA%" & git pull >nul 2>nul & popd',
+    ') else (',
+    '  echo Clonando %REPO% ...',
+    '  git clone --depth 1 "%REPO%" "%PASTA%" || (',
+    '    echo [ERRO] nao consegui clonar.',
+    '    endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '  )',
+    ')',
+    'pushd "%PASTA%"',
+    'if exist ".venv" (',
+    '  call ".venv\\Scripts\\activate.bat"',
+    '  if "%PRECISA312%"=="1" (',
+    '    python -c "import sys; raise SystemExit(0 if sys.version_info[:2]==(3,12) else 1)" >nul 2>nul',
+    '    if errorlevel 1 (',
+    '      echo [refazendo] ambiente criado com Python incompativel.',
+    '      call deactivate >nul 2>nul',
+    '      rmdir /s /q ".venv"',
+    '    )',
+    '  )',
+    ')',
+    'if not exist ".venv" %PY% -m venv .venv',
+    'call ".venv\\Scripts\\activate.bat"',
+    'python -m pip install --upgrade pip >nul',
+    'if exist "requirements.txt" (',
+    '  pip install -r requirements.txt || (',
+    '    echo [ERRO] instalacao das dependencias falhou.',
+    '    popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '  )',
+    '  echo [ok] %PASTA% pronto.',
+    ') else (',
+    '  echo [ATENCAO] sem requirements.txt; veja o README de %REPO%.',
+    '  popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    ')',
+    'popd',
+    'endlocal & exit /b 0',
+  ];
+  return L.join('\r\n') + '\r\n';
+}
+
+function baixaInstaladorTudo(){
+  const msg = document.getElementById('voz-inst-msg');
+  const mw = document.getElementById('voz-stt-model')?.value || 'base';
+  try{
+    const url = URL.createObjectURL(new Blob([scriptInstalaTudo(mw)], { type: 'application/octet-stream' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'instalar-tudo.bat';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    if (msg){
+      msg.innerHTML = '<b>instalar-tudo.bat</b> baixado (modelo do whisper: <b>' + esc(mw) +
+        '</b>). Coloque numa pasta onde as vozes possam viver — ele instala ao lado do ' +
+        'arquivo. <b>Abra no Bloco de Notas antes de rodar.</b> Pode rodar de novo depois: ' +
+        'pula o que já estiver feito.';
+      msg.className = 'hint ok';
+    }
+  }catch(e){
+    if (msg){ msg.textContent = 'Não consegui gerar o arquivo: ' + e.message; msg.className = 'hint erro'; }
+  }
+}
+
 function baixaInstaladorVoz(id){
   const m = VOZ_INSTALADORES[id];
   const txt = scriptInstaladorVoz(id);
@@ -764,4 +1042,6 @@ function setupInstaladoresVoz(){
   if (c) c.onclick = () => baixaInstaladorVoz('chatterbox');
   const k = document.getElementById('voz-inst-kokoro');
   if (k) k.onclick = () => baixaInstaladorVoz('kokoro');
+  const t = document.getElementById('voz-inst-tudo');
+  if (t) t.onclick = () => baixaInstaladorTudo();
 }
