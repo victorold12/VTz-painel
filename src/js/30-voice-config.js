@@ -937,7 +937,7 @@ function scriptInstalaTudo(modeloWhisper){
     'if defined JARVIS_PULAR_VOZES (',
     '  echo      [pulado] JARVIS_PULAR_VOZES ligado.',
     ') else (',
-    '  call :instala_python_repo "' + cb.repo + '" "' + cb.pasta + '" 1',
+    '  call :instala_python_repo "' + cb.repo + '" "' + cb.pasta + '" 1 chatterbox chatterbox-tts',
     ')',
     'echo.',
     'echo --- [7/7] ' + kk.nome + ' (vozes prontas)',
@@ -1154,6 +1154,8 @@ function scriptInstalaTudo(modeloWhisper){
     'set "REPO=%~1"',
     'set "PASTA=%VOZES%\\%~2"',
     'set "PRECISA312=%~3"',
+    'set "MODULO=%~4"',
+    'set "PACOTE=%~5"',
     /* 0 = qualquer Python serve | 1 = exige 3.12 | 2 = prefere 3.12, aceita outro.
        O Kokoro virou 2 depois do teste no Windows: ele nao FIXA torch como o
        Chatterbox, mas o `python` do PATH e o mais novo instalado, e foi nele
@@ -1203,6 +1205,21 @@ function scriptInstalaTudo(modeloWhisper){
     '  echo             "Could not find a version ... torch" = Python incompativel.',
     '  echo             erro de compilador ou CUDA = placa de video.',
     '  popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    ')',
+    /* O requirements.txt do Chatterbox instala TUDO menos o motor: `pip install`
+       termina com sucesso, e `import chatterbox` estoura na primeira execução.
+       Como o instalador declarava vitória ali, o erro só aparecia depois, numa
+       janela minimizada que fechava sozinha. Conferir o import fecha esse buraco
+       — sucesso do pip nao e prova de que da pra usar. */
+    'if defined MODULO (',
+    '  python -c "import %MODULO%" >nul 2>nul',
+    '  if errorlevel 1 (',
+    '    echo      faltou o motor ^(%MODULO%^); instalando %PACOTE%...',
+    '    pip install %PACOTE% || (',
+    '      echo      [ERRO] nao consegui instalar %PACOTE%.',
+    '      popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '    )',
+    '  )',
     ')',
     'echo      [ok] pronto em %PASTA%',
     'popd',
