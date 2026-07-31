@@ -937,7 +937,7 @@ function scriptInstalaTudo(modeloWhisper){
     'if defined JARVIS_PULAR_VOZES (',
     '  echo      [pulado] JARVIS_PULAR_VOZES ligado.',
     ') else (',
-    '  call :instala_python_repo "' + cb.repo + '" "' + cb.pasta + '" 1 chatterbox chatterbox-tts',
+    '  call :instala_python_repo "' + cb.repo + '" "' + cb.pasta + '" 1 chatterbox chatterbox-tts sim sim',
     ')',
     'echo.',
     'echo --- [7/7] ' + kk.nome + ' (vozes prontas)',
@@ -1156,6 +1156,8 @@ function scriptInstalaTudo(modeloWhisper){
     'set "PRECISA312=%~3"',
     'set "MODULO=%~4"',
     'set "PACOTE=%~5"',
+    'set "ALINHA_TORCH=%~6"',
+    'set "DESLIGA_MARCA=%~7"',
     /* 0 = qualquer Python serve | 1 = exige 3.12 | 2 = prefere 3.12, aceita outro.
        O Kokoro virou 2 depois do teste no Windows: ele nao FIXA torch como o
        Chatterbox, mas o `python` do PATH e o mais novo instalado, e foi nele
@@ -1220,6 +1222,35 @@ function scriptInstalaTudo(modeloWhisper){
     '      popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
     '    )',
     '  )',
+    ')',
+    /* ===== O que a noite de 31/07 custou pra descobrir =====
+       Cada linha abaixo corresponde a um erro que o Victor comeu na mao. Nenhuma
+       veio de documentacao — todas de execucao real, e por isso ficam aqui em
+       vez de num README que ninguem le.
+
+       1. torch. O requirements.txt fixa 2.5.1; o chatterbox-tts exige 2.6.0. O
+          pip sobe o torch e DEIXA o torchvision velho -> "ponto de entrada nao
+          encontrado", que nao parece problema de versao nenhum. Alinhar os tres
+          juntos e a unica forma de nao cair nisso.
+       2. resemble-perth. Vem instalado mas o __init__ engole ImportError e deixa
+          a classe como None; o servidor entao morre em "NoneType is not
+          callable" 4 GB depois de baixar o modelo. A marca-d'agua so identifica
+          audio gerado por IA — nao participa de sintetizar fala. Desligar troca
+          um travamento total por uma funcao que ninguem aqui usa. */
+    'if defined ALINHA_TORCH (',
+    '  echo      alinhando torch/torchvision/torchaudio ^(2.6.0^)...',
+    '  pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0',
+    ')',
+    'if defined DESLIGA_MARCA if exist "config.yaml" (',
+    '  echo      desligando a marca-d^\'agua ^(perth^)...',
+    '  ' + ps(
+      "try{ " +
+        "$f='config.yaml'; $t=Get-Content $f -Raw; " +
+        "$n=[regex]::Replace($t,'(?im)^(\\s*enable_watermarking\\s*:\\s*)true\\s*$','${1}false'); " +
+        "if($n -ne $t){ Set-Content $f $n -Encoding UTF8; Write-Host '      [ok] marca-d''agua desligada.' } " +
+        "else { Write-Host '      (nada pra desligar no config.yaml)' } " +
+      "}catch{ Write-Host ('      [aviso] nao consegui editar config.yaml: ' + $_.Exception.Message) }"
+    ),
     ')',
     'echo      [ok] pronto em %PASTA%',
     'popd',
