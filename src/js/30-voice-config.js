@@ -860,8 +860,28 @@ function scriptInstalaTudo(modeloWhisper){
     'echo.',
     '',
     'REM ============ 4. ffmpeg ============',
+    /* O winget NAO e universal: ele vem no "Instalador de Aplicativo" da
+       Microsoft Store, e na maquina do Victor simplesmente nao existe. O passo
+       antigo dependia so dele e sempre falhava ali, deixando a ESCUTA
+       ("Ei, JARVIS") sem gravador — sem nunca dizer que havia outro caminho.
+
+       Agora tenta o winget e, se nao der, baixa direto do GitHub: exatamente o
+       que este script ja faz pro whisper.cpp, com a mesma tecnica de perguntar
+       qual e o anexo da versao mais nova em vez de cravar um nome de arquivo
+       que muda a cada release. */
     'echo --- [3/7] ffmpeg',
-    'call :garante "ffmpeg -version" Gyan.FFmpeg ffmpeg https://ffmpeg.org',
+    'ffmpeg -version >nul 2>nul',
+    'if not errorlevel 1 (',
+    '  echo      [ok] ja instalado no PATH.',
+    ') else (',
+    '  if not defined SEMWINGET (',
+    '    echo      tentando pelo winget...',
+    '    winget install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements >nul 2>nul',
+    '    call :recarrega_path',
+    '  )',
+    '  ffmpeg -version >nul 2>nul',
+    '  if errorlevel 1 call :baixa_ffmpeg',
+    ')',
     'echo.',
     '',
     'REM ============ 5. modelo do whisper ============',
@@ -954,18 +974,39 @@ function scriptInstalaTudo(modeloWhisper){
     'REM motivo de nao funcionar. Mescla no stt.json que ja existe, em vez de',
     'REM sobrescrever: as escolhas de modelo e threads sao preservadas.',
     'echo --- Apontando o Agente Local pras pastas',
+    /* `ConvertFrom-Json -AsHashtable` NAO existe no PowerShell 5.1, que e o que
+       o `powershell.exe` do Windows roda — o -AsHashtable chegou no PowerShell 6,
+       que e o `pwsh.exe` e nao vem instalado. Ou seja, este passo falhava em
+       TODA maquina, sempre, com "Nao e possivel localizar um parametro que
+       coincida com o nome de parametro 'AsHashtable'". E falhava calado: o
+       catch transformava em "[aviso]" e o script seguia dizendo que terminou.
+       O efeito era o Agente Local procurando o modelo do whisper na pasta
+       antiga e nao achando nada.
+
+       PSObject + Add-Member -Force funciona nas duas versoes, e preserva as
+       chaves que ja estavam no arquivo (modelo e threads escolhidos a mao). */
     ps(
       "$ErrorActionPreference='Stop'; " +
       "try{ " +
         "$d=Join-Path $env:USERPROFILE '.jarvis-agente'; " +
         "if(-not (Test-Path $d)){ New-Item -ItemType Directory -Path $d | Out-Null } " +
         "$f=Join-Path $d 'stt.json'; " +
-        "$c=@{}; if(Test-Path $f){ $c=Get-Content $f -Raw | ConvertFrom-Json -AsHashtable } " +
-        "$c['modelsDir']='%WMOD%'; " +
+        "$c=$null; " +
+        "if(Test-Path $f){ try{ $c=Get-Content $f -Raw | ConvertFrom-Json }catch{ $c=$null } } " +
+        "if($null -eq $c){ $c=New-Object PSObject } " +
+        "$c | Add-Member -NotePropertyName modelsDir -NotePropertyValue '%WMOD%' -Force; " +
         "$exe=Join-Path '%WPROG%' 'whisper-cli.exe'; " +
-        "if(Test-Path $exe){ $c['binary']=$exe } " +
-        "$c['model']='" + mw + "'; " +
-        "$c | ConvertTo-Json -Depth 5 | Set-Content $f -Encoding UTF8; " +
+        "if(Test-Path $exe){ $c | Add-Member -NotePropertyName binary -NotePropertyValue $exe -Force } " +
+        "$c | Add-Member -NotePropertyName model -NotePropertyValue '" + mw + "' -Force; " +
+        /* WriteAllText com UTF8Encoding($false), e NAO `Set-Content -Encoding
+           UTF8`: no PowerShell 5.1 — que e o que o Windows tem — o -Encoding
+           UTF8 grava BOM. O JSON.parse do Node estoura no BOM, e todo
+           carregador do agente envolve o parse num catch que devolve os
+           padroes. Resultado: o arquivo ficava no disco com o conteudo CERTO e
+           o agente ignorava tudo, em silencio dos dois lados. O instalador
+           dizia "[ok] stt.json atualizado" e o whisper continuava procurando o
+           modelo na pasta velha. */
+        "[System.IO.File]::WriteAllText($f, ($c | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding $false)); " +
         "Write-Host '      [ok] stt.json atualizado.' " +
       "}catch{ Write-Host ('      [aviso] nao consegui escrever stt.json: ' + $_.Exception.Message) }"
     ),
@@ -999,7 +1040,11 @@ function scriptInstalaTudo(modeloWhisper){
     '  echo   start "Chatterbox ^(porta ' + cb.porta + '^)" cmd /k "cd /d vozes\\' + cb.pasta + ' ^&^& call .venv\\Scripts\\activate.bat ^&^& python server.py"',
     '  echo ^) else ^( echo [pulado] Chatterbox nao instalado. ^)',
     '  echo if exist "vozes\\' + kk.pasta + '\\.venv\\Scripts\\activate.bat" (',
-    '  echo   start "Kokoro ^(porta ' + kk.porta + '^)" cmd /k "cd /d vozes\\' + kk.pasta + ' ^&^& call .venv\\Scripts\\activate.bat ^&^& python server.py"',
+    /* O Kokoro NAO tem server.py — a entrada dele e `api.src.main:app` pelo
+       uvicorn. Esta linha mandava `python server.py` nos dois, entao o Kokoro
+       falhava com "can't open file server.py" toda vez que este .bat rodava,
+       inclusive no login do Windows pelo atalho da Inicializacao. */
+    '  echo   start "Kokoro ^(porta ' + kk.porta + '^)" cmd /k "cd /d vozes\\' + kk.pasta + ' ^&^& call .venv\\Scripts\\activate.bat ^&^& python -m uvicorn api.src.main:app --host 127.0.0.1 --port ' + kk.porta + '"',
     '  echo ^) else ^( echo [pulado] Kokoro nao instalado. ^)',
     '  echo echo.',
     '  echo echo Os dois servidores estao subindo em janelas minimizadas.',
@@ -1133,6 +1178,98 @@ function scriptInstalaTudo(modeloWhisper){
     'if defined PATH_U set "PATH=%PATH%;%PATH_U%"',
     'exit /b 0',
     '',
+    /* Copia o requirements.txt tirando as linhas de torch, quando a versao certa
+       do torch JA foi instalada antes. Sem isso o pip leria "torch==2.5.1",
+       decidiria que precisa trocar o 2.6.0 que acabou de entrar, e faria
+       exatamente a desinstalacao que este arranjo existe pra evitar.
+
+       `torch\\b` e nao `torch`: pacotes como `torchsde` (que o Chatterbox usa de
+       verdade) NAO podem ser removidos da lista. A fronteira de palavra separa
+       "torch" de "torchsde", e o grupo opcional cobre torchvision/torchaudio. */
+    ':requirements_sem_torch',
+    'if not defined ALINHA_TORCH (',
+    '  copy /y "requirements.txt" "requirements-jarvis.txt" >nul',
+    '  exit /b 0',
+    ')',
+    ps(
+      "try{ " +
+        "$L=Get-Content 'requirements.txt' | Where-Object { $_ -notmatch '^\\s*torch(vision|audio)?\\b\\s*[=<>!~]' }; " +
+        "Set-Content 'requirements-jarvis.txt' $L -Encoding UTF8; " +
+    /* Sem `^(` aqui: o `^` so escapa fora de aspas. Como a linha inteira do
+       PowerShell vai entre aspas duplas, o cmd nao mexe nos parenteses — e um
+       `^` escrito a mao sairia impresso na tela. */
+        "Write-Host ('      ' + $L.Count + ' dependencias (as linhas de torch saem: a versao certa ja entrou)') " +
+      "}catch{ Copy-Item 'requirements.txt' 'requirements-jarvis.txt' -Force }"
+    ),
+    /* Se o PowerShell falhar por qualquer motivo, seguir sem o arquivo faria o
+       pip reclamar de um caminho inexistente — pior que instalar com a lista
+       original. */
+    'if not exist "requirements-jarvis.txt" copy /y "requirements.txt" "requirements-jarvis.txt" >nul',
+    'exit /b 0',
+    '',
+    /* Baixa o ffmpeg sem winget e sem mexer no PATH do usuario.
+       Mexer no PATH seria invasivo e so valeria pra processos abertos DEPOIS —
+       o mesmo tropeco que ja derrubou este script uma vez. Em vez disso grava o
+       caminho no listener.json, do jeito que o whisper ja faz com o stt.json. */
+    ':baixa_ffmpeg',
+    'if exist "%RAIZ%\\ffmpeg\\ffmpeg.exe" (',
+    '  echo      [ok] ja baixado aqui.',
+    '  goto :aponta_ffmpeg',
+    ')',
+    'echo      baixando do GitHub ^(sem winget^)...',
+    'if not exist "%RAIZ%\\ffmpeg" mkdir "%RAIZ%\\ffmpeg"',
+    ps(
+      "$ErrorActionPreference='Stop'; " +
+      "try{ " +
+        "$r=Invoke-RestMethod -Uri 'https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest' -Headers @{'User-Agent'='jarvis'}; " +
+        "$a=$r.assets | Where-Object { $_.name -match 'win64' -and $_.name -match 'gpl' -and $_.name -like '*.zip' -and $_.name -notmatch 'shared' } | Select-Object -First 1; " +
+        "if(-not $a){ throw ('nenhum anexo win64 nesta release: ' + (($r.assets | ForEach-Object { $_.name }) -join ', ')) } " +
+        "Write-Host ('      achei: ' + $a.name); " +
+        "$z=Join-Path $env:TEMP $a.name; " +
+        "Invoke-WebRequest -Uri $a.browser_download_url -OutFile $z; " +
+        "$tmp=Join-Path $env:TEMP 'jarvis-ffmpeg'; " +
+        "if(Test-Path $tmp){ Remove-Item $tmp -Recurse -Force } " +
+        "Expand-Archive -Path $z -DestinationPath $tmp -Force; " +
+        "$exe=Get-ChildItem -Path $tmp -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1; " +
+        "if(-not $exe){ throw 'baixou e extraiu, mas nao achei ffmpeg.exe dentro' } " +
+        "Copy-Item $exe.FullName (Join-Path '%RAIZ%\\ffmpeg' 'ffmpeg.exe') -Force; " +
+        "Remove-Item $z,$tmp -Recurse -Force; " +
+        "Write-Host '      [ok] baixado.'; exit 0 " +
+      "}catch{ Write-Host ('      [ERRO] ' + $_.Exception.Message); exit 1 }"
+    ),
+    'if errorlevel 1 (',
+    '  echo      Pegue o ffmpeg a mao em https://ffmpeg.org/download.html',
+    '  echo      e ponha ffmpeg.exe em: %RAIZ%\\ffmpeg',
+    '  set "FALHOU=%FALHOU% ffmpeg"',
+    '  exit /b 0',
+    ')',
+    '',
+    ':aponta_ffmpeg',
+    /* Sem isto o download seria inutil: o listener procura "ffmpeg" no PATH, e
+       a pasta nova nao esta la. Mescla no listener.json em vez de sobrescrever,
+       pra preservar o que a pessoa ja escolheu (trecho, dispositivo). */
+    ps(
+      "try{ " +
+        "$d=Join-Path $env:USERPROFILE '.jarvis-agente'; " +
+        "if(-not (Test-Path $d)){ New-Item -ItemType Directory -Path $d | Out-Null } " +
+        "$f=Join-Path $d 'listener.json'; " +
+        "$c=$null; if(Test-Path $f){ try{ $c=Get-Content $f -Raw | ConvertFrom-Json }catch{ $c=$null } } " +
+        "if($null -eq $c){ $c=New-Object PSObject } " +
+        "$c | Add-Member -NotePropertyName ffmpegPath -NotePropertyValue (Join-Path '%RAIZ%\\ffmpeg' 'ffmpeg.exe') -Force; " +
+        /* WriteAllText com UTF8Encoding($false), e NAO `Set-Content -Encoding
+           UTF8`: no PowerShell 5.1 — que e o que o Windows tem — o -Encoding
+           UTF8 grava BOM. O JSON.parse do Node estoura no BOM, e todo
+           carregador do agente envolve o parse num catch que devolve os
+           padroes. Resultado: o arquivo ficava no disco com o conteudo CERTO e
+           o agente ignorava tudo, em silencio dos dois lados. O instalador
+           dizia "[ok] stt.json atualizado" e o whisper continuava procurando o
+           modelo na pasta velha. */
+        "[System.IO.File]::WriteAllText($f, ($c | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding $false)); " +
+        "Write-Host '      [ok] a escuta ja sabe onde achar o ffmpeg.' " +
+      "}catch{ Write-Host ('      [aviso] nao consegui escrever listener.json: ' + $_.Exception.Message) }"
+    ),
+    'exit /b 0',
+    '',
     ':confere_tamanho',
     /* Um redirecionamento pra página de erro chega como HTML de poucos KB e
        ficaria salvo com o nome do modelo — pra falhar bem depois, dentro do
@@ -1149,6 +1286,21 @@ function scriptInstalaTudo(modeloWhisper){
     /* Chatterbox e Kokoro seguem o mesmo ritual (clonar, venv, requirements);
        muda só se exige Python 3.12. Uma sub-rotina evita duas cópias
        divergirem com o tempo. */
+    /* ===== `&` SIMPLES, NUNCA `^&`, nas linhas de saida por erro =====
+       Parece que o `&` precisa de escape dentro de um bloco `( )`. NAO precisa —
+       e escapar quebra tudo em silencio: o `^&` faz o `&` virar ARGUMENTO
+       LITERAL do `popd`, entao `endlocal`, `set` e `exit /b 0` nunca executam. O
+       script imprime "[ERRO] ..." e seguem em frente ate imprimir "[ok] pronto",
+       nas duas linhas seguidas.
+
+       Aconteceu de verdade com o Kokoro na maquina do Victor:
+
+           [ERRO] instalacao pelo pyproject.toml falhou.
+           [ok] pronto em ...\Kokoro-FastAPI
+
+       Medido num cmd real, a tres niveis de aninhamento: com `&` simples o
+       `exit /b` roda E o FALHOU propaga pra fora do setlocal; com `^&`, nenhum
+       dos dois. Nao troque sem rodar um .bat de teste. */
     ':instala_python_repo',
     'setlocal',
     'set "REPO=%~1"',
@@ -1167,11 +1319,11 @@ function scriptInstalaTudo(modeloWhisper){
     'if not "%PRECISA312%"=="0" ( py -3.12 --version >nul 2>nul && set "PY=py -3.12" )',
     'if "%PRECISA312%"=="1" if "%PY%"=="python" (',
     '  echo      [pulado] precisa do Python 3.12, que nao esta disponivel.',
-    '  endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '  goto :repo_falhou_cedo',
     ')',
     'where git >nul 2>nul || (',
     '  echo      [pulado] precisa do Git.',
-    '  endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '  goto :repo_falhou_cedo',
     ')',
     'if exist "%PASTA%" (',
     '  echo      atualizando...',
@@ -1180,7 +1332,7 @@ function scriptInstalaTudo(modeloWhisper){
     '  echo      clonando %REPO% ...',
     '  git clone --depth 1 "%REPO%" "%PASTA%" || (',
     '    echo      [ERRO] nao consegui clonar.',
-    '    endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '    goto :repo_falhou_cedo',
     '  )',
     ')',
     'pushd "%PASTA%"',
@@ -1198,15 +1350,100 @@ function scriptInstalaTudo(modeloWhisper){
     'if not exist ".venv" %PY% -m venv .venv',
     'call ".venv\\Scripts\\activate.bat"',
     'python -m pip install --upgrade pip >nul',
+    /* ===== setuptools: a peca que sumiu debaixo do projeto inteiro =====
+       Ate o Python 3.11, todo venv novo vinha com setuptools dentro, e por isso
+       `import pkg_resources` sempre funcionou. No 3.12 o venv passou a vir
+       LIMPO — e este instalador usa `py -3.12` de proposito, por causa do torch.
+
+       Quem paga a conta e o `perth` (a marca-d'agua da Resemble): ele importa
+       pkg_resources e, quando falha, o __init__ dele ENGOLE o ImportError e
+       deixa `PerthImplicitWatermarker` valendo None. O Chatterbox entao morre
+       carregando o modelo com "TypeError: 'NoneType' object is not callable" —
+       uma mensagem que nao cita marca-d'agua, nem setuptools, nem pkg_resources.
+
+       Foi essa cadeia que fez o projeto passar sessoes chutando o nome de uma
+       chave no config.yaml. Nenhuma chave resolveria: o crash acontece dentro
+       do pacote chatterbox, antes de qualquer configuracao do servidor.
+       Confirmado em github.com/resemble-ai/Perth/issues/7.
+
+       Vai pra TODOS os motores, nao so pro Chatterbox: bibliotecas Python
+       escritas antes do 3.12 assumem pkg_resources sem declarar, e este e o
+       tipo de falta que aparece longe da causa. */
+    /* `setuptools<82` e NAO `--upgrade setuptools`. O pkg_resources foi REMOVIDO
+       no setuptools 82.0.0 — entao pedir a versao mais nova instala justamente
+       a que nao tem o que o perth precisa. A primeira tentativa deste conserto
+       fez exatamente isso: instalou setuptools, e o `import pkg_resources`
+       continuou falhando. Conserto certo, versao errada.
+       (setuptools.pypa.io/en/stable/history.html — removido na v82) */
+    'python -m pip install "setuptools<82" wheel >nul || echo      [aviso] nao consegui instalar setuptools.',
+    /* Nem todo projeto Python usa requirements.txt. O Kokoro-FastAPI declara as
+       dependencias no pyproject.toml, e o script recusava instalar dizendo "sem
+       requirements.txt; veja o README" — ou seja, o Kokoro NUNCA foi instalado
+       por este instalador. O venv ficava criado e vazio, e o servidor morria
+       depois com "No module named uvicorn", que parece outro problema. */
+    'set "USA_PYPROJECT="',
     'if not exist "requirements.txt" (',
-    '  echo      [ATENCAO] sem requirements.txt; veja o README de %REPO%.',
-    '  popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '  if exist "pyproject.toml" (',
+    '    set "USA_PYPROJECT=1"',
+    '  ) else (',
+    '    echo      [ATENCAO] sem requirements.txt nem pyproject.toml; veja o README de %REPO%.',
+    '    goto :repo_falhou',
+    '  )',
     ')',
-    'pip install -r requirements.txt || (',
-    '  echo      [ERRO] instalacao das dependencias falhou.',
-    '  echo             "Could not find a version ... torch" = Python incompativel.',
-    '  echo             erro de compilador ou CUDA = placa de video.',
-    '  popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '',
+    /* ===== O torch vai ANTES, e nao depois =====
+       A ordem antiga era: instalar requirements.txt (que fixa torch==2.5.1) e
+       DEPOIS forcar 2.6.0. Isso obriga o pip a DESINSTALAR o 2.5.1 pra por o
+       2.6.0 no lugar — e desinstalar é a operacao mais fragil que existe aqui,
+       porque mexe em milhares de arquivos ja em uso.
+
+       Na maquina do Victor o pip foi interrompido exatamente ai, por uma pasta
+       do PATH que o Windows recusa atravessar (o Codex da OpenAI instala a sua
+       como junção; o erro sai como "ponto de montagem nao confiavel"). O
+       rollback nao conseguiu restaurar: "ERROR: Failed to restore ...\torch\".
+       O resultado foi um torch pela metade, que depois produz erros que nao
+       parecem ter nada a ver — "No module named 'torch.distributed.tensor'" e
+       "cannot import name 'autocast' from 'torch.amp'".
+
+       Instalando a versao certa PRIMEIRO, e tirando as linhas de torch do
+       requirements, nao existe desinstalacao nenhuma pra ser interrompida. */
+    'if defined ALINHA_TORCH (',
+    '  echo      instalando torch 2.6.0 ^(antes das dependencias, pra nao ter que trocar depois^)...',
+    '  pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 || (',
+    '    echo      [ERRO] nao consegui instalar o torch.',
+    '    goto :repo_falhou',
+    '  )',
+    ')',
+    '',
+    'if defined USA_PYPROJECT (',
+    '  echo      sem requirements.txt; instalando pelo pyproject.toml...',
+    '  pip install . || (',
+    /* A causa real na maquina do Victor nao foi "falta cmake", como o erro
+       sugeria: foi "CMAKE_C_COMPILER not set" — uma dependencia do Kokoro nao
+       tem wheel pronta pro Python 3.12 e tenta COMPILAR do zero, o que exige as
+       Build Tools do Visual Studio (varios GB). Despejar 37 linhas de traceback
+       do CMake mandava cacar a coisa errada; nomear as duas causas provaveis
+       custa quatro linhas e resolve a duvida. */
+    '    echo      [ERRO] instalacao pelo pyproject.toml falhou. As duas causas comuns:',
+    '    echo             "CMAKE_C_COMPILER not set" ou "Microsoft Visual C++ 14.0"',
+    '    echo                 = alguma dependencia compila do zero e falta compilador.',
+    '    echo                   Instale o "Build Tools for Visual Studio" ^(varios GB^):',
+    '    echo                   https://visualstudio.microsoft.com/visual-cpp-build-tools/',
+    '    echo             qualquer outra coisa = veja o README de %REPO%',
+    '    echo             O ' + kk.nome + ' e o RESERVA: sem ele o ' + cb.nome + ' continua falando.',
+    '    goto :repo_falhou',
+    '  )',
+    ') else (',
+    /* Nome FIXO, e nao uma variavel devolvida pela sub-rotina: o cmd expande o
+       bloco inteiro do `if` ANTES de executar qualquer coisa dentro dele, entao
+       um %REQ% definido pelo `call` chegaria aqui ainda vazio. */
+    '  call :requirements_sem_torch',
+    '  pip install -r "requirements-jarvis.txt" || (',
+    '    echo      [ERRO] instalacao das dependencias falhou.',
+    '    echo             "Could not find a version ... torch" = Python incompativel.',
+    '    echo             erro de compilador ou CUDA = placa de video.',
+    '    goto :repo_falhou',
+    '  )',
     ')',
     /* O requirements.txt do Chatterbox instala TUDO menos o motor: `pip install`
        termina com sucesso, e `import chatterbox` estoura na primeira execução.
@@ -1219,7 +1456,7 @@ function scriptInstalaTudo(modeloWhisper){
     '    echo      faltou o motor ^(%MODULO%^); instalando %PACOTE%...',
     '    pip install %PACOTE% || (',
     '      echo      [ERRO] nao consegui instalar %PACOTE%.',
-    '      popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '      goto :repo_falhou',
     '    )',
     '  )',
     ')',
@@ -1237,10 +1474,67 @@ function scriptInstalaTudo(modeloWhisper){
           callable" 4 GB depois de baixar o modelo. A marca-d'agua so identifica
           audio gerado por IA — nao participa de sintetizar fala. Desligar troca
           um travamento total por uma funcao que ninguem aqui usa. */
+    /* Sucesso do pip nao e prova de que da pra usar — a lição que este projeto
+       ja pagou duas vezes. Aqui ela aparece na forma mais cruel: o pip pode ser
+       INTERROMPIDO no meio e ainda assim o script seguir, porque o passo
+       seguinte nao tinha por que desconfiar.
+
+       Um torch pela metade nao falha no import de cara: falha lá dentro, com
+       "cannot import name 'autocast'" ou "No module named
+       'torch.distributed.tensor'" — mensagens que mandam procurar bug no
+       Chatterbox, no CUDA, na versao do Python. Em nenhuma delas aparece a
+       palavra que explicaria tudo: o pacote esta corrompido no disco.
+
+       Nao da pra consertar um venv nesse estado; da pra reconhecer e refazer.
+       Apagar aqui e o certo: a proxima execucao recria limpo, e o script ja
+       existe pra ser rodado de novo. */
     'if defined ALINHA_TORCH (',
-    '  echo      alinhando torch/torchvision/torchaudio ^(2.6.0^)...',
-    '  pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0',
+    '  python -c "import torch; torch.zeros(1)" >nul 2>nul',
+    '  if errorlevel 1 (',
+    '    echo      [ERRO] o torch ficou quebrado neste ambiente.',
+    '    echo             O pip foi interrompido no meio de uma instalacao. A causa',
+    '    echo             mais comum e uma pasta do PATH que o Windows recusa',
+    '    echo             atravessar ^(o erro sai como "ponto de montagem nao',
+    '    echo             confiavel"^); antivirus e disco cheio dao no mesmo.',
+    '    echo             Apagando o ambiente - rode este arquivo de novo pra',
+    '    echo             recria-lo limpo.',
+    '    call deactivate >nul 2>nul',
+    '    rmdir /s /q ".venv"',
+    '    goto :repo_falhou',
+    '  )',
     ')',
+    /* Confere que o perth resolve ANTES de declarar vitoria. Se
+       PerthImplicitWatermarker ainda for None aqui, o servidor vai subir, abrir
+       a porta e morrer carregando o modelo — respondendo ao painel sem falar,
+       que e o pior estado possivel porque parece que funcionou.
+
+       O `pip install` de setuptools acima ja deve ter resolvido; esta segunda
+       tentativa cobre o caso de o proprio resemble-perth nao ter entrado. E se
+       ainda assim falhar, o script DIZ, em vez de deixar a descoberta pro
+       usuario ouvir silencio depois. */
+    'if defined DESLIGA_MARCA (',
+    '  python -c "import perth,sys; sys.exit(0 if perth.PerthImplicitWatermarker else 1)" >nul 2>nul',
+    '  if errorlevel 1 (',
+    '    echo      a marca-d^\'agua nao carregou; instalando resemble-perth e setuptools...',
+    '    pip install "setuptools<82" resemble-perth >nul 2>nul',
+    '    python -c "import perth,sys; sys.exit(0 if perth.PerthImplicitWatermarker else 1)" >nul 2>nul',
+    '    if errorlevel 1 (',
+    '      echo      [ATENCAO] o perth continua sem carregar. O servidor vai subir e',
+    '      echo                abrir a porta, mas o modelo NAO vai carregar - ele',
+    '      echo                responde e nao fala. Causa conhecida: falta pkg_resources',
+    '      echo                ^(setuptools^). Veja github.com/resemble-ai/Perth/issues/7',
+    /* Sem `set "FALHOU=..."` aqui: esta sub-rotina roda dentro de um `setlocal`,
+       entao a variavel morreria no `endlocal` e a linha seria codigo que nao faz
+       nada — pior que nao existir, porque parece que faz. Quem registra esta
+       falha e a mensagem acima, e quem a pega no automatico e o sobe-vozes.js,
+       que le o stdout do servidor e reprova modelo que nao carregou. */
+    '    ) else ( echo      [ok] marca-d^\'agua carregando. )',
+    '  ) else ( echo      [ok] marca-d^\'agua carregando. )',
+    ')',
+    /* O passo abaixo desliga a marca-d'agua na CONFIGURACAO do servidor, quando
+       ela existe. Ele NAO e o que conserta o travamento — isso ficou provado
+       quando o Chatterbox quebrou no CI com o config.yaml ja editado. Fica
+       porque gerar audio sem marca-d'agua continua sendo o que se quer aqui. */
     'if defined DESLIGA_MARCA if exist "config.yaml" (',
     '  echo      desligando a marca-d^\'agua ^(perth^)...',
     '  ' + ps(
@@ -1255,6 +1549,32 @@ function scriptInstalaTudo(modeloWhisper){
     'echo      [ok] pronto em %PASTA%',
     'popd',
     'endlocal & exit /b 0',
+    '',
+    /* ===== POR QUE `goto` E NAO `exit /b` NOS CAMINHOS DE ERRO =====
+       `exit /b` dentro de `comando || ( ... )` que por sua vez esta dentro de
+       `if ( ... )` NAO sai da sub-rotina: o cmd engole a saida e a execucao
+       segue na linha de baixo. Reproduzido nesta maquina, num .bat de 15 linhas:
+
+           if defined FLAG (
+             cmd /c exit 1 || ( echo [ERRO]; endlocal ^& exit /b 0 )
+           )
+           echo [ok] NAO DEVIA APARECER     <- aparecia
+
+       Foi exatamente o que aconteceu com o Kokoro: o instalador imprimiu
+       "[ERRO] instalacao pelo pyproject.toml falhou" e, tres linhas depois,
+       "[ok] pronto em ...". Declarar vitoria sobre uma falha e o defeito que
+       este projeto mais combate, e ele voltou por uma regra de escape do cmd.
+
+       `goto` atravessa qualquer nivel de parenteses. Um ponto de saida so, e
+       nao ha como um caminho novo esquecer de sair.
+
+       O `:repo_falhou` cai POR DENTRO no `:repo_falhou_cedo` de proposito:
+       quem ja tinha feito `pushd` precisa do `popd`, quem falhou antes dele
+       nao — e o resto da limpeza e identico nos dois casos. */
+    ':repo_falhou',
+    'popd',
+    ':repo_falhou_cedo',
+    'endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
   ];
   return L.join('\r\n') + '\r\n';
 }

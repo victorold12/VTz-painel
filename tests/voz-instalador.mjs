@@ -116,6 +116,50 @@ checa('nome do arquivo de TUDO', tudo.nome === 'instalar-tudo.bat', tudo.nome);
 checa('conteúdo é script do Windows', tudo.txt.startsWith('@echo off'), tudo.txt.slice(0, 30));
 checa('instala em Documentos\\VTz LLM', /VTz LLM/.test(tudo.txt));
 
+/* ===== O que a execução na máquina do Victor custou pra descobrir =====
+   Cada asserção abaixo corresponde a um defeito que só apareceu rodando de
+   verdade — nenhum deles derrubou o CI, porque o CI instalava e nunca ligava. */
+
+/* 1. ORDEM. Instalar o requirements (que fixa torch 2.5.1) e só depois forçar
+      2.6.0 obriga o pip a DESINSTALAR — a operação mais frágil daqui, porque
+      mexe em milhares de arquivos em uso. Foi interrompida no meio por uma
+      pasta do PATH que o Windows recusa atravessar, o rollback não conseguiu
+      restaurar, e sobrou um torch pela metade. Os sintomas ("cannot import
+      name 'autocast'") não têm nenhuma relação aparente com a causa. */
+{
+  const iTorch = tudo.txt.indexOf('pip install torch==2.6.0');
+  const iReq   = tudo.txt.indexOf('pip install -r "requirements-jarvis.txt"');
+  checa('torch é instalado ANTES das dependências', iTorch > 0 && iReq > 0 && iTorch < iReq,
+    { iTorch, iReq });
+  checa('e o requirements usado não tem as linhas de torch',
+    tudo.txt.includes('requirements_sem_torch') && tudo.txt.includes("-notmatch '^\\s*torch"),
+    tudo.txt.slice(tudo.txt.indexOf('-notmatch'), tudo.txt.indexOf('-notmatch') + 60));
+  /* torchsde é dependência real do Chatterbox: o filtro não pode levá-lo junto. */
+  checa('o filtro usa fronteira de palavra (não mata torchsde)',
+    tudo.txt.includes('torch(vision|audio)?\\b'));
+}
+
+/* 2. O venv corrompido tem que ser RECONHECIDO. Sem isto o script segue e
+      declara vitória sobre um ambiente que não roda. */
+checa('confere se o torch sobreviveu à instalação',
+  /python -c "import torch; torch\.zeros\(1\)"/.test(tudo.txt));
+
+/* 3. Projeto sem requirements.txt. O Kokoro-FastAPI usa pyproject.toml, e o
+      script recusava instalar — ou seja, o Kokoro nunca foi instalado por
+      aqui, e o venv vazio depois falhava com "No module named uvicorn". */
+checa('instala projeto que só tem pyproject.toml',
+  /pyproject\.toml/.test(tudo.txt) && /pip install \./.test(tudo.txt));
+
+/* 4. `-AsHashtable` só existe no PowerShell 6+; o Windows roda o 5.1. Este
+      passo falhava em TODA máquina, sempre, e calado. */
+checa('não usa -AsHashtable (não existe no PowerShell do Windows)',
+  !/AsHashtable/.test(tudo.txt));
+
+/* 5. O Kokoro não tem server.py — o ligar-vozes.bat mandava um comando que não
+      existe, inclusive no login do Windows pelo atalho da Inicialização. */
+checa('o ligar-vozes sobe o Kokoro pelo uvicorn',
+  /uvicorn api\.src\.main:app --host 127\.0\.0\.1 --port 8880/.test(tudo.txt));
+
 /* ============================================================
    DENTRO do Electron o MESMO botão instala aqui dentro.
 
