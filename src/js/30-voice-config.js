@@ -522,6 +522,16 @@ const VOZ_INSTALADORES = {
   chatterbox: {
     nome: 'Chatterbox',
     repo: 'https://github.com/devnen/Chatterbox-TTS-Server',
+    /* Commit FIXO, não a ponta do branch. Verificado nesta combinação em
+       01/08/2026: instala, sobe, carrega o modelo e sintetiza (309.164 bytes,
+       6,44s, pico 13820 de 32767).
+
+       Seguir a ponta já custou: o upstream passou a puxar transformers 5.2.0,
+       que exige um huggingface-hub que o requirements.txt do próprio servidor
+       segura em 0.36.2 — e o servidor morria no import depois de uma
+       instalação "bem-sucedida". Pra mover este pino: atualize, rode
+       `node electron-shell/scripts/prova-voz.js` e só então commite o SHA novo. */
+    commit: '915ae289340e10c6047f27f47e22eae9bf350c32',
     pasta: 'Chatterbox-TTS-Server',
     porta: 8004,
     peso: '~2 GB de modelo na primeira execução',
@@ -539,6 +549,12 @@ const VOZ_INSTALADORES = {
   kokoro: {
     nome: 'Kokoro',
     repo: 'https://github.com/remsky/Kokoro-FastAPI',
+    /* Fixo pelo mesmo motivo do Chatterbox, com uma ressalva honesta: este
+       commit NÃO chegou a instalar aqui — a instalação para em falta de
+       compilador C++ (ver a mensagem do pyproject). O pino serve pra que, no
+       dia em que alguém resolver o compilador, o resultado seja reproduzível
+       em vez de "depende de quando você rodou". */
+    commit: '91cd44d6805dc04b8945871988ef354cd6d0ca9e',
     pasta: 'Kokoro-FastAPI',
     porta: 8880,
     peso: '~350 MB de modelo',
@@ -967,14 +983,16 @@ function scriptInstalaTudo(modeloWhisper){
     'if defined JARVIS_PULAR_VOZES (',
     '  echo      [pulado] JARVIS_PULAR_VOZES ligado.',
     ') else (',
-    '  call :instala_python_repo "' + cb.repo + '" "' + cb.pasta + '" 1 chatterbox chatterbox-tts sim sim',
+    '  call :instala_python_repo "' + cb.repo + '" "' + cb.pasta + '" 1 chatterbox chatterbox-tts sim sim ' + cb.commit,
     ')',
     'echo.',
     'echo --- [7/7] ' + kk.nome + ' (vozes prontas)',
     'if defined JARVIS_PULAR_VOZES (',
     '  echo      [pulado] JARVIS_PULAR_VOZES ligado.',
     ') else (',
-    '  call :instala_python_repo "' + kk.repo + '" "' + kk.pasta + '" 2',
+    /* Os `""` sao os parametros 4 a 7 (modulo, pacote, torch, marca-d'agua), que
+       o Kokoro nao usa: o commit fixo e o oitavo e a posicao importa. */
+    '  call :instala_python_repo "' + kk.repo + '" "' + kk.pasta + '" 2 "" "" "" "" ' + kk.commit,
     ')',
     'echo.',
     '',
@@ -1320,6 +1338,7 @@ function scriptInstalaTudo(modeloWhisper){
     'set "PACOTE=%~5"',
     'set "ALINHA_TORCH=%~6"',
     'set "DESLIGA_MARCA=%~7"',
+    'set "PIN=%~8"',
     /* 0 = qualquer Python serve | 1 = exige 3.12 | 2 = prefere 3.12, aceita outro.
        O Kokoro virou 2 depois do teste no Windows: ele nao FIXA torch como o
        Chatterbox, mas o `python` do PATH e o mais novo instalado, e foi nele
@@ -1335,16 +1354,53 @@ function scriptInstalaTudo(modeloWhisper){
     '  echo      [pulado] precisa do Git.',
     '  goto :repo_falhou_cedo',
     ')',
+    /* ===== COMMIT FIXO, E NAO "o que o upstream tiver hoje" =====
+       Antes isto era `git clone --depth 1` + `git pull` a cada execucao. Ou
+       seja: o que instalava hoje nao era o que instalou ontem, e cada
+       combinacao nova podia quebrar. Foi assim que o Chatterbox passou a puxar
+       transformers 5.2.0, que exige um huggingface-hub que o requirements.txt
+       do proprio servidor segura em 0.36.2 — instalacao "bem-sucedida" e
+       servidor morrendo no import.
+
+       Pior: o requirements.txt de la briga consigo mesmo (onnx quer
+       protobuf>=4.25.1, descript-audiotools quer <3.20). Nao existe resolucao
+       correta; existe uma combinacao que FUNCIONA, e ela foi verificada aqui.
+       Fixar o commit e o que transforma "instala as dependencias" em "instala
+       a combinacao testada".
+
+       Sem `--depth 1`: um clone raso nao tem o commit fixado, so a ponta do
+       branch. Sao ~20 MB de historico contra varios GB de modelo — nao muda a
+       conta.
+
+       Se o pino falhar (upstream reescreveu a historia), NAO trava a
+       instalacao: avisa alto e segue com a ponta. Ficar sem instalar por causa
+       de um commit que sumiu seria pior que instalar algo nao testado — desde
+       que a pessoa saiba qual dos dois recebeu. */
     'if exist "%PASTA%" (',
-    '  echo      atualizando...',
-    '  pushd "%PASTA%" & git pull >nul 2>nul & popd',
+    '  echo      buscando o commit testado ^(%PIN:~0,8%^)...',
     ') else (',
     '  echo      clonando %REPO% ...',
-    '  git clone --depth 1 "%REPO%" "%PASTA%" || (',
+    '  git clone --quiet "%REPO%" "%PASTA%" || (',
     '    echo      [ERRO] nao consegui clonar.',
     '    goto :repo_falhou_cedo',
     '  )',
     ')',
+    /* Um `pushd` so, FORA do if/else. A primeira versao punha
+       `pushd ... ^& git fetch ^& popd` dentro do ramo — e o `^&` saiu literal no
+       .bat, fazendo o pushd receber a linha inteira como caminho e imprimir "O
+       sistema nao pode encontrar o caminho especificado" em toda execucao. O
+       resto seguia funcionando, o que e pior: erro visivel que nao quebra nada
+       ensina a ignorar erro. */
+    'pushd "%PASTA%"',
+    'git fetch --quiet origin 2>nul',
+    'git checkout --quiet %PIN% 2>nul',
+    'if errorlevel 1 (',
+    '  echo      [ATENCAO] nao achei o commit testado %PIN%.',
+    '  echo                O upstream deve ter reescrito a historia. Seguindo com',
+    '  echo                a versao mais nova - que NAO foi testada com este app.',
+    '  echo                Se a voz falhar, e o primeiro lugar pra olhar.',
+    ') else ( echo      [ok] fixado no commit testado. )',
+    'popd',
     'pushd "%PASTA%"',
     'if exist ".venv" (',
     '  call ".venv\\Scripts\\activate.bat"',
