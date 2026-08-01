@@ -1,0 +1,26 @@
+<!-- Bancada de teste do renderizador de markdown + matemática.
+
+     Carrega os ARQUIVOS REAIS de src/js, no mesmo esquema do
+     _harness-merge.html: o bundle de produção é uma IIFE minificada, então
+     nada dele sai pro `window` e um teste não consegue chamar
+     `safeRenderMarkdown` de dentro de `page.evaluate`.
+
+     A saída fácil seria expor a função no `window` — e é justamente a que o
+     comentário do _harness-merge.html proíbe: "expor a função só pra teste
+     mudaria o produto pra acomodar o teste". Carregar as fontes como scripts
+     clássicos põe as declarações no escopo global sem tocar em nada que vai
+     pro ar.
+
+     Só os dois arquivos de que safeRenderMarkdown depende. Nenhum dos dois tem
+     código de topo que execute — são só declarações de função, então carregar
+     isolado não dispara efeito colateral nem procura elemento que não existe. -->
+<meta charset="utf-8">
+<title>bancada — markdown e matemática</title>
+
+<script src="../../vendor/marked.min.js"></script>
+<script src="../../vendor/purify.min.js"></script>
+<script src="../../vendor/katex.min.js"></script>
+<link rel="stylesheet" href="../../vendor/katex.min.css">
+
+<script src="41-matematica.js"></script>
+<script src="21-super-gems.js"></script>

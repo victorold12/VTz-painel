@@ -22,7 +22,12 @@ const ctx = await novoContexto(b);
 const p = await ctx.newPage();
 const erros = [];
 p.on('pageerror', e => erros.push(e.message));
-await p.goto(estatico.url + '/index.html');
+/* Bancada, e não o index.html: o bundle de produção é uma IIFE minificada, e
+   `safeRenderMarkdown` não existe no `window` — este teste ficou quebrado desde
+   que o build passou a empacotar assim, falhando com "is not defined". A
+   bancada carrega os arquivos REAIS de src/js como scripts clássicos, sem
+   mudar o produto pra acomodar o teste (ver src/js/_harness-markdown.html). */
+await p.goto(estatico.url + '/src/js/_harness-markdown.html');
 await p.waitForTimeout(1800);
 
 const renderiza = (md) => p.evaluate(t => {
@@ -110,7 +115,16 @@ checa('nada executou', await p.evaluate(() => !window.__furou));
    DOMPurify. `trust:false` fecha isso — e é aqui que se verifica. */
 {
   const r = await renderiza('$\\href{javascript:window.__furou=1}{clique}$');
-  checa('KaTeX não emite javascript:', !/javascript:/i.test(r.html), r.html.slice(0, 120));
+  /* Procurar a string "javascript:" no HTML inteiro reprova o inocente: com
+     `trust:false` o KaTeX renderiza `\href` como TEXTO e ainda ecoa o LaTeX
+     original dentro de <annotation encoding="application/x-tex">. O
+     "javascript:" aparece ali como conteúdo exibido, não como destino.
+
+     O que importa é se virou LINK CLICÁVEL. Medido: nenhum <a> é criado, e
+     nada executa. (Esta asserção nunca tinha rodado — o teste morria antes,
+     porque chamava safeRenderMarkdown num bundle IIFE que não a expõe.) */
+  checa('KaTeX não cria link javascript:',
+    !/<a[^>]+href\s*=\s*["']?\s*javascript:/i.test(r.html), r.html.slice(0, 140));
 }
 
 console.log('— misturas, que é onde renderizador costuma quebrar');
