@@ -1195,6 +1195,21 @@ function scriptInstalaTudo(modeloWhisper){
     /* Chatterbox e Kokoro seguem o mesmo ritual (clonar, venv, requirements);
        muda só se exige Python 3.12. Uma sub-rotina evita duas cópias
        divergirem com o tempo. */
+    /* ===== `&` SIMPLES, NUNCA `^&`, nas linhas de saida por erro =====
+       Parece que o `&` precisa de escape dentro de um bloco `( )`. NAO precisa —
+       e escapar quebra tudo em silencio: o `^&` faz o `&` virar ARGUMENTO
+       LITERAL do `popd`, entao `endlocal`, `set` e `exit /b 0` nunca executam. O
+       script imprime "[ERRO] ..." e seguem em frente ate imprimir "[ok] pronto",
+       nas duas linhas seguidas.
+
+       Aconteceu de verdade com o Kokoro na maquina do Victor:
+
+           [ERRO] instalacao pelo pyproject.toml falhou.
+           [ok] pronto em ...\Kokoro-FastAPI
+
+       Medido num cmd real, a tres niveis de aninhamento: com `&` simples o
+       `exit /b` roda E o FALHOU propaga pra fora do setlocal; com `^&`, nenhum
+       dos dois. Nao troque sem rodar um .bat de teste. */
     ':instala_python_repo',
     'setlocal',
     'set "REPO=%~1"',
@@ -1281,7 +1296,7 @@ function scriptInstalaTudo(modeloWhisper){
     '    set "USA_PYPROJECT=1"',
     '  ) else (',
     '    echo      [ATENCAO] sem requirements.txt nem pyproject.toml; veja o README de %REPO%.',
-    '    popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '    popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
     '  )',
     ')',
     '',
@@ -1305,7 +1320,7 @@ function scriptInstalaTudo(modeloWhisper){
     '  echo      instalando torch 2.6.0 ^(antes das dependencias, pra nao ter que trocar depois^)...',
     '  pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 || (',
     '    echo      [ERRO] nao consegui instalar o torch.',
-    '    popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '    popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
     '  )',
     ')',
     '',
@@ -1313,7 +1328,7 @@ function scriptInstalaTudo(modeloWhisper){
     '  echo      sem requirements.txt; instalando pelo pyproject.toml...',
     '  pip install . || (',
     '    echo      [ERRO] instalacao pelo pyproject.toml falhou. Veja o README de %REPO%.',
-    '    popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '    popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
     '  )',
     ') else (',
     /* Nome FIXO, e nao uma variavel devolvida pela sub-rotina: o cmd expande o
@@ -1324,7 +1339,7 @@ function scriptInstalaTudo(modeloWhisper){
     '    echo      [ERRO] instalacao das dependencias falhou.',
     '    echo             "Could not find a version ... torch" = Python incompativel.',
     '    echo             erro de compilador ou CUDA = placa de video.',
-    '    popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '    popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
     '  )',
     ')',
     /* O requirements.txt do Chatterbox instala TUDO menos o motor: `pip install`
@@ -1338,7 +1353,7 @@ function scriptInstalaTudo(modeloWhisper){
     '    echo      faltou o motor ^(%MODULO%^); instalando %PACOTE%...',
     '    pip install %PACOTE% || (',
     '      echo      [ERRO] nao consegui instalar %PACOTE%.',
-    '      popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '      popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
     '    )',
     '  )',
     ')',
@@ -1382,7 +1397,7 @@ function scriptInstalaTudo(modeloWhisper){
     '    echo             recria-lo limpo.',
     '    call deactivate >nul 2>nul',
     '    rmdir /s /q ".venv"',
-    '    popd ^& endlocal ^& set "FALHOU=%FALHOU% %~2" ^& exit /b 0',
+    '    popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
     '  )',
     ')',
     /* Confere que o perth resolve ANTES de declarar vitoria. Se
