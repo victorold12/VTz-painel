@@ -935,7 +935,17 @@ function scriptInstalaTudo(modeloWhisper){
         "$exe=Get-ChildItem -Path '%WPROG%' -Recurse -Filter 'whisper-cli.exe' | Select-Object -First 1; " +
         "if(-not $exe){ $exe=Get-ChildItem -Path '%WPROG%' -Recurse -Filter 'main.exe' | Select-Object -First 1 } " +
         "if(-not $exe){ throw 'baixou e extraiu, mas nao achei whisper-cli.exe nem main.exe dentro' } " +
-        "if($exe.FullName -ne (Join-Path '%WPROG%' 'whisper-cli.exe')){ Copy-Item $exe.FullName (Join-Path '%WPROG%' 'whisper-cli.exe') -Force } " +
+        /* Copia a PASTA INTEIRA onde o .exe estava, nao so o .exe.
+           O zip do whisper.cpp traz o binario dentro de "Release\", junto das
+           DLLs dele (ggml.dll, whisper.dll, ggml-cpu.dll...). Copiar so o
+           executavel pra cima o separava das proprias bibliotecas: o arquivo
+           ficava exatamente onde o stt.json apontava, e morria na execucao com
+           codigo 3221225781 (0xC0000135, "DLL nao encontrada") — sem mensagem
+           nenhuma no stderr. O instalador dizia "[ok] instalado", o caminho
+           conferia, e a transcricao nunca funcionou. Mesma familia do BOM:
+           parece certo, esta no lugar, e nao roda. */
+        "if($exe.Directory.FullName -ne (Get-Item '%WPROG%').FullName){ " +
+          "Copy-Item (Join-Path $exe.Directory.FullName '*') '%WPROG%' -Recurse -Force } " +
         "Write-Host '      [ok] instalado.'; exit 0 " +
       "}catch{ Write-Host ('      [ERRO] ' + $_.Exception.Message); exit 1 }"
     ),
