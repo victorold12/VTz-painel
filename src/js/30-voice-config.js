@@ -1470,6 +1470,54 @@ function scriptInstalaTudo(modeloWhisper){
     '    )',
     '  )',
     ')',
+    '',
+    /* ===== ALINHAMENTO FINAL: o requirements.txt do servidor briga consigo =====
+       Instalar o motor e uma SEGUNDA transacao do pip, e o pip nao reavalia o
+       que a primeira ja tinha posto. Foi assim que a maquina do Victor chegou
+       num estado que o proprio pip chamaria de invalido:
+
+         chatterbox-tts 0.1.7  exige  transformers==5.2.0
+         transformers 5.2.0    exige  huggingface-hub>=1.3.0
+         instalado             estava huggingface-hub 0.36.2  (pino do requirements)
+
+       O servidor entao morria com "huggingface-hub>=1.3.0 is required ... but
+       found 0.36.2" — depois de instalar com sucesso, e sem nada no caminho
+       apontando pra causa.
+
+       Juntar tudo numa transacao so seria o certo, e nao funciona aqui: o pip
+       retrocede procurando um numpy<2.0 e tenta COMPILAR uma versao sem wheel
+       pro 3.12, morrendo em "pkgutil has no attribute ImpImporter". Entao o
+       conserto e este: deixar cada transacao rodar e alinhar no fim as duas
+       pecas que sempre saem tortas.
+
+       O protobuf e um conflito REAL e insoluvel do upstream — o onnx quer
+       >=4.25.1 e o descript-audiotools quer <3.20, no mesmo requirements. Quem
+       esta no caminho de execucao e o onnx (o s3tokenizer o importa ao carregar
+       o modelo); o descript-audiotools nunca chega a ser importado. Verificado:
+       com protobuf 7.35.1 o servidor sintetiza normalmente. O `pip check`
+       continua reclamando, e por isso ele NAO serve de criterio aqui — quem
+       decide e sair som. */
+    'if defined ALINHA_TORCH (',
+    '  echo      alinhando as dependencias que o requirements deixa em conflito...',
+    '  python -c "import transformers,huggingface_hub,sys; from packaging.version import Version as V; sys.exit(0 if V(huggingface_hub.__version__).major>=1 else 1)" >nul 2>nul',
+    '  if errorlevel 1 pip install "huggingface-hub>=1.3.0,<2.0"',
+    '  python -c "import onnx" >nul 2>nul',
+    '  if errorlevel 1 pip install "protobuf>=4.25.1"',
+    /* `import chatterbox` sozinho NAO pegava o defeito: ele passa antes de
+       tocar em transformers. A cadeia que quebrava e esta — a mesma que o
+       server.py percorre ao subir. Se ela nao importa aqui, o servidor vai
+       abrir a porta e morrer carregando o modelo, que e o pior estado
+       possivel porque parece que funcionou. */
+    '  echo      conferindo se o motor carrega de verdade...',
+    '  python -c "from chatterbox.tts import ChatterboxTTS" >nul 2>nul',
+    '  if errorlevel 1 (',
+    '    echo      [ERRO] o motor instalou mas nao carrega. Rode isto na pasta pra ver a causa:',
+    '    echo             cd /d "%PASTA%"',
+    '    echo             .venv\\Scripts\\python.exe -c "from chatterbox.tts import ChatterboxTTS"',
+    '    goto :repo_falhou',
+    '  )',
+    '  echo      [ok] o motor carrega.',
+    ')',
     /* ===== O que a noite de 31/07 custou pra descobrir =====
        Cada linha abaixo corresponde a um erro que o Victor comeu na mao. Nenhuma
        veio de documentacao — todas de execucao real, e por isso ficam aqui em
