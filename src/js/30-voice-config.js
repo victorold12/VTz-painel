@@ -860,8 +860,28 @@ function scriptInstalaTudo(modeloWhisper){
     'echo.',
     '',
     'REM ============ 4. ffmpeg ============',
+    /* O winget NAO e universal: ele vem no "Instalador de Aplicativo" da
+       Microsoft Store, e na maquina do Victor simplesmente nao existe. O passo
+       antigo dependia so dele e sempre falhava ali, deixando a ESCUTA
+       ("Ei, JARVIS") sem gravador — sem nunca dizer que havia outro caminho.
+
+       Agora tenta o winget e, se nao der, baixa direto do GitHub: exatamente o
+       que este script ja faz pro whisper.cpp, com a mesma tecnica de perguntar
+       qual e o anexo da versao mais nova em vez de cravar um nome de arquivo
+       que muda a cada release. */
     'echo --- [3/7] ffmpeg',
-    'call :garante "ffmpeg -version" Gyan.FFmpeg ffmpeg https://ffmpeg.org',
+    'ffmpeg -version >nul 2>nul',
+    'if not errorlevel 1 (',
+    '  echo      [ok] ja instalado no PATH.',
+    ') else (',
+    '  if not defined SEMWINGET (',
+    '    echo      tentando pelo winget...',
+    '    winget install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements >nul 2>nul',
+    '    call :recarrega_path',
+    '  )',
+    '  ffmpeg -version >nul 2>nul',
+    '  if errorlevel 1 call :baixa_ffmpeg',
+    ')',
     'echo.',
     '',
     'REM ============ 5. modelo do whisper ============',
@@ -978,7 +998,15 @@ function scriptInstalaTudo(modeloWhisper){
         "$exe=Join-Path '%WPROG%' 'whisper-cli.exe'; " +
         "if(Test-Path $exe){ $c | Add-Member -NotePropertyName binary -NotePropertyValue $exe -Force } " +
         "$c | Add-Member -NotePropertyName model -NotePropertyValue '" + mw + "' -Force; " +
-        "$c | ConvertTo-Json -Depth 5 | Set-Content $f -Encoding UTF8; " +
+        /* WriteAllText com UTF8Encoding($false), e NAO `Set-Content -Encoding
+           UTF8`: no PowerShell 5.1 — que e o que o Windows tem — o -Encoding
+           UTF8 grava BOM. O JSON.parse do Node estoura no BOM, e todo
+           carregador do agente envolve o parse num catch que devolve os
+           padroes. Resultado: o arquivo ficava no disco com o conteudo CERTO e
+           o agente ignorava tudo, em silencio dos dois lados. O instalador
+           dizia "[ok] stt.json atualizado" e o whisper continuava procurando o
+           modelo na pasta velha. */
+        "[System.IO.File]::WriteAllText($f, ($c | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding $false)); " +
         "Write-Host '      [ok] stt.json atualizado.' " +
       "}catch{ Write-Host ('      [aviso] nao consegui escrever stt.json: ' + $_.Exception.Message) }"
     ),
@@ -1179,6 +1207,69 @@ function scriptInstalaTudo(modeloWhisper){
     'if not exist "requirements-jarvis.txt" copy /y "requirements.txt" "requirements-jarvis.txt" >nul',
     'exit /b 0',
     '',
+    /* Baixa o ffmpeg sem winget e sem mexer no PATH do usuario.
+       Mexer no PATH seria invasivo e so valeria pra processos abertos DEPOIS —
+       o mesmo tropeco que ja derrubou este script uma vez. Em vez disso grava o
+       caminho no listener.json, do jeito que o whisper ja faz com o stt.json. */
+    ':baixa_ffmpeg',
+    'if exist "%RAIZ%\\ffmpeg\\ffmpeg.exe" (',
+    '  echo      [ok] ja baixado aqui.',
+    '  goto :aponta_ffmpeg',
+    ')',
+    'echo      baixando do GitHub ^(sem winget^)...',
+    'if not exist "%RAIZ%\\ffmpeg" mkdir "%RAIZ%\\ffmpeg"',
+    ps(
+      "$ErrorActionPreference='Stop'; " +
+      "try{ " +
+        "$r=Invoke-RestMethod -Uri 'https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest' -Headers @{'User-Agent'='jarvis'}; " +
+        "$a=$r.assets | Where-Object { $_.name -match 'win64' -and $_.name -match 'gpl' -and $_.name -like '*.zip' -and $_.name -notmatch 'shared' } | Select-Object -First 1; " +
+        "if(-not $a){ throw ('nenhum anexo win64 nesta release: ' + (($r.assets | ForEach-Object { $_.name }) -join ', ')) } " +
+        "Write-Host ('      achei: ' + $a.name); " +
+        "$z=Join-Path $env:TEMP $a.name; " +
+        "Invoke-WebRequest -Uri $a.browser_download_url -OutFile $z; " +
+        "$tmp=Join-Path $env:TEMP 'jarvis-ffmpeg'; " +
+        "if(Test-Path $tmp){ Remove-Item $tmp -Recurse -Force } " +
+        "Expand-Archive -Path $z -DestinationPath $tmp -Force; " +
+        "$exe=Get-ChildItem -Path $tmp -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1; " +
+        "if(-not $exe){ throw 'baixou e extraiu, mas nao achei ffmpeg.exe dentro' } " +
+        "Copy-Item $exe.FullName (Join-Path '%RAIZ%\\ffmpeg' 'ffmpeg.exe') -Force; " +
+        "Remove-Item $z,$tmp -Recurse -Force; " +
+        "Write-Host '      [ok] baixado.'; exit 0 " +
+      "}catch{ Write-Host ('      [ERRO] ' + $_.Exception.Message); exit 1 }"
+    ),
+    'if errorlevel 1 (',
+    '  echo      Pegue o ffmpeg a mao em https://ffmpeg.org/download.html',
+    '  echo      e ponha ffmpeg.exe em: %RAIZ%\\ffmpeg',
+    '  set "FALHOU=%FALHOU% ffmpeg"',
+    '  exit /b 0',
+    ')',
+    '',
+    ':aponta_ffmpeg',
+    /* Sem isto o download seria inutil: o listener procura "ffmpeg" no PATH, e
+       a pasta nova nao esta la. Mescla no listener.json em vez de sobrescrever,
+       pra preservar o que a pessoa ja escolheu (trecho, dispositivo). */
+    ps(
+      "try{ " +
+        "$d=Join-Path $env:USERPROFILE '.jarvis-agente'; " +
+        "if(-not (Test-Path $d)){ New-Item -ItemType Directory -Path $d | Out-Null } " +
+        "$f=Join-Path $d 'listener.json'; " +
+        "$c=$null; if(Test-Path $f){ try{ $c=Get-Content $f -Raw | ConvertFrom-Json }catch{ $c=$null } } " +
+        "if($null -eq $c){ $c=New-Object PSObject } " +
+        "$c | Add-Member -NotePropertyName ffmpegPath -NotePropertyValue (Join-Path '%RAIZ%\\ffmpeg' 'ffmpeg.exe') -Force; " +
+        /* WriteAllText com UTF8Encoding($false), e NAO `Set-Content -Encoding
+           UTF8`: no PowerShell 5.1 — que e o que o Windows tem — o -Encoding
+           UTF8 grava BOM. O JSON.parse do Node estoura no BOM, e todo
+           carregador do agente envolve o parse num catch que devolve os
+           padroes. Resultado: o arquivo ficava no disco com o conteudo CERTO e
+           o agente ignorava tudo, em silencio dos dois lados. O instalador
+           dizia "[ok] stt.json atualizado" e o whisper continuava procurando o
+           modelo na pasta velha. */
+        "[System.IO.File]::WriteAllText($f, ($c | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding $false)); " +
+        "Write-Host '      [ok] a escuta ja sabe onde achar o ffmpeg.' " +
+      "}catch{ Write-Host ('      [aviso] nao consegui escrever listener.json: ' + $_.Exception.Message) }"
+    ),
+    'exit /b 0',
+    '',
     ':confere_tamanho',
     /* Um redirecionamento pra página de erro chega como HTML de poucos KB e
        ficaria salvo com o nome do modelo — pra falhar bem depois, dentro do
@@ -1228,11 +1319,11 @@ function scriptInstalaTudo(modeloWhisper){
     'if not "%PRECISA312%"=="0" ( py -3.12 --version >nul 2>nul && set "PY=py -3.12" )',
     'if "%PRECISA312%"=="1" if "%PY%"=="python" (',
     '  echo      [pulado] precisa do Python 3.12, que nao esta disponivel.',
-    '  endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '  goto :repo_falhou_cedo',
     ')',
     'where git >nul 2>nul || (',
     '  echo      [pulado] precisa do Git.',
-    '  endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '  goto :repo_falhou_cedo',
     ')',
     'if exist "%PASTA%" (',
     '  echo      atualizando...',
@@ -1241,7 +1332,7 @@ function scriptInstalaTudo(modeloWhisper){
     '  echo      clonando %REPO% ...',
     '  git clone --depth 1 "%REPO%" "%PASTA%" || (',
     '    echo      [ERRO] nao consegui clonar.',
-    '    endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '    goto :repo_falhou_cedo',
     '  )',
     ')',
     'pushd "%PASTA%"',
@@ -1296,7 +1387,7 @@ function scriptInstalaTudo(modeloWhisper){
     '    set "USA_PYPROJECT=1"',
     '  ) else (',
     '    echo      [ATENCAO] sem requirements.txt nem pyproject.toml; veja o README de %REPO%.',
-    '    popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '    goto :repo_falhou',
     '  )',
     ')',
     '',
@@ -1320,15 +1411,27 @@ function scriptInstalaTudo(modeloWhisper){
     '  echo      instalando torch 2.6.0 ^(antes das dependencias, pra nao ter que trocar depois^)...',
     '  pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 || (',
     '    echo      [ERRO] nao consegui instalar o torch.',
-    '    popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '    goto :repo_falhou',
     '  )',
     ')',
     '',
     'if defined USA_PYPROJECT (',
     '  echo      sem requirements.txt; instalando pelo pyproject.toml...',
     '  pip install . || (',
-    '    echo      [ERRO] instalacao pelo pyproject.toml falhou. Veja o README de %REPO%.',
-    '    popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    /* A causa real na maquina do Victor nao foi "falta cmake", como o erro
+       sugeria: foi "CMAKE_C_COMPILER not set" — uma dependencia do Kokoro nao
+       tem wheel pronta pro Python 3.12 e tenta COMPILAR do zero, o que exige as
+       Build Tools do Visual Studio (varios GB). Despejar 37 linhas de traceback
+       do CMake mandava cacar a coisa errada; nomear as duas causas provaveis
+       custa quatro linhas e resolve a duvida. */
+    '    echo      [ERRO] instalacao pelo pyproject.toml falhou. As duas causas comuns:',
+    '    echo             "CMAKE_C_COMPILER not set" ou "Microsoft Visual C++ 14.0"',
+    '    echo                 = alguma dependencia compila do zero e falta compilador.',
+    '    echo                   Instale o "Build Tools for Visual Studio" ^(varios GB^):',
+    '    echo                   https://visualstudio.microsoft.com/visual-cpp-build-tools/',
+    '    echo             qualquer outra coisa = veja o README de %REPO%',
+    '    echo             O ' + kk.nome + ' e o RESERVA: sem ele o ' + cb.nome + ' continua falando.',
+    '    goto :repo_falhou',
     '  )',
     ') else (',
     /* Nome FIXO, e nao uma variavel devolvida pela sub-rotina: o cmd expande o
@@ -1339,7 +1442,7 @@ function scriptInstalaTudo(modeloWhisper){
     '    echo      [ERRO] instalacao das dependencias falhou.',
     '    echo             "Could not find a version ... torch" = Python incompativel.',
     '    echo             erro de compilador ou CUDA = placa de video.',
-    '    popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '    goto :repo_falhou',
     '  )',
     ')',
     /* O requirements.txt do Chatterbox instala TUDO menos o motor: `pip install`
@@ -1353,7 +1456,7 @@ function scriptInstalaTudo(modeloWhisper){
     '    echo      faltou o motor ^(%MODULO%^); instalando %PACOTE%...',
     '    pip install %PACOTE% || (',
     '      echo      [ERRO] nao consegui instalar %PACOTE%.',
-    '      popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '      goto :repo_falhou',
     '    )',
     '  )',
     ')',
@@ -1397,7 +1500,7 @@ function scriptInstalaTudo(modeloWhisper){
     '    echo             recria-lo limpo.',
     '    call deactivate >nul 2>nul',
     '    rmdir /s /q ".venv"',
-    '    popd & endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
+    '    goto :repo_falhou',
     '  )',
     ')',
     /* Confere que o perth resolve ANTES de declarar vitoria. Se
@@ -1446,6 +1549,32 @@ function scriptInstalaTudo(modeloWhisper){
     'echo      [ok] pronto em %PASTA%',
     'popd',
     'endlocal & exit /b 0',
+    '',
+    /* ===== POR QUE `goto` E NAO `exit /b` NOS CAMINHOS DE ERRO =====
+       `exit /b` dentro de `comando || ( ... )` que por sua vez esta dentro de
+       `if ( ... )` NAO sai da sub-rotina: o cmd engole a saida e a execucao
+       segue na linha de baixo. Reproduzido nesta maquina, num .bat de 15 linhas:
+
+           if defined FLAG (
+             cmd /c exit 1 || ( echo [ERRO]; endlocal ^& exit /b 0 )
+           )
+           echo [ok] NAO DEVIA APARECER     <- aparecia
+
+       Foi exatamente o que aconteceu com o Kokoro: o instalador imprimiu
+       "[ERRO] instalacao pelo pyproject.toml falhou" e, tres linhas depois,
+       "[ok] pronto em ...". Declarar vitoria sobre uma falha e o defeito que
+       este projeto mais combate, e ele voltou por uma regra de escape do cmd.
+
+       `goto` atravessa qualquer nivel de parenteses. Um ponto de saida so, e
+       nao ha como um caminho novo esquecer de sair.
+
+       O `:repo_falhou` cai POR DENTRO no `:repo_falhou_cedo` de proposito:
+       quem ja tinha feito `pushd` precisa do `popd`, quem falhou antes dele
+       nao — e o resto da limpeza e identico nos dois casos. */
+    ':repo_falhou',
+    'popd',
+    ':repo_falhou_cedo',
+    'endlocal & set "FALHOU=%FALHOU% %~2" & exit /b 0',
   ];
   return L.join('\r\n') + '\r\n';
 }
