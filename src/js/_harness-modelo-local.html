@@ -1,0 +1,24 @@
+<!-- Bancada do 43-modelo-local.js.
+
+     Mesmo motivo das outras: o bundle é uma IIFE minificada e nada dele sai pro
+     window, então um teste não consegue chamar as funções de dentro de
+     `page.evaluate`. Expor no window mudaria o produto pra acomodar o teste.
+
+     Ressalva registrada: bancada carrega o que MANDAM carregar, não o que o
+     build monta — quem cobre esse ângulo é o tests/manifesto.mjs.
+
+     As dependências abaixo vêm de outros arquivos do bundle no app real. Aqui
+     são mínimas de propósito: o que se quer exercitar é a PONTUAÇÃO e a decisão
+     de rotear, não a camada de rede nem o formatador de conteúdo. -->
+<meta charset="utf-8">
+<title>bancada — modelo local</title>
+<script>
+  /* Do 00-core-state.js / 17-fallback-models.js no app real. */
+  window.contentToText = (c) => typeof c === 'string' ? c
+    : Array.isArray(c) ? c.map(p => p?.text || '').join(' ') : String(c || '');
+  window.isImageModel = (m) => /image|dall|flux|sdxl/i.test(m?.id || '');
+  /* Do 42-telemetria-custo.js. O teste espia o que foi registrado. */
+  window.__registradas = [];
+  window.registraChamadaLocal = (linha) => { window.__registradas.push(linha); };
+</script>
+<script src="43-modelo-local.js"></script>

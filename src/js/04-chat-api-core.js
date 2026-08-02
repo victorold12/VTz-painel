@@ -31,7 +31,26 @@ function orMaxTokens(){
 }
 
 /* Chamada única à API de chat — todas as features passam por aqui */
-function orFetch(payload, opts = {}){
+async function orFetch(payload, opts = {}){
+  /* PRIMEIRA PARADA: o modelo local desta máquina.
+     Só fica com a pergunta quando ela é simples E o Ollama está de pé; em
+     qualquer dúvida devolve null e a chamada segue pra nuvem exatamente como
+     antes. Ver 43-modelo-local.js — inclusive o porquê de a decisão morar aqui
+     e não no backend.
+
+     Antes do relógio e do AbortController de propósito: uma resposta local sai
+     em ~300ms e entra no mesmo `Response` que o chamador já sabe ler, então não
+     há o que cronometrar nem o que cancelar. Contar essa latência junto com a
+     da nuvem também sujaria a média que o painel usa pra detectar provedor
+     lento. */
+  if (typeof talvezLocal === 'function' && !opts.semLocal){
+    const local = await talvezLocal(payload);
+    if (local) return local;
+  }
+  return orFetchNuvem(payload, opts);
+}
+
+function orFetchNuvem(payload, opts = {}){
   // Roteamento por throughput: mesma qualidade (modelo idêntico), mas o OpenRouter
   // escolhe o provedor mais rápido no momento. Não sobrescreve preferências já postas.
   const comTeto = payload.max_tokens ? payload : { ...payload, max_tokens: orMaxTokens() };
