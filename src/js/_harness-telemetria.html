@@ -1,0 +1,23 @@
+<!-- Bancada do 42-telemetria-custo.js.
+
+     Mesmo motivo do _harness-markdown.html: o bundle é uma IIFE minificada e
+     nada dele sai pro window, então um teste não consegue chamar as funções de
+     dentro de `page.evaluate`. Expor no window mudaria o produto pra acomodar
+     o teste — proibido pelo comentário do _harness-merge.html.
+
+     Ressalva registrada: bancada carrega o que MANDAM carregar, não o que o
+     build monta. Ela mascararia um arquivo fora do manifesto — foi assim que o
+     41-matematica.js passou meses fora do bundle. Quem cobre esse ângulo é o
+     tests/manifesto.mjs, e é por isso que ele existe.
+
+     `backendUrl` e `backendHeaders` vêm do 02-backend-requests.js no app real;
+     aqui são substituíveis pelo teste, porque o que se quer exercitar é a fila
+     e o resumo, não a camada HTTP. -->
+<meta charset="utf-8">
+<title>bancada — telemetria de custo</title>
+<script>
+  // Padrão: sem backend. O teste sobrescreve quando quer o outro caminho.
+  window.backendUrl = () => '';
+  window.backendHeaders = (extra) => ({ ...(extra || {}) });
+</script>
+<script src="42-telemetria-custo.js"></script>

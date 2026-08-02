@@ -48,6 +48,12 @@ function orFetch(payload, opts = {}){
       `O provedor não respondeu em ${Math.round(teto / 1000)}s.`, 'TimeoutError')),
     teto);
 
+  /* Mede aqui porque este é o ponto ÚNICO por onde toda chamada passa — o
+     comentário acima da função diz isso, e é o que torna a medição completa em
+     vez de espalhada por oito lugares. O `trackUsage` consome esta latência
+     quando o `usage` chega. */
+  const t0 = performance.now();
+
   return fetch(OR_BASE + '/chat/completions', {
     method:'POST',
     headers:{
@@ -59,15 +65,29 @@ function orFetch(payload, opts = {}){
     body: JSON.stringify(body),
     signal: ctrl.signal,
   }).finally(() => {
+    try{ marcaLatencia(performance.now() - t0); }catch(e){ /* nunca quebra */ }
     clearTimeout(relogio);
     opts.signal?.removeEventListener('abort', cancelaPeloUsuario);
   });
 }
 /* Contabilidade de custo unificada */
-function trackUsage(usage, modelId, conv){
+function trackUsage(usage, modelId, conv, origem){
   if (!usage) return;
   const pricing = getModelPricing(modelId);
   const cost = (usage.prompt_tokens||0)*pricing.prompt + (usage.completion_tokens||0)*pricing.completion;
+  /* Além do total acumulado abaixo, guarda a chamada COM CARIMBO DE TEMPO.
+     O acumulado responde "quanto já gastei"; não responde "quanto gastei esta
+     semana", "qual conversa saiu mais cara" nem "o modelo novo baixou o custo".
+     Agregar cedo joga fora a pergunta que ainda não foi feita.
+     Nunca derruba a resposta: telemetria que causa falha é o oposto do que ela
+     serve. */
+  try{
+    registraChamadaLocal({
+      model: modelId,
+      tokens_in: usage.prompt_tokens, tokens_out: usage.completion_tokens,
+      custo_usd: cost, origem: origem || 'chat',
+    });
+  }catch(e){ /* medir nunca quebra o medido */ }
   state.totalCost += cost;
   localStorage.setItem('vtz_or_cost', String(state.totalCost));
   state.costByModel[modelId] = (state.costByModel[modelId] || 0) + cost;

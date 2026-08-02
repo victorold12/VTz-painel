@@ -370,6 +370,12 @@ function toggleTheme(){
 
 /* ---------- Init ---------- */
 document.addEventListener('DOMContentLoaded', () => {
+  /* Descarrega a telemetria de custo acumulada. O dado já está seguro no
+     localStorage desde a chamada; isto só junta as duas metades da medição no
+     backend — a dele (agentes, orquestração) e a daqui (o chat do dia a dia).
+     Sem backend, fica local e o resumo local continua respondendo. */
+  try{ ligaEnvioDeTelemetria(); }catch(e){ /* medir nunca quebra o app */ }
+
   // Rodando dentro do app Electron: herda a URL do backend que foi usada no
   // pareamento (injetada pelo preload). Sem isto, o painel não sabia qual
   // backend usar e a aba "Agente Local" ficava vazia mesmo com o agente
