@@ -172,3 +172,26 @@ export function achaServidor(){
   ].filter(Boolean);
   return candidatos.find(c => fs.existsSync(path.join(c, 'app', 'main.py'))) || null;
 }
+
+/* Como chamar o Python nesta máquina.
+ *
+ * Os testes de integração faziam `spawn('python3', ...)` — convenção de
+ * Linux/macOS. No Windows `python3` não existe (ou é o atalho da Microsoft
+ * Store, que abre a loja em vez de rodar), então a suíte inteira reprovava com
+ * "o backend não subiu" em qualquer máquina Windows.
+ *
+ * Isso importa mais do que parece: o projeto decidiu que instalador, voz e
+ * .msi se depuram MELHOR na máquina do Victor, que é Windows. Um arnês que só
+ * roda em Linux empurra toda verificação de volta pro CI, que é o oposto.
+ *
+ * VTZ_PYTHON permite apontar um interpretador específico quando a heurística
+ * não serve (vários Pythons instalados, venv, etc).
+ */
+export function comandoPython() {
+  const escolhido = process.env.VTZ_PYTHON;
+  if (escolhido) return { cmd: escolhido, prefixo: [] };
+  // `py -3.12` é o lançador oficial do Windows; a versão é a mesma que o
+  // projeto exige por causa do torch (ver CLAUDE.md).
+  if (process.platform === 'win32') return { cmd: 'py', prefixo: ['-3.12'] };
+  return { cmd: 'python3', prefixo: [] };
+}

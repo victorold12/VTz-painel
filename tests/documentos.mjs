@@ -15,10 +15,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import {
   servePainel, abreNavegador, novoContexto, fingeCatalogo,
-  abreConfig, voltaProChat, placar, achaServidor, exigePortaLivre,
-} from './_ajuda.mjs';
+  abreConfig, voltaProChat, placar, achaServidor, exigePortaLivre, comandoPython} from './_ajuda.mjs';
+
+const PY = comandoPython();
 
 const SERVIDOR = achaServidor();
 if (!SERVIDOR){
@@ -39,7 +41,7 @@ fs.writeFileSync(ARQ, 'Anotacoes da chacara.\n\nA cerca foi trocada em marco.\n\
 for (const porta of [8192, 8193]) await exigePortaLivre(porta);
 const estatico = await servePainel(8192);
 
-const uvicorn = spawn('python3', ['-m', 'uvicorn', 'app.main:app', '--port', '8193', '--host', '127.0.0.1'],
+const uvicorn = spawn(PY.cmd, [...PY.prefixo, '-m', 'uvicorn', 'app.main:app', '--port', '8193', '--host', '127.0.0.1'],
   { cwd: SERVIDOR, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, JARVIS_DB_PATH: path.join(TMP, 'e2e.db'),
            ALLOWED_ORIGINS: estatico.url, RENDER: '' } });
@@ -142,7 +144,12 @@ console.log('— PDF entra sem converter na mão');
 /* PDF de verdade, com camada de texto, montado em tests/fixtures. Se o pdf.js
    não carregar ou o worker não subir, isto falha — que é o ponto: o caminho
    inteiro (script + worker + extração) precisa funcionar no navegador. */
-const PDF = path.join(path.dirname(new URL(import.meta.url).pathname), 'fixtures', 'contrato.pdf');
+/* `fileURLToPath`, NUNCA `new URL(...).pathname`: no Windows o pathname vem
+   como "/C:/Users/VTz%20produti/..." — barra antes da letra de unidade e espaço
+   percent-encoded. O `path.join` disso produz "C:\C:\Users\VTz%20produti".
+   Já documentado em servidor/electron-shell/scripts/prepare-webapp.js; o teste
+   repetiu o erro assim mesmo. */
+const PDF = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'contrato.pdf');
 await p.setInputFiles('#docs-file', PDF);
 await p.waitForTimeout(4000);
 const msgPdf = await p.evaluate(() => document.getElementById('docs-msg')?.textContent || '');

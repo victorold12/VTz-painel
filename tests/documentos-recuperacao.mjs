@@ -12,8 +12,9 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import {
   servePainel, abreNavegador, novoContexto, fingeCatalogo, gravaAvisos, avisos,
-  abreConfig, placar, achaServidor, exigePortaLivre,
-} from './_ajuda.mjs';
+  abreConfig, placar, achaServidor, exigePortaLivre, comandoPython} from './_ajuda.mjs';
+
+const PY = comandoPython();
 
 const SERVIDOR = achaServidor();
 if (!SERVIDOR){
@@ -36,7 +37,7 @@ const estatico = await servePainel(8194);
 
 let uvicorn = null;
 async function sobeBackend(){
-  uvicorn = spawn('python3', ['-m', 'uvicorn', 'app.main:app', '--port', '8195', '--host', '127.0.0.1'],
+  uvicorn = spawn(PY.cmd, [...PY.prefixo, '-m', 'uvicorn', 'app.main:app', '--port', '8195', '--host', '127.0.0.1'],
     { cwd: SERVIDOR, stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, JARVIS_DB_PATH: BANCO, ALLOWED_ORIGINS: estatico.url, RENDER: '' } });
   for (let i = 0; i < 60; i++){
